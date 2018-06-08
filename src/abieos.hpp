@@ -129,20 +129,35 @@ struct json_to_native_state : public rapidjson::BaseReaderHandler<rapidjson::UTF
 }; // json_to_native_state
 
 template <typename T>
-bool json_to_native(T& obj);
+auto json_to_native(json_to_native_state& state, T& obj, json_event event)
+    -> std::enable_if_t<std::is_arithmetic_v<T>, bool>;
+
 template <typename T>
-bool json_to_native(json_to_native_state& state, T& obj, json_event event);
+auto json_to_native(json_to_native_state& state, T& obj, json_event event)
+    -> std::enable_if_t<std::is_class_v<T>, bool>;
+
+template <typename T>
+auto json_to_native(json_to_native_state& state, std::vector<T>& obj, json_event event);
+
+template <typename First, typename Second>
+auto json_to_native(json_to_native_state& state, std::pair<First, Second>& obj, json_event event);
+
 bool json_to_native(json_to_native_state& state, std::string& obj, json_event event);
 
-using extensions_type = std::vector<std::pair<uint16_t, std::vector<char>>>;
+struct hex_bytes {};
+
+inline bool bin_to_native(bin_to_native_state& state, hex_bytes& obj, bool start) { return true; }
+inline bool json_to_native(json_to_native_state& state, hex_bytes& obj, json_event event) { return false; }
 
 struct name {
     uint64_t value = 0;
 };
 
-bool bin_to_native(bin_to_native_state& state, name& obj, bool start) { return bin_to_native(state, obj.value, start); }
+inline bool bin_to_native(bin_to_native_state& state, name& obj, bool start) {
+    return bin_to_native(state, obj.value, start);
+}
 
-bool json_to_native(json_to_native_state& state, name& obj, json_event event) {
+inline bool json_to_native(json_to_native_state& state, name& obj, json_event event) {
     // !!!
     return json_to_native(state, obj.value, event);
 }
@@ -151,6 +166,8 @@ using action_name = name;
 using field_name = name;
 using table_name = name;
 using type_name = name;
+
+using extensions_type = std::vector<std::pair<uint16_t, hex_bytes>>;
 
 struct type_def {
     type_name new_type_name{};
@@ -418,7 +435,7 @@ bool bin_to_native(bin_to_native_state& state, T& obj, bool start) {
     return true;
 }
 
-bool bin_to_native(bin_to_native_state& state, std::string& obj, bool) { return true; }
+inline bool bin_to_native(bin_to_native_state& state, std::string& obj, bool) { return true; }
 
 template <typename T>
 bool bin_to_native(T& obj) {
@@ -448,8 +465,43 @@ bool json_to_native(T& obj, std::string_view json) {
         return false;
     rapidjson::Reader reader;
     rapidjson::InsituStringStream ss(mutable_json.data());
-    return reader.Parse < rapidjson::kParseValidateEncodingFlag || rapidjson::kParseIterativeFlag ||
-           rapidjson::kParseFullPrecisionFlag > (ss, state);
+    return reader.Parse<rapidjson::kParseValidateEncodingFlag | rapidjson::kParseIterativeFlag |
+                        rapidjson::kParseFullPrecisionFlag>(ss, state);
 }
+
+template <typename T>
+auto json_to_native(json_to_native_state& state, T& obj, json_event event)
+    -> std::enable_if_t<std::is_arithmetic_v<T>, bool> {
+
+    if (event == json_event::received_bool)
+        obj = state.value_bool;
+    else if (event == json_event::received_uint64)
+        obj = state.value_uint64;
+    else if (event == json_event::received_int64)
+        obj = state.value_int64;
+    else if (event == json_event::received_double)
+        obj = state.value_double;
+    else
+        return false;
+    return true;
+}
+
+template <typename T>
+auto json_to_native(json_to_native_state& state, T& obj, json_event event)
+    -> std::enable_if_t<std::is_class_v<T>, bool> {
+    return false;
+}
+
+template <typename T>
+auto json_to_native(json_to_native_state& state, std::vector<T>& obj, json_event event) {
+    return false;
+}
+
+template <typename First, typename Second>
+auto json_to_native(json_to_native_state& state, std::pair<First, Second>& obj, json_event event) {
+    return false;
+}
+
+inline bool json_to_native(json_to_native_state& state, std::string& obj, json_event event) { return false; }
 
 } // namespace abieos
