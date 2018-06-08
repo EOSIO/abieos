@@ -4,6 +4,8 @@
 #include <string_view>
 #include <vector>
 
+#include "rapidjson/reader.h"
+
 namespace abieos {
 
 template <typename T>
@@ -32,17 +34,22 @@ auto& member_from_void(member_ptr<P>, void* p) {
 }
 
 struct bin_to_native_state;
+struct json_to_native_state;
+enum class json_event;
 
 using bin_to_native_callback = bool (*)(bin_to_native_state&, void*, bool);
+using json_to_native_callback = bool (*)(json_to_native_state&, void*, json_event);
 
 struct serializer {
     bin_to_native_callback bin_to_native = nullptr;
+    json_to_native_callback json_to_native = nullptr;
 };
 
 struct field_serializer {
     const char* name = "<unknown>";
     bool required = true;
     bin_to_native_callback bin_to_native = nullptr;
+    json_to_native_callback json_to_native = nullptr;
 };
 
 struct stack_entry {
@@ -61,6 +68,72 @@ template <typename T>
 bool bin_to_native(bin_to_native_state& state, T& obj, bool start);
 bool bin_to_native(bin_to_native_state& state, std::string& obj, bool start);
 
+enum class json_event {
+    init,
+    received_null,
+    received_bool,
+    received_uint64,
+    received_int64,
+    received_double,
+    received_string,
+    received_start_object,
+    received_key,
+    received_end_object,
+    received_start_array,
+    received_end_array,
+};
+
+struct json_to_native_state : public rapidjson::BaseReaderHandler<rapidjson::UTF8<>, json_to_native_state> {
+    std::vector<stack_entry> stack;
+
+    bool value_bool = 0;
+    uint64_t value_uint64 = 0;
+    int64_t value_int64 = 0;
+    double value_double = 0;
+    std::string value_string{};
+    std::string key{};
+
+    bool process(json_event event);
+
+    bool Null() { return process(json_event::received_null); }
+    bool Bool(bool v) {
+        value_bool = v;
+        return process(json_event::received_bool);
+    }
+    bool Int(int v) { return Int64(v); }
+    bool Uint(unsigned v) { return Uint64(v); }
+    bool Int64(int64_t v) {
+        value_int64 = v;
+        return process(json_event::received_int64);
+    }
+    bool Uint64(uint64_t v) {
+        value_uint64 = v;
+        return process(json_event::received_uint64);
+    }
+    bool Double(double v) {
+        value_double = v;
+        return process(json_event::received_double);
+    }
+    bool String(const char* v, rapidjson::SizeType length, bool) {
+        value_string = {v, length};
+        return process(json_event::received_string);
+    }
+    bool StartObject() { return process(json_event::received_start_object); }
+    bool Key(const char* v, rapidjson::SizeType length, bool) {
+        key = {v, length};
+        return process(json_event::received_key);
+    }
+    bool EndObject(rapidjson::SizeType) { return process(json_event::received_end_object); }
+    bool StartArray() { return process(json_event::received_start_array); }
+    bool EndArray(rapidjson::SizeType) { return process(json_event::received_end_array); }
+}; // json_to_native_state
+
+template <typename T>
+bool json_to_native(T& obj);
+template <typename T>
+bool json_to_native(json_to_native_state& state, T& obj, json_event event);
+bool json_to_native(json_to_native_state& state, std::string& obj, json_event event);
+
 using extensions_type = std::vector<std::pair<uint16_t, std::vector<char>>>;
 
 struct name {
@@ -68,6 +141,11 @@ struct name {
 };
 
 bool bin_to_native(bin_to_native_state& state, name& obj, bool start) { return bin_to_native(state, obj.value, start); }
+
+bool json_to_native(json_to_native_state& state, name& obj, json_event event) {
+    // !!!
+    return json_to_native(state, obj.value, event);
+}
 
 using action_name = name;
 using field_name = name;
@@ -203,8 +281,10 @@ constexpr serializer create_serializer() {
     return {
         [](bin_to_native_state& state, void* v, bool start) {
             return bin_to_native(state, *reinterpret_cast<T*>(v), start);
-        }
-        //
+        },
+        [](json_to_native_state& state, void* v, json_event event) {
+            return json_to_native(state, *reinterpret_cast<T*>(v), event);
+        },
     };
 }
 
@@ -240,6 +320,9 @@ constexpr auto create_field_serializers() {
         fields[i].required = required;
         fields[i].bin_to_native = [](bin_to_native_state& state, void* v, bool start) {
             return bin_to_native(state, member_from_void(decltype(member_ptr){}, v), start);
+        };
+        fields[i].json_to_native = [](json_to_native_state& state, void* v, json_event event) {
+            return json_to_native(state, member_from_void(decltype(member_ptr){}, v), event);
         };
         ++i;
     });
@@ -348,6 +431,25 @@ bool bin_to_native(T& obj) {
             return false;
     }
     return true;
+}
+
+inline bool json_to_native_state::process(json_event event) {
+    if (stack.empty())
+        return false;
+    auto& x = stack.back();
+    return x.ser->json_to_native(*this, x.obj, event);
+}
+
+template <typename T>
+bool json_to_native(T& obj, std::string_view json) {
+    std::string mutable_json{json};
+    json_to_native_state state;
+    if (!json_to_native(state, obj, json_event::init))
+        return false;
+    rapidjson::Reader reader;
+    rapidjson::InsituStringStream ss(mutable_json.data());
+    return reader.Parse < rapidjson::kParseValidateEncodingFlag || rapidjson::kParseIterativeFlag ||
+           rapidjson::kParseFullPrecisionFlag > (ss, state);
 }
 
 } // namespace abieos

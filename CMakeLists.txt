@@ -7,3 +7,4 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 project(abieos VERSION 0.1 LANGUAGES CXX)
 
 add_executable(test src/test.cpp)
+target_include_directories(test PUBLIC external/rapidjson/include)
