@@ -6,6 +6,18 @@
 
 namespace abieos {
 
+template <typename T>
+inline constexpr bool is_vector_v = false;
+
+template <typename T>
+inline constexpr bool is_vector_v<std::vector<T>> = true;
+
+template <typename T>
+inline constexpr bool is_pair_v = false;
+
+template <typename First, typename Second>
+inline constexpr bool is_pair_v<std::pair<First, Second>> = true;
+
 template <auto P>
 struct member_ptr {};
 
@@ -48,12 +60,8 @@ bool bin_to_native(T& obj);
 template <typename T>
 bool bin_to_native(bin_to_native_state& state, T& obj, bool start);
 bool bin_to_native(bin_to_native_state& state, std::string& obj, bool start);
-template <typename T>
-bool bin_to_native(bin_to_native_state& state, std::vector<T>& obj, bool start);
-template <typename... Ts>
-bool bin_to_native(bin_to_native_state& state, std::tuple<Ts...>& obj, bool start);
 
-using extensions_type = std::vector<std::tuple<uint16_t, std::vector<char>>>;
+using extensions_type = std::vector<std::pair<uint16_t, std::vector<char>>>;
 
 struct name {
     uint64_t value = 0;
@@ -241,39 +249,29 @@ constexpr auto create_field_serializers() {
 template <typename T>
 constexpr inline auto field_serializers = create_field_serializers<T>();
 
-template <typename T>
-bool bin_to_native(bin_to_native_state& state, T& obj, bool start) {
-    static_assert(std::is_arithmetic_v<T> || std::is_class_v<T>);
-
-    if constexpr (std::is_arithmetic_v<T>) {
-
-    } else if constexpr (std::is_class_v<T>) {
-        if (start) {
-            printf("%*s{ %d fields\n", int(state.stack.size() * 4), "", int(field_serializers<T>.size()));
-            state.stack.push_back({&obj, &serializer_for<T>});
-            return true;
-        }
-        auto& stack_entry = state.stack.back();
-        if (stack_entry.fields_processed < field_serializers<T>.size()) {
-            auto& field_ser = field_serializers<T>[stack_entry.fields_processed];
-            printf("%*sfield %d/%d: %s\n", int(state.stack.size() * 4), "", int(stack_entry.fields_processed),
-                   int(field_serializers<T>.size()), field_serializers<T>[stack_entry.fields_processed].name);
-            ++stack_entry.fields_processed;
-            return field_ser.bin_to_native(state, &obj, true);
-        } else {
-            printf("%*s}\n", int((state.stack.size() - 1) * 4), "");
-            state.stack.pop_back();
-            return true;
-        }
+template <typename State, typename T, typename F>
+bool serialize_class(State& state, T& obj, bool start, F f) {
+    if (start) {
+        printf("%*s{ %d fields\n", int(state.stack.size() * 4), "", int(field_serializers<T>.size()));
+        state.stack.push_back({&obj, &serializer_for<T>});
+        return true;
     }
-
-    return true;
+    auto& stack_entry = state.stack.back();
+    if (stack_entry.fields_processed < field_serializers<T>.size()) {
+        auto& field_ser = field_serializers<T>[stack_entry.fields_processed];
+        printf("%*sfield %d/%d: %s\n", int(state.stack.size() * 4), "", int(stack_entry.fields_processed),
+               int(field_serializers<T>.size()), field_serializers<T>[stack_entry.fields_processed].name);
+        ++stack_entry.fields_processed;
+        return f(field_ser);
+    } else {
+        printf("%*s}\n", int((state.stack.size() - 1) * 4), "");
+        state.stack.pop_back();
+        return true;
+    }
 }
 
-bool bin_to_native(bin_to_native_state& state, std::string& obj, bool) { return true; }
-
-template <typename T>
-bool bin_to_native(bin_to_native_state& state, std::vector<T>& v, bool start) {
+template <typename State, typename T, typename F>
+bool serialize_vector(State& state, std::vector<T>& v, bool start, F f) {
     if (start) {
         v.resize(3); // !!!
         printf("%*s[ %d items\n", int(state.stack.size() * 4), "", int(v.size()));
@@ -283,7 +281,7 @@ bool bin_to_native(bin_to_native_state& state, std::vector<T>& v, bool start) {
     auto& stack_entry = state.stack.back();
     if (stack_entry.fields_processed < v.size()) {
         printf("%*sitem %d/%d\n", int(state.stack.size() * 4), "", int(stack_entry.fields_processed), int(v.size()));
-        return serializer_for<T>.bin_to_native(state, &v[stack_entry.fields_processed++], true);
+        return f(v[stack_entry.fields_processed++]);
     } else {
         printf("%*s]\n", int((state.stack.size() - 1) * 4), "");
         state.stack.pop_back();
@@ -292,10 +290,52 @@ bool bin_to_native(bin_to_native_state& state, std::vector<T>& v, bool start) {
     return true;
 }
 
-template <typename... Ts>
-bool bin_to_native(bin_to_native_state& state, std::tuple<Ts...>& obj, bool start) {
+template <typename State, typename First, typename Second, typename F>
+bool serialize_pair(State& state, std::pair<First, Second>& v, bool start, F f) {
+    if (start) {
+        printf("%*s[ pair\n", int(state.stack.size() * 4), "");
+        state.stack.push_back({&v, &serializer_for<std::pair<First, Second>>});
+        return true;
+    }
+    auto& stack_entry = state.stack.back();
+    if (stack_entry.fields_processed == 0) {
+        printf("%*sitem 0/1\n", int(state.stack.size() * 4), "");
+        ++stack_entry.fields_processed;
+        return f(v.first);
+    } else if (stack_entry.fields_processed == 1) {
+        printf("%*sitem 1/1\n", int(state.stack.size() * 4), "");
+        ++stack_entry.fields_processed;
+        return f(v.second);
+    } else {
+        printf("%*s]\n", int((state.stack.size() - 1) * 4), "");
+        state.stack.pop_back();
+        return true;
+    }
     return true;
 }
+
+template <typename T>
+bool bin_to_native(bin_to_native_state& state, T& obj, bool start) {
+    static_assert(std::is_arithmetic_v<T> || std::is_class_v<T>);
+    if constexpr (std::is_arithmetic_v<T>) {
+        // !!!
+    } else if constexpr (is_vector_v<T>) {
+        return serialize_vector(state, obj, start, [&](auto& item) { //
+            return serializer_for<std::decay_t<decltype(item)>>.bin_to_native(state, &item, true);
+        });
+    } else if constexpr (is_pair_v<T>) {
+        return serialize_pair(state, obj, start, [&](auto& item) { //
+            return serializer_for<std::decay_t<decltype(item)>>.bin_to_native(state, &item, true);
+        });
+    } else if constexpr (std::is_class_v<T>) {
+        return serialize_class(state, obj, start, [&](auto& field_ser) { //
+            return field_ser.bin_to_native(state, &obj, true);
+        });
+    }
+    return true;
+}
+
+bool bin_to_native(bin_to_native_state& state, std::string& obj, bool) { return true; }
 
 template <typename T>
 bool bin_to_native(T& obj) {
