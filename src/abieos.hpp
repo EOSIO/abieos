@@ -37,19 +37,20 @@ struct bin_to_native_state;
 struct json_to_native_state;
 enum class json_event;
 
-using bin_to_native_callback = bool (*)(bin_to_native_state&, void*, bool);
-using json_to_native_callback = bool (*)(json_to_native_state&, void*, json_event);
-
 struct serializer {
-    bin_to_native_callback bin_to_native = nullptr;
-    json_to_native_callback json_to_native = nullptr;
+    virtual bool bin_to_native(bin_to_native_state&, void*, bool) const = 0;
+    virtual bool json_to_native(json_to_native_state&, void*, json_event) const = 0;
+};
+
+struct field_serializer_methods {
+    virtual bool bin_to_native(bin_to_native_state&, void*, bool) const = 0;
+    virtual bool json_to_native(json_to_native_state&, void*, json_event) const = 0;
 };
 
 struct field_serializer {
     const char* name = "<unknown>";
     bool required = true;
-    bin_to_native_callback bin_to_native = nullptr;
-    json_to_native_callback json_to_native = nullptr;
+    const field_serializer_methods* methods = nullptr;
 };
 
 struct stack_entry {
@@ -294,19 +295,17 @@ constexpr void for_each_type(F f) {
 }
 
 template <typename T>
-constexpr serializer create_serializer() {
-    return {
-        [](bin_to_native_state& state, void* v, bool start) {
-            return bin_to_native(state, *reinterpret_cast<T*>(v), start);
-        },
-        [](json_to_native_state& state, void* v, json_event event) {
-            return json_to_native(state, *reinterpret_cast<T*>(v), event);
-        },
-    };
-}
+struct serializer_impl : serializer {
+    bool bin_to_native(bin_to_native_state& state, void* v, bool start) const override {
+        return ::abieos::bin_to_native(state, *reinterpret_cast<T*>(v), start);
+    }
+    bool json_to_native(json_to_native_state& state, void* v, json_event event) const override {
+        return ::abieos::json_to_native(state, *reinterpret_cast<T*>(v), event);
+    }
+};
 
 template <typename T>
-auto serializer_for = create_serializer<T>();
+auto serializer_for = serializer_impl<T>{};
 
 inline constexpr auto create_all_serializers() {
     constexpr auto num_types = [] {
@@ -323,6 +322,22 @@ inline constexpr auto create_all_serializers() {
 
 inline constexpr auto all_serializers = create_all_serializers();
 
+template <typename member_ptr>
+constexpr auto create_field_serializer_methods_impl() {
+    struct impl : field_serializer_methods {
+        bool bin_to_native(bin_to_native_state& state, void* v, bool start) const override {
+            return ::abieos::bin_to_native(state, member_from_void(member_ptr{}, v), start);
+        }
+        bool json_to_native(json_to_native_state& state, void* v, json_event event) const override {
+            return ::abieos::json_to_native(state, member_from_void(member_ptr{}, v), event);
+        }
+    };
+    return impl{};
+}
+
+template <typename member_ptr>
+constexpr auto field_serializer_methods_impl = create_field_serializer_methods_impl<member_ptr>();
+
 template <typename T>
 constexpr auto create_field_serializers() {
     constexpr auto num_fields = ([&]() constexpr {
@@ -333,15 +348,7 @@ constexpr auto create_field_serializers() {
     std::array<field_serializer, num_fields> fields;
     int i = 0;
     for_each_field((T*)nullptr, [&](auto* name, auto member_ptr, auto required) {
-        fields[i].name = name;
-        fields[i].required = required;
-        fields[i].bin_to_native = [](bin_to_native_state& state, void* v, bool start) {
-            return bin_to_native(state, member_from_void(decltype(member_ptr){}, v), start);
-        };
-        fields[i].json_to_native = [](json_to_native_state& state, void* v, json_event event) {
-            return json_to_native(state, member_from_void(decltype(member_ptr){}, v), event);
-        };
-        ++i;
+        fields[i++] = {name, required, &field_serializer_methods_impl<decltype(member_ptr)>};
     });
     return fields;
 }
@@ -429,7 +436,7 @@ bool bin_to_native(bin_to_native_state& state, T& obj, bool start) {
         });
     } else if constexpr (std::is_class_v<T>) {
         return serialize_class(state, obj, start, [&](auto& field_ser) { //
-            return field_ser.bin_to_native(state, &obj, true);
+            return field_ser.methods->bin_to_native(state, &obj, true);
         });
     }
     return true;
