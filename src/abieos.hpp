@@ -154,8 +154,50 @@ struct hex_bytes {};
 inline bool bin_to_native(bin_to_native_state& state, hex_bytes& obj, bool start) { return true; }
 inline bool json_to_native(hex_bytes& obj, json_to_native_state& state, json_event event, bool start) { return false; }
 
+inline constexpr uint64_t char_to_symbol(char c) {
+    if (c >= 'a' && c <= 'z')
+        return (c - 'a') + 6;
+    if (c >= '1' && c <= '5')
+        return (c - '1') + 1;
+    return 0;
+}
+
+inline constexpr uint64_t string_to_name(const char* str) {
+    uint64_t name = 0;
+    int i = 0;
+    for (; str[i] && i < 12; ++i)
+        name |= (char_to_symbol(str[i]) & 0x1f) << (64 - 5 * (i + 1));
+    if (i == 12)
+        name |= char_to_symbol(str[12]) & 0x0F;
+    return name;
+}
+
+inline std::string name_to_string(uint64_t name) {
+    static const char* charmap = ".12345abcdefghijklmnopqrstuvwxyz";
+    std::string str(13, '.');
+
+    uint64_t tmp = name;
+    for (uint32_t i = 0; i <= 12; ++i) {
+        char c = charmap[tmp & (i == 0 ? 0x0f : 0x1f)];
+        str[12 - i] = c;
+        tmp >>= (i == 0 ? 4 : 5);
+    }
+
+    const auto last = str.find_last_not_of('.');
+    if (last != std::string::npos)
+        str = str.substr(0, last + 1);
+
+    return str;
+}
+
 struct name {
     uint64_t value = 0;
+
+    constexpr name(uint64_t value = 0) : value{value} {}
+    constexpr name(const char* str) : value{string_to_name(str)} {}
+    constexpr name(const name&) = default;
+
+    explicit operator std::string() const { return name_to_string(value); }
 };
 
 inline bool bin_to_native(bin_to_native_state& state, name& obj, bool start) {
@@ -163,10 +205,10 @@ inline bool bin_to_native(bin_to_native_state& state, name& obj, bool start) {
 }
 
 inline bool json_to_native(name& obj, json_to_native_state& state, json_event event, bool start) {
-    printf("???? %d\n", event);
     if (event == json_event::received_string) {
-        printf("%*sname: %s\n", int(state.stack.size() * 4), "", state.value_string.c_str());
-        // todo
+        obj.value = string_to_name(state.value_string.c_str());
+        printf("%*sname: %s (%08llx) %s\n", int(state.stack.size() * 4), "", state.value_string.c_str(), obj.value,
+               std::string{obj}.c_str());
         return true;
     } else
         return false;
@@ -515,7 +557,7 @@ bool json_to_native(root_object_wrapper<T>& wrapper, json_to_native_state& state
         state.stack.push_back({&wrapper, &serializer_for<root_object_wrapper<T>>});
         return true;
     } else if (event == json_event::received_start_object)
-        return json_to_native(wrapper.obj, state, json_event::received_start_object, true);
+        return json_to_native(wrapper.obj, state, event, true);
     else
         return false;
 }
@@ -576,7 +618,7 @@ auto json_to_native(std::vector<T>& v, json_to_native_state& state, json_event e
 
 template <typename First, typename Second>
 auto json_to_native(std::pair<First, Second>& obj, json_to_native_state& state, json_event event, bool start) {
-    return false;
+    return false; // TODO
 }
 
 inline bool json_to_native(std::string& obj, json_to_native_state& state, json_event event, bool start) {
