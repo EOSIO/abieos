@@ -654,6 +654,10 @@ struct abi_type {
     bool filled_struct{};
 };
 
+struct contract {
+    std::map<type_name, abi_type> abi_types;
+};
+
 template <int i>
 bool ends_with(const std::string& s, const char (&suffix)[i]) {
     return s.size() >= i && !strcmp(s.c_str() + s.size() - i, suffix);
@@ -670,7 +674,7 @@ inline abi_type& get_type(std::map<type_name, abi_type>& abi_types, const type_n
             type.array_of = &get_type(abi_types, name.substr(0, name.size() - 2), depth + 1);
             return abi_types[name] = std::move(type);
         } else
-            throw std::runtime_error("abi references unknown type " + name);
+            throw std::runtime_error("abi references unknown type \"" + name + "\"");
     }
     if (it->second.alias_of)
         return *it->second.alias_of;
@@ -687,7 +691,7 @@ inline abi_type& fill_struct(std::map<type_name, abi_type>& abi_types, abi_type&
     if (type.filled_struct)
         return type;
     if (!type.struct_def)
-        throw std::runtime_error("abi type " + type.name + " is not a struct");
+        throw std::runtime_error("abi type \"" + type.name + "\" is not a struct");
     if (!type.struct_def->base.empty())
         type.fields = fill_struct(abi_types, get_type(abi_types, type.struct_def->base, depth + 1), depth + 1).fields;
     for (auto& field : type.struct_def->fields)
@@ -695,29 +699,29 @@ inline abi_type& fill_struct(std::map<type_name, abi_type>& abi_types, abi_type&
     return type;
 }
 
-inline auto create_abi_types(const abi_def& abi) {
-    std::map<type_name, abi_type> abi_types;
+inline contract create_contract(const abi_def& abi) {
+    contract c;
     for (auto& t : abi.types) {
         if (t.new_type_name.empty())
             throw std::runtime_error("abi has a type with a missing name");
-        auto [_, inserted] = abi_types.insert({t.new_type_name, abi_type{t.new_type_name, t.type}});
+        auto [_, inserted] = c.abi_types.insert({t.new_type_name, abi_type{t.new_type_name, t.type}});
         if (!inserted)
-            throw std::runtime_error("abi redefines type " + t.new_type_name);
+            throw std::runtime_error("abi redefines type \"" + t.new_type_name + "\"");
     }
     for (auto& s : abi.structs) {
         if (s.name.empty())
             throw std::runtime_error("abi has a struct with a missing name");
-        auto [_, inserted] = abi_types.insert({s.name, abi_type{s.name, {}, &s}});
+        auto [_, inserted] = c.abi_types.insert({s.name, abi_type{s.name, {}, &s}});
         if (!inserted)
-            throw std::runtime_error("abi redefines type " + s.name);
+            throw std::runtime_error("abi redefines type \"" + s.name + "\"");
     }
-    for (auto& [_, t] : abi_types)
+    for (auto& [_, t] : c.abi_types)
         if (!t.alias_of_name.empty())
-            t.alias_of = &get_type(abi_types, t.alias_of_name, 0);
-    for (auto& [_, t] : abi_types)
+            t.alias_of = &get_type(c.abi_types, t.alias_of_name, 0);
+    for (auto& [_, t] : c.abi_types)
         if (t.struct_def)
-            fill_struct(abi_types, t, 0);
-    return abi_types;
+            fill_struct(c.abi_types, t, 0);
+    return c;
 }
 
 } // namespace abieos

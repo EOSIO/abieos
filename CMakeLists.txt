@@ -8,3 +8,6 @@ project(abieos VERSION 0.1 LANGUAGES CXX)
 
 add_executable(test src/test.cpp)
 target_include_directories(test PUBLIC external/rapidjson/include)
+
+add_library(abieos MODULE src/abieos.cpp)
+target_include_directories(abieos PUBLIC external/rapidjson/include)
