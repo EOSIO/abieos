@@ -1,4 +1,5 @@
 #include <array>
+#include <map>
 #include <stdint.h>
 #include <string>
 #include <string_view>
@@ -193,12 +194,15 @@ inline std::string name_to_string(uint64_t name) {
 struct name {
     uint64_t value = 0;
 
-    constexpr name(uint64_t value = 0) : value{value} {}
-    constexpr name(const char* str) : value{string_to_name(str)} {}
+    constexpr name() = default;
+    constexpr explicit name(uint64_t value) : value{value} {}
+    constexpr explicit name(const char* str) : value{string_to_name(str)} {}
     constexpr name(const name&) = default;
 
     explicit operator std::string() const { return name_to_string(value); }
 };
+
+inline bool operator<(name a, name b) { return a.value < b.value; }
 
 inline bool bin_to_native(bin_to_native_state& state, name& obj, bool start) {
     return bin_to_native(state, obj.value, start);
@@ -215,9 +219,9 @@ inline bool json_to_native(name& obj, json_to_native_state& state, json_event ev
 }
 
 using action_name = name;
-using field_name = name;
+using field_name = std::string;
 using table_name = name;
-using type_name = name;
+using type_name = std::string;
 
 using extensions_type = std::vector<std::pair<uint16_t, hex_bytes>>;
 
@@ -331,6 +335,7 @@ constexpr void for_each_field(abi_def*, F f) {
     f("abi_extensions", member_ptr<&abi_def::abi_extensions>{}, false);
 }
 
+/*
 template <typename F>
 constexpr void for_each_type(F f) {
     // These must remain in lexicographical order
@@ -344,6 +349,7 @@ constexpr void for_each_type(F f) {
     f("table_def", (table_def*)nullptr);
     f("type_def", (type_def*)nullptr);
 }
+*/
 
 template <typename T>
 struct serializer_impl : serializer {
@@ -358,6 +364,7 @@ struct serializer_impl : serializer {
 template <typename T>
 auto serializer_for = serializer_impl<T>{};
 
+/*
 inline constexpr auto create_all_serializers() {
     constexpr auto num_types = [] {
         int num_types = 0;
@@ -372,6 +379,7 @@ inline constexpr auto create_all_serializers() {
 }
 
 inline constexpr auto all_serializers = create_all_serializers();
+*/
 
 template <typename member_ptr>
 constexpr auto create_field_serializer_methods_impl() {
@@ -628,6 +636,88 @@ inline bool json_to_native(std::string& obj, json_to_native_state& state, json_e
         return true;
     } else
         return false;
+}
+
+struct abi_field {
+    field_name name{};
+    struct abi_type* type{};
+};
+
+struct abi_type {
+    type_name name{};
+    type_name alias_of_name{};
+    const struct_def* struct_def{};
+    abi_type* alias_of{};
+    abi_type* array_of{};
+    abi_type* base{};
+    std::vector<abi_field> fields{};
+    bool filled_struct{};
+};
+
+template <int i>
+bool ends_with(const std::string& s, const char (&suffix)[i]) {
+    return s.size() >= i && !strcmp(s.c_str() + s.size() - i, suffix);
+}
+
+inline abi_type& get_type(std::map<type_name, abi_type>& abi_types, const type_name& name, int depth) {
+    if (depth >= 32)
+        throw std::runtime_error("abi recursion limit reached");
+    auto it = abi_types.find(name);
+    if (it == abi_types.end()) {
+        // todo: optional
+        if (ends_with(name, "[]")) {
+            abi_type type{name};
+            type.array_of = &get_type(abi_types, name.substr(0, name.size() - 2), depth + 1);
+            return abi_types[name] = std::move(type);
+        } else
+            throw std::runtime_error("abi references unknown type " + name);
+    }
+    if (it->second.alias_of)
+        return *it->second.alias_of;
+    if (it->second.alias_of_name.empty())
+        return it->second;
+    auto& other = get_type(abi_types, it->second.alias_of_name, depth + 1);
+    it->second.alias_of = &other;
+    return other;
+}
+
+inline abi_type& fill_struct(std::map<type_name, abi_type>& abi_types, abi_type& type, int depth) {
+    if (depth >= 32)
+        throw std::runtime_error("abi recursion limit reached");
+    if (type.filled_struct)
+        return type;
+    if (!type.struct_def)
+        throw std::runtime_error("abi type " + type.name + " is not a struct");
+    if (!type.struct_def->base.empty())
+        type.fields = fill_struct(abi_types, get_type(abi_types, type.struct_def->base, depth + 1), depth + 1).fields;
+    for (auto& field : type.struct_def->fields)
+        type.fields.push_back(abi_field{field.name, &get_type(abi_types, field.type, depth + 1)});
+    return type;
+}
+
+inline auto create_abi_types(const abi_def& abi) {
+    std::map<type_name, abi_type> abi_types;
+    for (auto& t : abi.types) {
+        if (t.new_type_name.empty())
+            throw std::runtime_error("abi has a type with a missing name");
+        auto [_, inserted] = abi_types.insert({t.new_type_name, abi_type{t.new_type_name, t.type}});
+        if (!inserted)
+            throw std::runtime_error("abi redefines type " + t.new_type_name);
+    }
+    for (auto& s : abi.structs) {
+        if (s.name.empty())
+            throw std::runtime_error("abi has a struct with a missing name");
+        auto [_, inserted] = abi_types.insert({s.name, abi_type{s.name, {}, &s}});
+        if (!inserted)
+            throw std::runtime_error("abi redefines type " + s.name);
+    }
+    for (auto& [_, t] : abi_types)
+        if (!t.alias_of_name.empty())
+            t.alias_of = &get_type(abi_types, t.alias_of_name, 0);
+    for (auto& [_, t] : abi_types)
+        if (t.struct_def)
+            fill_struct(abi_types, t, 0);
+    return abi_types;
 }
 
 } // namespace abieos
