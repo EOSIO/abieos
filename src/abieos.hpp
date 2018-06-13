@@ -1,4 +1,5 @@
 #include <array>
+#include <boost/algorithm/hex.hpp>
 #include <boost/date_time/posix_time/posix_time.hpp>
 #include <ctime>
 #include <map>
@@ -44,6 +45,11 @@ struct root_object_wrapper {
     T& obj;
 };
 
+template <typename T>
+void push_raw(std::vector<char>& bin, const T& obj) {
+    bin.insert(bin.end(), reinterpret_cast<const char*>(&obj), reinterpret_cast<const char*>(&obj + 1));
+}
+
 ///////////////////////////////////////////////////////////////////////////////
 // stream events
 ///////////////////////////////////////////////////////////////////////////////
@@ -72,7 +78,7 @@ struct event_data {
 };
 
 bool receive_event(struct json_to_native_state&, event_type);
-bool receive_event(struct json_to_abi_state&, event_type);
+bool receive_event(struct json_to_bin_state&, event_type);
 
 template <typename Derived>
 struct json_reader_handler : public rapidjson::BaseReaderHandler<rapidjson::UTF8<>, Derived> {
@@ -138,7 +144,8 @@ struct bin_to_native_state {
     std::vector<native_stack_entry> stack;
 };
 
-struct json_to_abi_state : json_reader_handler<json_to_abi_state> {
+struct json_to_bin_state : json_reader_handler<json_to_bin_state> {
+    std::vector<char> bin;
     std::vector<abi_stack_entry> stack;
 };
 
@@ -159,7 +166,7 @@ struct native_field_serializer {
 };
 
 struct abi_serializer {
-    virtual bool json_to_bin(json_to_native_state&, event_type, bool) const = 0;
+    virtual bool json_to_bin(json_to_bin_state&, event_type, bool) const = 0;
 };
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -189,19 +196,34 @@ template <typename T>
 bool json_to_native(root_object_wrapper<T>& obj, json_to_native_state& state, event_type event, bool start);
 
 template <typename T>
-auto json_to_bin(T*, json_to_native_state& state, event_type event, bool start)
+auto json_to_bin(T*, json_to_bin_state& state, event_type event, bool start)
     -> std::enable_if_t<std::is_arithmetic_v<T>, bool>;
-bool json_to_bin(std::string*, json_to_native_state& state, event_type event, bool start);
+bool json_to_bin(std::string*, json_to_bin_state& state, event_type event, bool start);
 
 ///////////////////////////////////////////////////////////////////////////////
 // serializable types
 ///////////////////////////////////////////////////////////////////////////////
 
-struct bytes {};
+struct bytes {
+    std::vector<char> data;
+};
 
 inline bool bin_to_native(bin_to_native_state& state, bytes& obj, bool start) { return true; }
 inline bool json_to_native(bytes& obj, json_to_native_state& state, event_type event, bool start) { return false; }
-inline bool json_to_bin(bytes*, json_to_native_state& state, event_type event, bool start) { return false; }
+
+void push_varuint32(std::vector<char>& bin, uint32_t v);
+inline bool json_to_bin(bytes*, json_to_bin_state& state, event_type event, bool start) {
+    if (event == event_type::received_string) {
+        auto& s = state.received_data.value_string;
+        printf("%*sbytes (%d hex digits)\n", int(state.stack.size() * 4), "", int(s.size()));
+        if (s.size() & 1)
+            return false;
+        push_varuint32(state.bin, s.size() / 2);
+        boost::algorithm::unhex(s.begin(), s.end(), std::back_inserter(state.bin));
+        return true;
+    } else
+        return false;
+}
 
 inline constexpr uint64_t char_to_symbol(char c) {
     if (c >= 'a' && c <= 'z')
@@ -267,11 +289,12 @@ inline bool json_to_native(name& obj, json_to_native_state& state, event_type ev
         return false;
 }
 
-inline bool json_to_bin(name*, json_to_native_state& state, event_type event, bool start) {
+inline bool json_to_bin(name*, json_to_bin_state& state, event_type event, bool start) {
     if (event == event_type::received_string) {
         name obj{string_to_name(state.received_data.value_string.c_str())};
         printf("%*sname: %s (%08llx) %s\n", int(state.stack.size() * 4), "", state.received_data.value_string.c_str(),
                obj.value, std::string{obj}.c_str());
+        push_raw(state.bin, obj.value);
         return true;
     } else
         return false;
@@ -296,7 +319,17 @@ struct varuint32 {
     }
 };
 
-inline bool json_to_bin(varuint32*, json_to_native_state& state, event_type event, bool start) {
+inline void push_varuint32(std::vector<char>& bin, uint32_t v) {
+    uint64_t val = v;
+    do {
+        uint8_t b = uint8_t(val) & 0x7f;
+        val >>= 7;
+        b |= ((val > 0) << 7);
+        bin.push_back(b);
+    } while (val);
+}
+
+inline bool json_to_bin(varuint32*, json_to_bin_state& state, event_type event, bool start) {
     varuint32 obj;
     if (event == event_type::received_bool)
         obj = state.received_data.value_bool;
@@ -308,6 +341,7 @@ inline bool json_to_bin(varuint32*, json_to_native_state& state, event_type even
         obj = state.received_data.value_double;
     else
         return false;
+    push_varuint32(state.bin, obj.value);
     return true;
 }
 
@@ -334,20 +368,114 @@ struct time_point_sec {
     }
 };
 
-inline bool json_to_bin(time_point_sec*, json_to_native_state& state, event_type event, bool start) {
+inline bool json_to_bin(time_point_sec*, json_to_bin_state& state, event_type event, bool start) {
     if (event == event_type::received_string) {
         time_point_sec obj{state.received_data.value_string};
         printf("%*stime_point_sec: %s (%u) %s\n", int(state.stack.size() * 4), "",
                state.received_data.value_string.c_str(), (unsigned)obj.utc_seconds, std::string{obj}.c_str());
+        push_raw(state.bin, obj.utc_seconds);
         return true;
     } else
         return false;
 }
 
-struct asset {};
+struct symbol_code {
+    uint64_t value = 0;
+};
 
-inline bool json_to_bin(asset*, json_to_native_state& state, event_type event, bool start) {
+inline constexpr uint64_t string_to_symbol_code(const char* str) {
+    while (*str == ' ')
+        ++str;
+    uint64_t result = 0;
+    uint32_t i = 0;
+    while (*str >= 'A' && *str <= 'Z')
+        result |= uint64_t(*str++) << (8 * i++);
+    return result;
+}
+
+inline std::string symbol_code_to_string(uint64_t v) {
+    std::string result;
+    while (v > 0) {
+        result += char(v & 0xFF);
+        v >>= 8;
+    }
+    return result;
+}
+
+inline bool json_to_bin(symbol_code*, json_to_bin_state& state, event_type event, bool start) {
     if (event == event_type::received_string) {
+        auto& s = state.received_data.value_string;
+        printf("%*ssymbol_code: %s\n", int(state.stack.size() * 4), "", s.c_str());
+        auto v = string_to_symbol_code(s.c_str());
+        push_raw(state.bin, v);
+        return true;
+    } else
+        return false;
+}
+
+struct symbol {
+    uint64_t value = 0;
+};
+
+inline constexpr uint64_t string_to_symbol(uint8_t precision, const char* str) {
+    return (string_to_symbol_code(str) << 8) | precision;
+}
+
+inline constexpr uint64_t string_to_symbol(const char* str) {
+    uint8_t precision = 0;
+    while (*str >= '0' && *str <= '9')
+        precision = precision * 10 + (*str++ - '0');
+    if (*str == ',')
+        ++str;
+    return string_to_symbol(precision, str);
+}
+
+inline std::string symbol_to_string(uint64_t v) {
+    return std::to_string(v & 0xff) + "," + symbol_code_to_string(v >> 8);
+}
+
+inline bool json_to_bin(symbol*, json_to_bin_state& state, event_type event, bool start) {
+    if (event == event_type::received_string) {
+        auto& s = state.received_data.value_string;
+        printf("%*ssymbol: %s\n", int(state.stack.size() * 4), "", s.c_str());
+        auto v = string_to_symbol(s.c_str());
+        push_raw(state.bin, v);
+        return true;
+    } else
+        return false;
+}
+
+struct asset {
+    int64_t amount = 0;
+    symbol sym{};
+};
+
+inline asset string_to_asset(const char* s) {
+    // todo: check overflow
+    while (*s == ' ')
+        ++s;
+    uint64_t amount = 0;
+    uint8_t precision = 0;
+    while (*s >= '0' && *s <= '9')
+        amount = amount * 10 + (*s++ - '0');
+    if (*s == '.') {
+        ++s;
+        while (*s >= '0' && *s <= '9') {
+            amount = amount * 10 + (*s++ - '0');
+            ++precision;
+        }
+    }
+    auto code = string_to_symbol_code(s);
+    return asset{(int64_t)amount, symbol{(code << 8) | precision}};
+}
+
+inline bool json_to_bin(asset*, json_to_bin_state& state, event_type event, bool start) {
+    if (event == event_type::received_string) {
+        auto& s = state.received_data.value_string;
+        printf("%*sasset: %s\n", int(state.stack.size() * 4), "", s.c_str());
+        auto v = string_to_asset(s.c_str());
+        push_raw(state.bin, v.amount);
+        push_raw(state.bin, v.sym.value);
         return true;
     } else
         return false;
@@ -795,15 +923,15 @@ constexpr void for_each_abi_type(F f) {
     // f("checksum512", (checksum512_type*)nullptr);
     // f("public_key", (public_key_type*)nullptr);
     // f("signature", (signature_type*)nullptr);
-    // f("symbol", (symbol*)nullptr);
-    // f("symbol_code", (symbol_code*)nullptr);
+    f("symbol", (symbol*)nullptr);
+    f("symbol_code", (symbol_code*)nullptr);
     f("asset", (asset*)nullptr);
     // f("extended_asset", (extended_asset*)nullptr);
 }
 
 template <typename T>
 struct abi_serializer_impl : abi_serializer {
-    bool json_to_bin(json_to_native_state& state, event_type event, bool start) const override {
+    bool json_to_bin(json_to_bin_state& state, event_type event, bool start) const override {
         return ::abieos::json_to_bin((T*)nullptr, state, event, start);
     }
 };
@@ -912,7 +1040,7 @@ inline contract create_contract(const abi_def& abi) {
 ///////////////////////////////////////////////////////////////////////////////
 
 template <typename T>
-auto json_to_bin(T*, json_to_native_state& state, event_type event, bool start)
+auto json_to_bin(T*, json_to_bin_state& state, event_type event, bool start)
     -> std::enable_if_t<std::is_arithmetic_v<T>, bool> {
     T obj;
     if (event == event_type::received_bool)
@@ -925,12 +1053,16 @@ auto json_to_bin(T*, json_to_native_state& state, event_type event, bool start)
         obj = state.received_data.value_double;
     else
         return false;
+    push_raw(state.bin, obj);
     return true;
 }
 
-inline bool json_to_bin(std::string*, json_to_native_state& state, event_type event, bool start) {
+inline bool json_to_bin(std::string*, json_to_bin_state& state, event_type event, bool start) {
     if (event == event_type::received_string) {
-        printf("%*sstring: %s\n", int(state.stack.size() * 4), "", state.received_data.value_string.c_str());
+        auto& s = state.received_data.value_string;
+        printf("%*sstring: %s\n", int(state.stack.size() * 4), "", s.c_str());
+        push_varuint32(state.bin, s.size());
+        state.bin.insert(state.bin.end(), s.begin(), s.end());
         return true;
     } else
         return false;
