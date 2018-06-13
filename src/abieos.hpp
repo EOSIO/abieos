@@ -44,6 +44,10 @@ struct root_object_wrapper {
     T& obj;
 };
 
+///////////////////////////////////////////////////////////////////////////////
+// stream events
+///////////////////////////////////////////////////////////////////////////////
+
 enum class event_type {
     received_null,         // 0
     received_bool,         // 1
@@ -109,16 +113,20 @@ struct json_reader_handler : public rapidjson::BaseReaderHandler<rapidjson::UTF8
     bool EndArray(rapidjson::SizeType) { return receive_event(get_derived(), event_type::received_end_array); }
 };
 
+///////////////////////////////////////////////////////////////////////////////
+// state and serializers
+///////////////////////////////////////////////////////////////////////////////
+
 struct native_serializer;
 struct native_stack_entry {
     void* obj = nullptr;
-    native_serializer* ser = nullptr;
+    const native_serializer* ser = nullptr;
     int position = 0;
 };
 
 struct abi_serializer;
 struct abi_stack_entry {
-    abi_serializer* ser = nullptr;
+    const abi_serializer* ser = nullptr;
     int position = 0;
 };
 
@@ -154,6 +162,10 @@ struct abi_serializer {
     virtual bool json_to_bin(json_to_native_state&, event_type, bool) const = 0;
 };
 
+///////////////////////////////////////////////////////////////////////////////
+// serializer function prototypes
+///////////////////////////////////////////////////////////////////////////////
+
 template <typename T>
 bool bin_to_native(T& obj);
 template <typename T>
@@ -180,6 +192,10 @@ template <typename T>
 auto json_to_bin(T*, json_to_native_state& state, event_type event, bool start)
     -> std::enable_if_t<std::is_arithmetic_v<T>, bool>;
 bool json_to_bin(std::string*, json_to_native_state& state, event_type event, bool start);
+
+///////////////////////////////////////////////////////////////////////////////
+// serializable types
+///////////////////////////////////////////////////////////////////////////////
 
 struct bytes {};
 
@@ -337,6 +353,10 @@ inline bool json_to_bin(asset*, json_to_native_state& state, event_type event, b
         return false;
 }
 
+///////////////////////////////////////////////////////////////////////////////
+// abi types
+///////////////////////////////////////////////////////////////////////////////
+
 using extensions_type = std::vector<std::pair<uint16_t, bytes>>;
 
 struct type_def {
@@ -449,6 +469,10 @@ constexpr void for_each_field(abi_def*, F f) {
     f("abi_extensions", member_ptr<&abi_def::abi_extensions>{}, false);
 }
 
+///////////////////////////////////////////////////////////////////////////////
+// native serializer implementations
+///////////////////////////////////////////////////////////////////////////////
+
 template <typename T>
 struct native_serializer_impl : native_serializer {
     bool bin_to_native(bin_to_native_state& state, void* v, bool start) const override {
@@ -460,7 +484,7 @@ struct native_serializer_impl : native_serializer {
 };
 
 template <typename T>
-auto native_serializer_for = native_serializer_impl<T>{};
+inline constexpr auto native_serializer_for = native_serializer_impl<T>{};
 
 template <typename member_ptr>
 constexpr auto create_native_field_serializer_methods_impl() {
@@ -476,7 +500,7 @@ constexpr auto create_native_field_serializer_methods_impl() {
 }
 
 template <typename member_ptr>
-constexpr auto field_serializer_methods_impl = create_native_field_serializer_methods_impl<member_ptr>();
+inline constexpr auto field_serializer_methods_for = create_native_field_serializer_methods_impl<member_ptr>();
 
 template <typename T>
 constexpr auto create_native_field_serializers() {
@@ -488,27 +512,31 @@ constexpr auto create_native_field_serializers() {
     std::array<native_field_serializer, num_fields> fields;
     int i = 0;
     for_each_field((T*)nullptr, [&](auto* name, auto member_ptr, auto required) {
-        fields[i++] = {name, required, &field_serializer_methods_impl<decltype(member_ptr)>};
+        fields[i++] = {name, required, &field_serializer_methods_for<decltype(member_ptr)>};
     });
     return fields;
 }
 
 template <typename T>
-constexpr inline auto native_field_serializers = create_native_field_serializers<T>();
+inline constexpr auto native_field_serializers_for = create_native_field_serializers<T>();
+
+///////////////////////////////////////////////////////////////////////////////
+// bin_to_native
+///////////////////////////////////////////////////////////////////////////////
 
 template <typename State, typename T, typename F>
 bool serialize_class(State& state, T& obj, bool start, F f) {
     if (start) {
-        printf("%*s{ %d fields\n", int(state.stack.size() * 4), "", int(native_field_serializers<T>.size()));
+        printf("%*s{ %d fields\n", int(state.stack.size() * 4), "", int(native_field_serializers_for<T>.size()));
         state.stack.push_back({&obj, &native_serializer_for<T>});
         return true;
     }
     auto& stack_entry = state.stack.back();
-    if (stack_entry.position < native_field_serializers<T>.size()) {
-        auto& field_ser = native_field_serializers<T>[stack_entry.position];
+    if (stack_entry.position < native_field_serializers_for<T>.size()) {
+        auto& field_ser = native_field_serializers_for<T>[stack_entry.position];
         printf("%*sfield %d/%d: %s\n", int(state.stack.size() * 4), "", int(stack_entry.position),
-               int(native_field_serializers<T>.size()),
-               std::string{native_field_serializers<T>[stack_entry.position].name}.c_str());
+               int(native_field_serializers_for<T>.size()),
+               std::string{native_field_serializers_for<T>[stack_entry.position].name}.c_str());
         ++stack_entry.position;
         return f(field_ser);
     } else {
@@ -603,6 +631,10 @@ bool bin_to_native(T& obj) {
     return true;
 }
 
+///////////////////////////////////////////////////////////////////////////////
+// json_to_native
+///////////////////////////////////////////////////////////////////////////////
+
 inline bool receive_event(struct json_to_native_state& state, event_type event) {
     if (state.stack.empty())
         return false;
@@ -661,7 +693,7 @@ auto json_to_native(T& obj, json_to_native_state& state, event_type event, bool 
         if (event != event_type::received_start_object)
             return false;
         if (trace_json_to_native)
-            printf("%*s{ %d fields\n", int(state.stack.size() * 4), "", int(native_field_serializers<T>.size()));
+            printf("%*s{ %d fields\n", int(state.stack.size() * 4), "", int(native_field_serializers_for<T>.size()));
         state.stack.push_back({&obj, &native_serializer_for<T>});
         return true;
     } else if (event == event_type::received_end_object) {
@@ -673,17 +705,17 @@ auto json_to_native(T& obj, json_to_native_state& state, event_type event, bool 
     auto& stack_entry = state.stack.back();
     if (event == event_type::received_key) {
         stack_entry.position = 0;
-        while (stack_entry.position < native_field_serializers<T>.size() &&
-               native_field_serializers<T>[stack_entry.position].name != state.received_data.key)
+        while (stack_entry.position < native_field_serializers_for<T>.size() &&
+               native_field_serializers_for<T>[stack_entry.position].name != state.received_data.key)
             ++stack_entry.position;
-        if (stack_entry.position >= native_field_serializers<T>.size())
+        if (stack_entry.position >= native_field_serializers_for<T>.size())
             return false; // TODO: eat unknown subtree
         return true;
-    } else if (stack_entry.position < native_field_serializers<T>.size()) {
-        auto& field_ser = native_field_serializers<T>[stack_entry.position];
+    } else if (stack_entry.position < native_field_serializers_for<T>.size()) {
+        auto& field_ser = native_field_serializers_for<T>[stack_entry.position];
         if (trace_json_to_native)
             printf("%*sfield %d/%d: %s (event %d)\n", int(state.stack.size() * 4), "", int(stack_entry.position),
-                   int(native_field_serializers<T>.size()), std::string{field_ser.name}.c_str(), event);
+                   int(native_field_serializers_for<T>.size()), std::string{field_ser.name}.c_str(), event);
         return field_ser.methods->json_to_native(&obj, state, event, true);
     } else {
         return true;
@@ -727,30 +759,9 @@ inline bool json_to_native(std::string& obj, json_to_native_state& state, event_
         return false;
 }
 
-template <typename T>
-auto json_to_bin(T*, json_to_native_state& state, event_type event, bool start)
-    -> std::enable_if_t<std::is_arithmetic_v<T>, bool> {
-    T obj;
-    if (event == event_type::received_bool)
-        obj = state.received_data.value_bool;
-    else if (event == event_type::received_uint64)
-        obj = state.received_data.value_uint64;
-    else if (event == event_type::received_int64)
-        obj = state.received_data.value_int64;
-    else if (event == event_type::received_double)
-        obj = state.received_data.value_double;
-    else
-        return false;
-    return true;
-}
-
-bool json_to_bin(std::string*, json_to_native_state& state, event_type event, bool start) {
-    if (event == event_type::received_string) {
-        printf("%*sstring: %s\n", int(state.stack.size() * 4), "", state.received_data.value_string.c_str());
-        return true;
-    } else
-        return false;
-}
+///////////////////////////////////////////////////////////////////////////////
+// abi serializer implementations
+///////////////////////////////////////////////////////////////////////////////
 
 template <typename F>
 constexpr void for_each_abi_type(F f) {
@@ -798,7 +809,11 @@ struct abi_serializer_impl : abi_serializer {
 };
 
 template <typename T>
-auto abi_serializer_for = abi_serializer_impl<T>{};
+inline constexpr auto abi_serializer_for = abi_serializer_impl<T>{};
+
+///////////////////////////////////////////////////////////////////////////////
+// abi handling
+///////////////////////////////////////////////////////////////////////////////
 
 struct abi_field {
     field_name name{};
@@ -814,7 +829,7 @@ struct abi_type {
     abi_type* base{};
     std::vector<abi_field> fields{};
     bool filled_struct{};
-    abi_serializer* ser{};
+    const abi_serializer* ser{};
 };
 
 struct contract {
@@ -890,6 +905,35 @@ inline contract create_contract(const abi_def& abi) {
         if (t.struct_def)
             fill_struct(c.abi_types, t, 0);
     return c;
+}
+
+///////////////////////////////////////////////////////////////////////////////
+// json_to_bin
+///////////////////////////////////////////////////////////////////////////////
+
+template <typename T>
+auto json_to_bin(T*, json_to_native_state& state, event_type event, bool start)
+    -> std::enable_if_t<std::is_arithmetic_v<T>, bool> {
+    T obj;
+    if (event == event_type::received_bool)
+        obj = state.received_data.value_bool;
+    else if (event == event_type::received_uint64)
+        obj = state.received_data.value_uint64;
+    else if (event == event_type::received_int64)
+        obj = state.received_data.value_int64;
+    else if (event == event_type::received_double)
+        obj = state.received_data.value_double;
+    else
+        return false;
+    return true;
+}
+
+inline bool json_to_bin(std::string*, json_to_native_state& state, event_type event, bool start) {
+    if (event == event_type::received_string) {
+        printf("%*sstring: %s\n", int(state.stack.size() * 4), "", state.received_data.value_string.c_str());
+        return true;
+    } else
+        return false;
 }
 
 } // namespace abieos
