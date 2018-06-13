@@ -1,4 +1,6 @@
 #include <array>
+#include <boost/date_time/posix_time/posix_time.hpp>
+#include <ctime>
 #include <map>
 #include <stdint.h>
 #include <string>
@@ -8,6 +10,9 @@
 #include "rapidjson/reader.h"
 
 namespace abieos {
+
+inline constexpr bool trace_json_to_native = false;
+inline constexpr bool trace_json_to_native_event = false;
 
 template <typename T>
 inline constexpr bool is_vector_v = false;
@@ -52,6 +57,10 @@ struct field_serializer {
     std::string_view name = "<unknown>";
     bool required = true;
     const field_serializer_methods* methods = nullptr;
+};
+
+struct abi_serializer {
+    virtual bool json_to_bin(json_to_native_state&, json_event, bool) const = 0;
 };
 
 struct stack_entry {
@@ -150,10 +159,16 @@ bool json_to_native(std::string& obj, json_to_native_state& state, json_event ev
 template <typename T>
 bool json_to_native(root_object_wrapper<T>& obj, json_to_native_state& state, json_event event, bool start);
 
-struct hex_bytes {};
+template <typename T>
+auto json_to_bin(T*, json_to_native_state& state, json_event event, bool start)
+    -> std::enable_if_t<std::is_arithmetic_v<T>, bool>;
+bool json_to_bin(std::string*, json_to_native_state& state, json_event event, bool start);
 
-inline bool bin_to_native(bin_to_native_state& state, hex_bytes& obj, bool start) { return true; }
-inline bool json_to_native(hex_bytes& obj, json_to_native_state& state, json_event event, bool start) { return false; }
+struct bytes {};
+
+inline bool bin_to_native(bin_to_native_state& state, bytes& obj, bool start) { return true; }
+inline bool json_to_native(bytes& obj, json_to_native_state& state, json_event event, bool start) { return false; }
+inline bool json_to_bin(bytes*, json_to_native_state& state, json_event event, bool start) { return false; }
 
 inline constexpr uint64_t char_to_symbol(char c) {
     if (c >= 'a' && c <= 'z')
@@ -211,6 +226,17 @@ inline bool bin_to_native(bin_to_native_state& state, name& obj, bool start) {
 inline bool json_to_native(name& obj, json_to_native_state& state, json_event event, bool start) {
     if (event == json_event::received_string) {
         obj.value = string_to_name(state.value_string.c_str());
+        if (trace_json_to_native)
+            printf("%*sname: %s (%08llx) %s\n", int(state.stack.size() * 4), "", state.value_string.c_str(), obj.value,
+                   std::string{obj}.c_str());
+        return true;
+    } else
+        return false;
+}
+
+inline bool json_to_bin(name*, json_to_native_state& state, json_event event, bool start) {
+    if (event == json_event::received_string) {
+        name obj{string_to_name(state.value_string.c_str())};
         printf("%*sname: %s (%08llx) %s\n", int(state.stack.size() * 4), "", state.value_string.c_str(), obj.value,
                std::string{obj}.c_str());
         return true;
@@ -223,7 +249,78 @@ using field_name = std::string;
 using table_name = name;
 using type_name = std::string;
 
-using extensions_type = std::vector<std::pair<uint16_t, hex_bytes>>;
+struct varuint32 {
+    uint32_t value = 0;
+
+    varuint32() = default;
+    explicit varuint32(uint32_t v) : value(v) {}
+
+    explicit operator uint32_t() { return value; }
+
+    varuint32& operator=(uint32_t v) {
+        value = v;
+        return *this;
+    }
+};
+
+inline bool json_to_bin(varuint32*, json_to_native_state& state, json_event event, bool start) {
+    varuint32 obj;
+    if (event == json_event::received_bool)
+        obj = state.value_bool;
+    else if (event == json_event::received_uint64)
+        obj = state.value_uint64;
+    else if (event == json_event::received_int64)
+        obj = state.value_int64;
+    else if (event == json_event::received_double)
+        obj = state.value_double;
+    else
+        return false;
+    return true;
+}
+
+struct time_point_sec {
+    uint32_t utc_seconds = 0;
+
+    time_point_sec() = default;
+
+    explicit time_point_sec(uint32_t seconds) : utc_seconds{seconds} {}
+
+    explicit time_point_sec(const std::string& s) {
+        static const boost::posix_time::ptime epoch = boost::posix_time::from_time_t(0);
+        boost::posix_time::ptime pt;
+        if (s.size() >= 5 && s.at(4) == '-') // http://en.wikipedia.org/wiki/ISO_8601
+            pt = boost::date_time::parse_delimited_time<boost::posix_time::ptime>(s, 'T');
+        else
+            pt = boost::posix_time::from_iso_string(s);
+        utc_seconds = (pt - epoch).total_seconds();
+    }
+
+    explicit operator std::string() {
+        const auto ptime = boost::posix_time::from_time_t(time_t(utc_seconds));
+        return boost::posix_time::to_iso_extended_string(ptime);
+    }
+};
+
+inline bool json_to_bin(time_point_sec*, json_to_native_state& state, json_event event, bool start) {
+    if (event == json_event::received_string) {
+        time_point_sec obj{state.value_string};
+        printf("%*stime_point_sec: %s (%u) %s\n", int(state.stack.size() * 4), "", state.value_string.c_str(),
+               (unsigned)obj.utc_seconds, std::string{obj}.c_str());
+        return true;
+    } else
+        return false;
+}
+
+struct asset {};
+
+inline bool json_to_bin(asset*, json_to_native_state& state, json_event event, bool start) {
+    if (event == json_event::received_string) {
+        return true;
+    } else
+        return false;
+}
+
+using extensions_type = std::vector<std::pair<uint16_t, bytes>>;
 
 struct type_def {
     type_name new_type_name{};
@@ -525,7 +622,8 @@ inline bool json_to_native_state::process(json_event event) {
     if (stack.empty())
         return false;
     auto& x = stack.back();
-    printf("> %d\n", event);
+    if (trace_json_to_native_event)
+        printf("(event %d)\n", event);
     return x.ser->json_to_native(x.obj, *this, event, false);
 }
 
@@ -577,11 +675,13 @@ auto json_to_native(T& obj, json_to_native_state& state, json_event event, bool 
     if (start) {
         if (event != json_event::received_start_object)
             return false;
-        printf("%*s{ %d fields\n", int(state.stack.size() * 4), "", int(field_serializers<T>.size()));
+        if (trace_json_to_native)
+            printf("%*s{ %d fields\n", int(state.stack.size() * 4), "", int(field_serializers<T>.size()));
         state.stack.push_back({&obj, &serializer_for<T>});
         return true;
     } else if (event == json_event::received_end_object) {
-        printf("%*s}\n", int((state.stack.size() - 1) * 4), "");
+        if (trace_json_to_native)
+            printf("%*s}\n", int((state.stack.size() - 1) * 4), "");
         state.stack.pop_back();
         return true;
     }
@@ -591,14 +691,14 @@ auto json_to_native(T& obj, json_to_native_state& state, json_event event, bool 
         while (stack_entry.position < field_serializers<T>.size() &&
                field_serializers<T>[stack_entry.position].name != state.key)
             ++stack_entry.position;
-        printf("???? %d %s\n", stack_entry.position, state.key.c_str());
         if (stack_entry.position >= field_serializers<T>.size())
             return false; // TODO: eat unknown subtree
         return true;
     } else if (stack_entry.position < field_serializers<T>.size()) {
         auto& field_ser = field_serializers<T>[stack_entry.position];
-        printf("%*sfield %d/%d: %s (event %d)\n", int(state.stack.size() * 4), "", int(stack_entry.position),
-               int(field_serializers<T>.size()), std::string{field_ser.name}.c_str(), event);
+        if (trace_json_to_native)
+            printf("%*sfield %d/%d: %s (event %d)\n", int(state.stack.size() * 4), "", int(stack_entry.position),
+                   int(field_serializers<T>.size()), std::string{field_ser.name}.c_str(), event);
         return field_ser.methods->json_to_native(&obj, state, event, true);
     } else {
         return true;
@@ -611,15 +711,18 @@ auto json_to_native(std::vector<T>& v, json_to_native_state& state, json_event e
     if (start) {
         if (event != json_event::received_start_array)
             return false;
-        printf("%*s[\n", int(state.stack.size() * 4), "");
+        if (trace_json_to_native)
+            printf("%*s[\n", int(state.stack.size() * 4), "");
         state.stack.push_back({&v, &serializer_for<std::vector<T>>});
         return true;
     } else if (event == json_event::received_end_array) {
-        printf("%*s]\n", int((state.stack.size() - 1) * 4), "");
+        if (trace_json_to_native)
+            printf("%*s]\n", int((state.stack.size() - 1) * 4), "");
         state.stack.pop_back();
         return true;
     }
-    printf("%*sitem %d (event %d)\n", int(state.stack.size() * 4), "", int(v.size()), event);
+    if (trace_json_to_native)
+        printf("%*sitem %d (event %d)\n", int(state.stack.size() * 4), "", int(v.size()), event);
     v.emplace_back();
     return json_to_native(v.back(), state, event, true);
 }
@@ -632,11 +735,85 @@ auto json_to_native(std::pair<First, Second>& obj, json_to_native_state& state, 
 inline bool json_to_native(std::string& obj, json_to_native_state& state, json_event event, bool start) {
     if (event == json_event::received_string) {
         obj = state.value_string;
-        printf("%*sstring: %s\n", int(state.stack.size() * 4), "", obj.c_str());
+        if (trace_json_to_native)
+            printf("%*sstring: %s\n", int(state.stack.size() * 4), "", obj.c_str());
         return true;
     } else
         return false;
 }
+
+template <typename T>
+auto json_to_bin(T*, json_to_native_state& state, json_event event, bool start)
+    -> std::enable_if_t<std::is_arithmetic_v<T>, bool> {
+    T obj;
+    if (event == json_event::received_bool)
+        obj = state.value_bool;
+    else if (event == json_event::received_uint64)
+        obj = state.value_uint64;
+    else if (event == json_event::received_int64)
+        obj = state.value_int64;
+    else if (event == json_event::received_double)
+        obj = state.value_double;
+    else
+        return false;
+    return true;
+}
+
+bool json_to_bin(std::string*, json_to_native_state& state, json_event event, bool start) {
+    if (event == json_event::received_string) {
+        printf("%*sstring: %s\n", int(state.stack.size() * 4), "", state.value_string.c_str());
+        return true;
+    } else
+        return false;
+}
+
+template <typename F>
+constexpr void for_each_abi_type(F f) {
+    static_assert(sizeof(float) == 4);
+    static_assert(sizeof(double) == 8);
+
+    f("bool", (bool*)nullptr);
+    f("int8", (int8_t*)nullptr);
+    f("uint8", (uint8_t*)nullptr);
+    f("int16", (int16_t*)nullptr);
+    f("uint16", (uint16_t*)nullptr);
+    f("int32", (int32_t*)nullptr);
+    f("uint32", (uint32_t*)nullptr);
+    f("int64", (int64_t*)nullptr);
+    f("uint64", (uint64_t*)nullptr);
+    // f("int128", (int128_t*)nullptr);
+    // f("uint128", (uint128_t*)nullptr);
+    // f("varint32", (signed_int*)nullptr);
+    f("varuint32", (varuint32*)nullptr);
+    f("float32", (float*)nullptr);
+    f("float64", (double*)nullptr);
+    // f("float128", (uint128_t*)nullptr);
+    // f("time_point", (time_point*)nullptr);
+    f("time_point_sec", (time_point_sec*)nullptr);
+    // f("block_timestamp_type", (block_timestamp_type*)nullptr);
+    f("name", (name*)nullptr);
+    f("bytes", (bytes*)nullptr);
+    f("string", (std::string*)nullptr);
+    // f("checksum160", (checksum160_type*)nullptr);
+    // f("checksum256", (checksum256_type*)nullptr);
+    // f("checksum512", (checksum512_type*)nullptr);
+    // f("public_key", (public_key_type*)nullptr);
+    // f("signature", (signature_type*)nullptr);
+    // f("symbol", (symbol*)nullptr);
+    // f("symbol_code", (symbol_code*)nullptr);
+    f("asset", (asset*)nullptr);
+    // f("extended_asset", (extended_asset*)nullptr);
+}
+
+template <typename T>
+struct abi_serializer_impl : abi_serializer {
+    bool json_to_bin(json_to_native_state& state, json_event event, bool start) const override {
+        return ::abieos::json_to_bin((T*)nullptr, state, event, start);
+    }
+};
+
+template <typename T>
+auto abi_serializer_for = abi_serializer_impl<T>{};
 
 struct abi_field {
     field_name name{};
@@ -652,6 +829,7 @@ struct abi_type {
     abi_type* base{};
     std::vector<abi_field> fields{};
     bool filled_struct{};
+    abi_serializer* ser{};
 };
 
 struct contract {
@@ -660,7 +838,7 @@ struct contract {
 
 template <int i>
 bool ends_with(const std::string& s, const char (&suffix)[i]) {
-    return s.size() >= i && !strcmp(s.c_str() + s.size() - i, suffix);
+    return s.size() >= i - 1 && !strcmp(s.c_str() + s.size() - (i - 1), suffix);
 }
 
 inline abi_type& get_type(std::map<type_name, abi_type>& abi_types, const type_name& name, int depth) {
@@ -701,6 +879,11 @@ inline abi_type& fill_struct(std::map<type_name, abi_type>& abi_types, abi_type&
 
 inline contract create_contract(const abi_def& abi) {
     contract c;
+    for_each_abi_type([&](const char* name, auto* p) {
+        abi_type type{name};
+        type.ser = &abi_serializer_for<std::decay_t<decltype(*p)>>;
+        c.abi_types.insert({type.name, std::move(type)});
+    });
     for (auto& t : abi.types) {
         if (t.new_type_name.empty())
             throw std::runtime_error("abi has a type with a missing name");
