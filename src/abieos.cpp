@@ -65,10 +65,19 @@ extern "C" int abieos_get_bin_size(abieos_context* context) {
     return context->result_bin.size();
 }
 
-extern "C" char* abieos_get_bin_data(abieos_context* context) {
+extern "C" const char* abieos_get_bin_data(abieos_context* context) {
     if (!context)
         return nullptr;
     return context->result_bin.data();
+}
+
+extern "C" const char* abieos_get_bin_hex(abieos_context* context) {
+    return handle_exceptions(context, nullptr, [&] {
+        context->result_str.clear();
+        boost::algorithm::hex(context->result_bin.begin(), context->result_bin.end(),
+                              std::back_inserter(context->result_str));
+        return context->result_str.c_str();
+    });
 }
 
 extern "C" uint64_t abieos_string_to_name(abieos_context* context, const char* str) {
@@ -86,8 +95,10 @@ extern "C" const char* abieos_name_to_string(abieos_context* context, uint64_t n
 extern "C" abieos_bool abieos_set_abi(abieos_context* context, uint64_t contract, const char* abi) {
     fix_null_str(abi);
     return handle_exceptions(context, false, [&] {
+        context->last_error = "abi parse error";
         abi_def def{};
-        json_to_native(def, abi);
+        if (!json_to_native(def, abi))
+            return false;
         auto c = create_contract(def);
         context->contracts.insert({name{contract}, std::move(c)});
         return true;
@@ -99,6 +110,7 @@ extern "C" abieos_bool abieos_json_to_bin_struct(abieos_context* context, uint64
     fix_null_str(name);
     fix_null_str(json);
     return handle_exceptions(context, false, [&] {
+        context->last_error = "json parse error";
         auto contract_it = context->contracts.find(::abieos::name{contract});
         if (contract_it == context->contracts.end())
             throw std::runtime_error("contract \"" + name_to_string(contract) + "\" is not loaded");
@@ -106,6 +118,7 @@ extern "C" abieos_bool abieos_json_to_bin_struct(abieos_context* context, uint64
         if (type_it == contract_it->second.abi_types.end() || !type_it->second.struct_def)
             throw std::runtime_error("contract \"" + name_to_string(contract) + "\" does not have struct \"" + name +
                                      "\"");
-        return true;
+        context->result_bin.clear();
+        return json_to_bin(context->result_bin, &type_it->second, json);
     });
 }
