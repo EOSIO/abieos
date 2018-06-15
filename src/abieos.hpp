@@ -20,7 +20,6 @@ inline constexpr bool trace_json_to_native_event = false;
 inline constexpr bool trace_json_to_bin = false;
 inline constexpr bool trace_json_to_bin_event = false;
 inline constexpr bool trace_bin_to_json = false;
-inline constexpr bool trace_bin_to_json_event = false;
 
 template <typename T>
 inline constexpr bool is_vector_v = false;
@@ -1362,18 +1361,19 @@ inline bool json_to_bin(std::string*, json_to_bin_state& state, const abi_type*,
 ///////////////////////////////////////////////////////////////////////////////
 
 inline bool bin_to_json(input_buffer& bin, const abi_type* type, std::string& dest) {
+    if (!type->ser)
+        return false;
     rapidjson::StringBuffer buffer{};
     rapidjson::Writer<rapidjson::StringBuffer> writer{buffer};
     bin_to_json_state state{bin, writer};
-    state.stack.push_back({type});
-    if (type->ser) {
-        if (type->ser->bin_to_json(state, type, true)) {
-            dest = buffer.GetString();
-            return true;
-        } else
-            return false;
-    } else
+    if (!type->ser->bin_to_json(state, type, true))
         return false;
+    if (type->struct_def || type->array_of)
+        while (!state.stack.empty())
+            if (!state.stack.back().type->ser->bin_to_json(state, state.stack.back().type, false))
+                return false;
+    dest = buffer.GetString();
+    return true;
 }
 
 inline bool bin_to_json(pseudo_object*, bin_to_json_state& state, const abi_type* type, bool start) {
@@ -1417,15 +1417,15 @@ inline bool bin_to_json(pseudo_array*, bin_to_json_state& state, const abi_type*
     auto& stack_entry = state.stack.back();
     if (++stack_entry.position < (ptrdiff_t)stack_entry.array_size) {
         if (trace_bin_to_json)
-            printf("%*sitem %d/%d\n", int(state.stack.size() * 4), "", int(stack_entry.position),
-                   int(stack_entry.array_size));
+            printf("%*sitem %d/%d %p %s\n", int(state.stack.size() * 4), "", int(stack_entry.position),
+                   int(stack_entry.array_size), type->array_of->ser, type->array_of->name.c_str());
         if (type->array_of->ser)
             return type->array_of->ser->bin_to_json(state, type->array_of, true);
         else
             return false;
     } else {
         if (trace_bin_to_json)
-            printf("%*s]\n", int((state.stack.size() - 1) * 4), "");
+            printf("%*s]\n", int((state.stack.size()) * 4), "");
         state.stack.pop_back();
         state.writer.EndArray();
         return true;

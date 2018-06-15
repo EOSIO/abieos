@@ -178,7 +178,8 @@ async function push_transfer() {
         memo: '',
     })));
     const actionDataHex = l.abieos_get_bin_hex(context).readCString();
-    console.log('abieos', actionDataHex);
+    console.log('action json->bin: ', actionDataHex);
+    console.log('action bin->json: ', hex_to_json(name('eosio.token'), 'transfer', actionDataHex));
 
     let info = await rpc.get_info();
     let refBlock = await rpc.get_block(info.head_block_num - 3);
@@ -203,6 +204,8 @@ async function push_transfer() {
     };
     check(l.abieos_json_to_bin(context, 0, cstr('transaction'), jsonStr(transaction)));
     let transactionDataHex = l.abieos_get_bin_hex(context).readCString();
+    console.log('transaction json->bin: ', transactionDataHex);
+    console.log('transaction bin->json: ', hex_to_json(0, 'transaction', transactionDataHex));
 
     // let sig = await signatureProvider.sign({ chainId: info.chain_id, serializedTransaction: hexToUint8Array(transactionDataHex) });
     // console.log('sig:', sig)
