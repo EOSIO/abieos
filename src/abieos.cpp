@@ -105,20 +105,44 @@ extern "C" abieos_bool abieos_set_abi(abieos_context* context, uint64_t contract
     });
 }
 
-extern "C" abieos_bool abieos_json_to_bin_struct(abieos_context* context, uint64_t contract, const char* name,
-                                                 const char* json) {
-    fix_null_str(name);
+extern "C" abieos_bool abieos_json_to_bin(abieos_context* context, uint64_t contract, const char* type,
+                                          const char* json) {
+    fix_null_str(type);
     fix_null_str(json);
     return handle_exceptions(context, false, [&] {
         context->last_error = "json parse error";
         auto contract_it = context->contracts.find(::abieos::name{contract});
         if (contract_it == context->contracts.end())
             throw std::runtime_error("contract \"" + name_to_string(contract) + "\" is not loaded");
-        auto type_it = contract_it->second.abi_types.find(name);
-        if (type_it == contract_it->second.abi_types.end() || !type_it->second.struct_def)
-            throw std::runtime_error("contract \"" + name_to_string(contract) + "\" does not have struct \"" + name +
+        auto type_it = contract_it->second.abi_types.find(type);
+        if (type_it == contract_it->second.abi_types.end())
+            throw std::runtime_error("contract \"" + name_to_string(contract) + "\" does not have type \"" + type +
                                      "\"");
         context->result_bin.clear();
         return json_to_bin(context->result_bin, &type_it->second, json);
+    });
+}
+
+extern "C" const char* abieos_hex_to_json(abieos_context* context, uint64_t contract, const char* type,
+                                          const char* hex) {
+    fix_null_str(type);
+    fix_null_str(hex);
+    return handle_exceptions(context, nullptr, [&]() -> const char* {
+        context->last_error = "binary decode error";
+        auto contract_it = context->contracts.find(::abieos::name{contract});
+        if (contract_it == context->contracts.end())
+            throw std::runtime_error("contract \"" + name_to_string(contract) + "\" is not loaded");
+        auto type_it = contract_it->second.abi_types.find(type);
+        if (type_it == contract_it->second.abi_types.end())
+            throw std::runtime_error("contract \"" + name_to_string(contract) + "\" does not have type \"" + type +
+                                     "\"");
+        std::vector<char> data;
+        boost::algorithm::unhex(hex, hex + strlen(hex), std::back_inserter(data));
+        input_buffer bin{data.data(), data.data() + data.size()};
+        if (!bin_to_json(bin, &type_it->second, context->result_str))
+            return nullptr;
+        if (bin.pos != bin.end)
+            throw std::runtime_error("Extra data");
+        return context->result_str.c_str();
     });
 }
