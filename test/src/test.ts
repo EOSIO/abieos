@@ -106,8 +106,14 @@ function check_types() {
     check_type('int32', '-2147483648');
     check_type('uint32', '0');
     check_type('uint32', '4294967295');
-    // int64
-    // uint64
+    check_type('int64', '0', '"0"');
+    check_type('int64', '1', '"1"');
+    check_type('int64', '-1', '"-1"');
+    check_type('int64', '"0"');
+    check_type('int64', '"9223372036854775807"');
+    check_type('int64', '"-9223372036854775808"');
+    check_type('uint64', '"0"');
+    check_type('uint64', '"18446744073709551615"');
     // int128
     // uint128
     check_type('varuint32', '0');
@@ -141,6 +147,7 @@ function check_types() {
     check_type('name', '"abcd"');
     check_type('name', '"ab.cd.ef"');
     check_type('name', '"ab.cd.ef.1234"');
+    check_type('name', '"..ab.cd.ef.."', '"..ab.cd.ef"');
     check_type('name', '"zzzzzzzzzzzz"');
     check_type('name', '"zzzzzzzzzzzzz"', '"zzzzzzzzzzzzj"');
     check_type('bytes', '""');

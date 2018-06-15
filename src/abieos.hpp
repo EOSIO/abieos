@@ -1330,16 +1330,21 @@ template <typename T>
 auto json_to_bin(T*, json_to_bin_state& state, const abi_type*, event_type event, bool start)
     -> std::enable_if_t<std::is_arithmetic_v<T>, bool> {
     T obj;
-    if (event == event_type::received_bool)
+    if (event == event_type::received_bool) {
         obj = state.received_data.value_bool;
-    else if (event == event_type::received_uint64)
+    } else if (event == event_type::received_uint64) {
         obj = state.received_data.value_uint64;
-    else if (event == event_type::received_int64)
+    } else if (event == event_type::received_int64) {
         obj = state.received_data.value_int64;
-    else if (event == event_type::received_double)
+    } else if (event == event_type::received_double) {
         obj = state.received_data.value_double;
-    else
+    } else if (event == event_type::received_string && std::is_integral_v<T> && std::is_signed_v<T>) {
+        obj = stoll(state.received_data.value_string);
+    } else if (event == event_type::received_string && std::is_integral_v<T> && !std::is_signed_v<T>) {
+        obj = stoull(state.received_data.value_string);
+    } else {
         return false;
+    }
     push_raw(state.bin, obj);
     return true;
 }
@@ -1436,15 +1441,18 @@ template <typename T>
 auto bin_to_json(T*, bin_to_json_state& state, const abi_type*, bool start)
     -> std::enable_if_t<std::is_arithmetic_v<T>, bool> {
 
-    // 64 bit: use string !!!
-    if constexpr (std::is_same_v<T, bool>)
+    if constexpr (std::is_same_v<T, bool>) {
         return state.writer.Bool(read_bin<T>(state.bin));
-    else if constexpr (std::is_floating_point_v<T>)
+    } else if constexpr (std::is_floating_point_v<T>) {
         return state.writer.Double(read_bin<T>(state.bin));
-    else if constexpr (std::is_signed_v<T>)
+    } else if constexpr (sizeof(T) == 8) {
+        auto s = std::to_string(read_bin<T>(state.bin));
+        return state.writer.String(s.c_str(), s.size());
+    } else if constexpr (std::is_signed_v<T>) {
         return state.writer.Int64(read_bin<T>(state.bin));
-    else
+    } else {
         return state.writer.Uint64(read_bin<T>(state.bin));
+    }
 }
 
 inline bool bin_to_json(std::string*, bin_to_json_state& state, const abi_type*, bool start) {
