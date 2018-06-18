@@ -60,20 +60,6 @@ void push_raw(std::vector<char>& bin, const T& obj) {
     bin.insert(bin.end(), reinterpret_cast<const char*>(&obj), reinterpret_cast<const char*>(&obj + 1));
 }
 
-inline size_t reserve_varuint(std::vector<char>& bin) {
-    auto result = bin.size();
-    bin.insert(bin.end(), {0, 0, 0, 0, 0});
-    return result;
-}
-
-inline void write_reserved_varuint(std::vector<char>& bin, size_t pos, uint32_t val) {
-    bin[pos + 0] = ((val >> 0) & 0x7f) | 0x80;
-    bin[pos + 1] = ((val >> 7) & 0x7f) | 0x80;
-    bin[pos + 2] = ((val >> 14) & 0x7f) | 0x80;
-    bin[pos + 3] = ((val >> 21) & 0x7f) | 0x80;
-    bin[pos + 4] = ((val >> 28) & 0x7f);
-}
-
 struct input_buffer {
     const char* pos = nullptr;
     const char* end = nullptr;
@@ -194,7 +180,13 @@ struct json_reader_handler : public rapidjson::BaseReaderHandler<rapidjson::UTF8
 // state and serializers
 ///////////////////////////////////////////////////////////////////////////////
 
+struct size_insertion {
+    size_t position = 0;
+    uint32_t size = 0;
+};
+
 struct native_serializer;
+
 struct native_stack_entry {
     void* obj = nullptr;
     const native_serializer* ser = nullptr;
@@ -204,7 +196,7 @@ struct native_stack_entry {
 struct json_to_bin_stack_entry {
     const struct abi_type* type = nullptr;
     int position = -1;
-    size_t array_size_location = 0;
+    size_t size_insertion_index = 0;
 };
 
 struct bin_to_json_stack_entry {
@@ -222,10 +214,9 @@ struct bin_to_native_state {
 };
 
 struct json_to_bin_state : json_reader_handler<json_to_bin_state> {
-    std::vector<char>& bin;
+    std::vector<char> bin;
+    std::vector<size_insertion> size_insertions{};
     std::vector<json_to_bin_stack_entry> stack{};
-
-    json_to_bin_state(std::vector<char>& bin) : bin{bin} {}
 };
 
 struct bin_to_json_state : json_reader_handler<bin_to_json_state> {
@@ -312,6 +303,7 @@ inline bool json_to_native(bytes& obj, json_to_native_state& state, event_type e
 }
 
 void push_varuint32(std::vector<char>& bin, uint32_t v);
+
 inline bool json_to_bin(bytes*, json_to_bin_state& state, const abi_type*, event_type event, bool start) {
     if (event == event_type::received_string) {
         auto& s = state.received_data.value_string;
@@ -1254,12 +1246,21 @@ inline bool receive_event(struct json_to_bin_state& state, event_type event, boo
 
 inline bool json_to_bin(std::vector<char>& bin, const abi_type* type, std::string_view json) {
     std::string mutable_json{json};
-    json_to_bin_state state{bin};
+    json_to_bin_state state;
     state.stack.push_back({type});
     rapidjson::Reader reader;
     rapidjson::InsituStringStream ss(mutable_json.data());
-    return reader.Parse<rapidjson::kParseValidateEncodingFlag | rapidjson::kParseIterativeFlag |
-                        rapidjson::kParseFullPrecisionFlag>(ss, state);
+    if (!reader.Parse<rapidjson::kParseValidateEncodingFlag | rapidjson::kParseIterativeFlag |
+                      rapidjson::kParseFullPrecisionFlag>(ss, state))
+        return false;
+    size_t pos = 0;
+    for (auto& insertion : state.size_insertions) {
+        bin.insert(bin.end(), state.bin.begin() + pos, state.bin.begin() + insertion.position);
+        push_varuint32(bin, insertion.size);
+        pos = insertion.position;
+    }
+    bin.insert(bin.end(), state.bin.begin() + pos, state.bin.end());
+    return true;
 }
 
 inline bool json_to_bin(pseudo_object*, json_to_bin_state& state, const abi_type* type, event_type event, bool start) {
@@ -1306,14 +1307,15 @@ inline bool json_to_bin(pseudo_array*, json_to_bin_state& state, const abi_type*
         if (trace_json_to_bin)
             printf("%*s[\n", int(state.stack.size() * 4), "");
         state.stack.push_back({type});
-        state.stack.back().array_size_location = reserve_varuint(state.bin);
+        state.stack.back().size_insertion_index = state.size_insertions.size();
+        state.size_insertions.push_back({state.bin.size()});
         return true;
     }
     auto& stack_entry = state.stack.back();
     if (event == event_type::received_end_array) {
         if (trace_json_to_bin)
             printf("%*s]\n", int((state.stack.size() - 1) * 4), "");
-        write_reserved_varuint(state.bin, stack_entry.array_size_location, stack_entry.position + 1);
+        state.size_insertions[stack_entry.size_insertion_index].size = stack_entry.position + 1;
         state.stack.pop_back();
         return true;
     }
