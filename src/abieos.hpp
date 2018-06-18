@@ -1,13 +1,10 @@
-#include <algorithm>
-#include <array>
 #include <boost/algorithm/hex.hpp>
 #include <boost/date_time/posix_time/posix_time.hpp>
 #include <ctime>
 #include <map>
-#include <stdint.h>
-#include <string>
-#include <string_view>
 #include <vector>
+
+#include "abieos_numeric.hpp"
 
 #include "rapidjson/reader.h"
 #include "rapidjson/stringbuffer.h"
@@ -57,6 +54,7 @@ struct pseudo_array;
 
 template <typename T>
 void push_raw(std::vector<char>& bin, const T& obj) {
+    static_assert(std::is_trivially_copyable_v<T>);
     bin.insert(bin.end(), reinterpret_cast<const char*>(&obj), reinterpret_cast<const char*>(&obj + 1));
 }
 
@@ -74,6 +72,7 @@ inline void read_bin(input_buffer& bin, void* dest, ptrdiff_t size) {
 
 template <typename T>
 void read_bin(input_buffer& bin, T& dest) {
+    static_assert(std::is_trivially_copyable_v<T>);
     read_bin(bin, &dest, sizeof(dest));
 }
 
@@ -325,6 +324,61 @@ inline bool bin_to_json(bytes*, bin_to_json_state& state, const abi_type*, bool 
     read_bin(state.bin, raw.data(), size);
     std::string result;
     boost::algorithm::hex(raw.begin(), raw.end(), std::back_inserter(result));
+    return state.writer.String(result.c_str(), result.size());
+}
+
+template <unsigned size>
+struct checksum {
+    std::array<uint8_t, size> value{{0}};
+};
+
+using checksum160 = checksum<20>;
+using checksum256 = checksum<32>;
+using checksum512 = checksum<64>;
+
+template <unsigned size>
+inline bool json_to_bin(checksum<size>*, json_to_bin_state& state, const abi_type*, event_type event, bool start) {
+    if (event == event_type::received_string) {
+        auto& s = state.received_data.value_string;
+        if (trace_json_to_bin)
+            printf("%*schecksum\n", int(state.stack.size() * 4), "");
+        std::vector<uint8_t> v;
+        boost::algorithm::unhex(s.begin(), s.end(), std::back_inserter(v));
+        if (v.size() != size)
+            throw std::runtime_error("checksum has incorrect size");
+        state.bin.insert(state.bin.end(), v.begin(), v.end());
+        return true;
+    } else
+        throw std::runtime_error("expected string containing hex");
+}
+
+template <unsigned size>
+inline bool bin_to_json(checksum<size>*, bin_to_json_state& state, const abi_type*, bool start) {
+    auto v = read_bin<checksum<size>>(state.bin);
+    std::string result;
+    boost::algorithm::hex(v.value.begin(), v.value.end(), std::back_inserter(result));
+    return state.writer.String(result.c_str(), result.size());
+}
+
+struct uint128 {
+    std::array<uint8_t, 16> value{{0}};
+};
+
+inline bool json_to_bin(uint128*, json_to_bin_state& state, const abi_type*, event_type event, bool start) {
+    if (event == event_type::received_string) {
+        auto& s = state.received_data.value_string;
+        if (trace_json_to_bin)
+            printf("%*suint128\n", int(state.stack.size() * 4), "");
+        auto value = decimal_to_binary<16>(s);
+        push_raw(state.bin, value);
+        return true;
+    } else
+        throw std::runtime_error("expected string containing uint128");
+}
+
+inline bool bin_to_json(uint128*, bin_to_json_state& state, const abi_type*, bool start) {
+    auto v = read_bin<uint128>(state.bin);
+    auto result = binary_to_decimal(v.value);
     return state.writer.String(result.c_str(), result.size());
 }
 
@@ -1090,7 +1144,7 @@ constexpr void for_each_abi_type(F f) {
     f("int64", (int64_t*)nullptr);
     f("uint64", (uint64_t*)nullptr);
     // f("int128", (int128_t*)nullptr);
-    // f("uint128", (uint128_t*)nullptr); !!!
+    f("uint128", (uint128*)nullptr);
     // f("varint32", (signed_int*)nullptr);
     f("varuint32", (varuint32*)nullptr);
     f("float32", (float*)nullptr);
@@ -1102,9 +1156,9 @@ constexpr void for_each_abi_type(F f) {
     f("name", (name*)nullptr);
     f("bytes", (bytes*)nullptr);
     f("string", (std::string*)nullptr);
-    // f("checksum160", (checksum160_type*)nullptr);
-    // f("checksum256", (checksum256_type*)nullptr); !!!
-    // f("checksum512", (checksum512_type*)nullptr);
+    f("checksum160", (checksum160*)nullptr);
+    f("checksum256", (checksum256*)nullptr);
+    f("checksum512", (checksum512*)nullptr);
     // f("public_key", (public_key_type*)nullptr); !!!
     // f("signature", (signature_type*)nullptr); !!!
     f("symbol", (symbol*)nullptr);

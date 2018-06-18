@@ -115,7 +115,11 @@ function check_types() {
     check_type('uint64', '"0"');
     check_type('uint64', '"18446744073709551615"');
     // int128
-    // uint128
+    check_type('uint128', '"0"');
+    check_type('uint128', '"1"');
+    check_type('uint128', '"18446744073709551615"');
+    check_type('uint128', '"340282366920938463463374607431768211454"');
+    check_type('uint128', '"340282366920938463463374607431768211455"');
     check_type('varuint32', '0');
     check_type('varuint32', '127');
     check_type('varuint32', '128');
@@ -157,9 +161,12 @@ function check_types() {
     check_type('string', '"z"');
     check_type('string', '"This is a string."');
     check_type('string', '"' + '*'.repeat(128) + '"');
-    // checksum160
-    // checksum256
-    // checksum512
+    check_type('checksum160', '"0000000000000000000000000000000000000000"');
+    check_type('checksum160', '"123456789ABCDEF01234567890ABCDEF70123456"');
+    check_type('checksum256', '"0000000000000000000000000000000000000000000000000000000000000000"');
+    check_type('checksum256', '"0987654321ABCDEF0987654321FFFF1234567890ABCDEF001234567890ABCDEF"');
+    check_type('checksum512', '"00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000"');
+    check_type('checksum512', '"0987654321ABCDEF0987654321FFFF1234567890ABCDEF001234567890ABCDEF0987654321ABCDEF0987654321FFFF1234567890ABCDEF001234567890ABCDEF"');
     // public_key
     // signature
     check_type('symbol_code', '"A"')
@@ -214,11 +221,11 @@ async function push_transfer() {
     console.log('transaction json->bin: ', transactionDataHex);
     console.log('transaction bin->json: ', hex_to_json(0, 'transaction', transactionDataHex));
 
-    // let sig = await signatureProvider.sign({ chainId: info.chain_id, serializedTransaction: hexToUint8Array(transactionDataHex) });
-    // console.log('sig:', sig)
+    let sig = await signatureProvider.sign({ chainId: info.chain_id, serializedTransaction: hexToUint8Array(transactionDataHex) });
+    console.log('sig:', sig)
 
     let result = await rpc.fetch('/v1/chain/push_transaction', {
-        signatures: [],
+        signatures: sig,
         compression: 0,
         packed_context_free_data: '',
         packed_trx: transactionDataHex,
