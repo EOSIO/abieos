@@ -77,9 +77,9 @@ function hex_to_json(contract: number, type: string, hex: string) {
 }
 
 function check_type(type: string, data: string, expected = data) {
-    //console.log('a', data);
+    // console.log('a', data);
     let hex = json_to_hex(0, type, data);
-    //console.log('b', hex);
+    // console.log('b', hex);
     let final = hex_to_json(0, type, hex);
     console.log(type, data, hex, final);
     if (final !== expected)
@@ -167,7 +167,10 @@ function check_types() {
     check_type('checksum256', '"0987654321ABCDEF0987654321FFFF1234567890ABCDEF001234567890ABCDEF"');
     check_type('checksum512', '"00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000"');
     check_type('checksum512', '"0987654321ABCDEF0987654321FFFF1234567890ABCDEF001234567890ABCDEF0987654321ABCDEF0987654321FFFF1234567890ABCDEF001234567890ABCDEF"');
-    // public_key
+    check_type('public_key', '"EOS69X3383RzBZj41k73CSjUNXM5MYGpnDxyPnWUKPEtYQmTBWz4D"')
+    check_type('public_key', '"EOS7yBtksm8Kkg85r4in4uCbfN77uRwe82apM8jjbhFVDgEgz3w8S"')
+    check_type('public_key', '"EOS7WnhaKwHpbSidYuh2DF1qAExTRUtPEdZCaZqt75cKcixuQUtdA"')
+    check_type('public_key', '"EOS7Bn1YDeZ18w2N9DU4KAJxZDt6hk3L7eUwFRAc1hb5bp6xJwxNV"')
     // signature
     check_type('symbol_code', '"A"')
     check_type('symbol_code', '"B"')
