@@ -167,6 +167,14 @@ function check_types() {
     check_type('checksum256', '"0987654321ABCDEF0987654321FFFF1234567890ABCDEF001234567890ABCDEF"');
     check_type('checksum512', '"00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000"');
     check_type('checksum512', '"0987654321ABCDEF0987654321FFFF1234567890ABCDEF001234567890ABCDEF0987654321ABCDEF0987654321FFFF1234567890ABCDEF001234567890ABCDEF"');
+    check_type('public_key', '"EOS1111111111111111111111111111111114T1Anm"')
+    check_type('public_key', '"EOS11111111111111111111111115qCHTcgbQwptSz99m"')
+    check_type('public_key', '"EOS111111111111111114ZrjxJnU1LA5xSyrWMNuXTrYSJ57"')
+    check_type('public_key', '"EOS1111111113diW7pnisfdBvHTXP7wvW5k5Ky1e5DVuF23dosU"')
+    check_type('public_key', '"EOS11DsZ6Lyr1aXpm9aBqqgV4iFJpNbSw5eE9LLTwNAxqjJgmjgbT"')
+    check_type('public_key', '"EOS12wkBET2rRgE8pahuaczxKbmv7ciehqsne57F9gtzf1PVYNMRa2"')
+    check_type('public_key', '"EOS1yp8ebBuKZ13orqUrZsGsP49e6K3ThVK1nLutxSyU5j9SaXz9a"')
+    check_type('public_key', '"EOS9adaAMuB9v8yX1mZ5PtoB6VFSCeqRGjASd8ZTM6VUkiHL7mue4K"')
     check_type('public_key', '"EOS69X3383RzBZj41k73CSjUNXM5MYGpnDxyPnWUKPEtYQmTBWz4D"')
     check_type('public_key', '"EOS7yBtksm8Kkg85r4in4uCbfN77uRwe82apM8jjbhFVDgEgz3w8S"')
     check_type('public_key', '"EOS7WnhaKwHpbSidYuh2DF1qAExTRUtPEdZCaZqt75cKcixuQUtdA"')

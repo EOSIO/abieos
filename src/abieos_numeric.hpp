@@ -78,9 +78,9 @@ std::array<uint8_t, size> base58_to_binary(std::string_view s) {
 
 template <auto size>
 std::string binary_to_base58(const std::array<uint8_t, size>& bin) {
-    std::string result("1");
-    for (auto it = bin.begin(); it != bin.end(); ++it) {
-        int carry = *it;
+    std::string result("");
+    for (auto byte : bin) {
+        int carry = byte;
         for (auto& result_digit : result) {
             int x = (base58_map[result_digit] << 8) + carry;
             result_digit = base58_chars[x % 58];
@@ -91,6 +91,11 @@ std::string binary_to_base58(const std::array<uint8_t, size>& bin) {
             carry = carry / 58;
         }
     }
+    for (auto byte : bin)
+        if (byte)
+            break;
+        else
+            result.push_back('1');
     std::reverse(result.begin(), result.end());
     return result;
 }
@@ -105,7 +110,7 @@ struct public_key {
     std::array<uint8_t, 33> data{};
 };
 
-auto digest_message(const unsigned char* message, size_t message_len) {
+inline auto digest_message_ripemd160(const unsigned char* message, size_t message_len) {
     std::array<unsigned char, 20> digest;
     ripemd160::ripemd160_state self;
     ripemd160::ripemd160_init(&self);
@@ -121,7 +126,7 @@ inline public_key string_to_public_key(const std::string& s) {
         public_key key{public_key_type::k1};
         static_assert(whole.size() == key.data.size() + 4);
         memcpy(key.data.data(), whole.data(), key.data.size());
-        auto ripe_digest = digest_message(key.data.data(), key.data.size());
+        auto ripe_digest = digest_message_ripemd160(key.data.data(), key.data.size());
         if (memcmp(ripe_digest.data(), whole.data() + key.data.size(), 4))
             throw std::runtime_error("Key checksum doesn't match");
         return key;
@@ -132,7 +137,7 @@ inline public_key string_to_public_key(const std::string& s) {
 
 inline std::string public_key_to_string(const public_key& key) {
     if (key.type == public_key_type::k1) {
-        auto ripe_digest = digest_message(key.data.data(), key.data.size());
+        auto ripe_digest = digest_message_ripemd160(key.data.data(), key.data.size());
         std::array<uint8_t, 37> whole;
         memcpy(whole.data(), key.data.data(), key.data.size());
         memcpy(whole.data() + key.data.size(), ripe_digest.data(), 4);
