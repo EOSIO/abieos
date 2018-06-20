@@ -25,13 +25,13 @@ inline constexpr auto base58_map = create_base58_map();
 template <auto size>
 std::array<uint8_t, size> decimal_to_binary(std::string_view s) {
     std::array<uint8_t, size> result{{0}};
-    for (auto it = s.begin(); it != s.end(); ++it) {
-        if (*it < '0' || *it > '9')
+    for (auto& src_digit : s) {
+        if (src_digit < '0' || src_digit > '9')
             throw std::runtime_error("invalid number");
-        uint8_t carry = *it - '0';
-        for (unsigned i = 0; i < size; ++i) {
-            int x = result[i] * 10 + carry;
-            result[i] = x;
+        uint8_t carry = src_digit - '0';
+        for (auto& result_byte : result) {
+            int x = result_byte * 10 + carry;
+            result_byte = x;
             carry = x >> 8;
         }
         if (carry)
@@ -43,15 +43,17 @@ std::array<uint8_t, size> decimal_to_binary(std::string_view s) {
 template <auto size>
 std::string binary_to_decimal(const std::array<uint8_t, size>& bin) {
     std::string result("0");
-    for (int i = (int)size * 8 - 1; i >= 0; --i) {
-        int carry = (bin[i / 8] >> (i & 7)) & 1;
-        for (size_t i = 0; i < result.size(); ++i) {
-            int x = (result[i] - '0') * 2 + carry;
-            result[i] = '0' + (x % 10);
+    for (auto byte_it = bin.rbegin(); byte_it != bin.rend(); ++byte_it) {
+        int carry = *byte_it;
+        for (auto& result_digit : result) {
+            int x = ((result_digit - '0') << 8) + carry;
+            result_digit = '0' + x % 10;
             carry = x / 10;
         }
-        if (carry)
-            result.push_back('0' + carry);
+        while (carry) {
+            result.push_back('0' + carry % 10);
+            carry = carry / 10;
+        }
     }
     std::reverse(result.begin(), result.end());
     return result;
