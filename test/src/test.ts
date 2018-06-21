@@ -8,7 +8,6 @@ const transactionAbi = require('json-loader!../../external/eosjs2/src/transactio
 import * as eosjs2 from '../../external/eosjs2/src/index';
 import * as eosjs2_jsonrpc from '../../external/eosjs2/src/eosjs2-jsonrpc';
 import * as eosjs2_jssig from '../../external/eosjs2/src/eosjs2-jssig';
-import * as eosjs2_ser from '../../external/eosjs2/src/eosjs2-serialize';
 
 const lib = new fastcall.Library('../build/libabieos.so')
     .function('void* abieos_create()')
@@ -22,21 +21,6 @@ const lib = new fastcall.Library('../build/libabieos.so')
     .function('int abieos_set_abi(void* context, uint64 contract, char* abi)')
     .function('int abieos_json_to_bin(void* context, uint64 contract, char* name, char* json)')
     .function('char* abieos_hex_to_json(void* context, uint64 contract, char* type, char* hex)');
-
-export function arrayToHex(data: Uint8Array) {
-    let result = '';
-    for (let x of data)
-        result += ('00' + x.toString(16)).slice(-2);
-    return result;
-}
-
-export function hexToUint8Array(hex: string) {
-    let l = hex.length / 2;
-    let result = new Uint8Array(l);
-    for (let i = 0; i < l; ++i)
-        result[i] = parseInt(hex.substr(i * 2, 2), 16);
-    return result;
-}
 
 const l = lib.interface;
 const cstr = fastcall.makeStringBuffer;
@@ -179,6 +163,10 @@ function check_types() {
     check_type('public_key', '"EOS7yBtksm8Kkg85r4in4uCbfN77uRwe82apM8jjbhFVDgEgz3w8S"')
     check_type('public_key', '"EOS7WnhaKwHpbSidYuh2DF1qAExTRUtPEdZCaZqt75cKcixuQUtdA"')
     check_type('public_key', '"EOS7Bn1YDeZ18w2N9DU4KAJxZDt6hk3L7eUwFRAc1hb5bp6xJwxNV"')
+    check_type('public_key', '"PUB_R1_1111111111111111111111111111111116amPNj"')
+    check_type('public_key', '"PUB_R1_67vQGPDMCR4gbqYV3hkfNz3BfzRmmSj27kFDKrwDbaZKtaX36u"')
+    check_type('public_key', '"PUB_R1_6FPFZqw5ahYrR9jD96yDbbDNTdKtNqRbze6oTDLntrsANgQKZu"')
+    check_type('public_key', '"PUB_R1_7zetsBPJwGQqgmhVjviZUfoBMktHinmTqtLczbQqrBjhaBgi6x"')
     // signature
     check_type('symbol_code', '"A"')
     check_type('symbol_code', '"B"')
@@ -209,7 +197,7 @@ async function push_transfer() {
     let info = await rpc.get_info();
     let refBlock = await rpc.get_block(info.head_block_num - 3);
     let transaction = {
-        expiration: eosjs2_ser.timePointSecToDate(eosjs2_ser.dateToTimePointSec(refBlock.timestamp) + 10),
+        expiration: eosjs2.serialize.timePointSecToDate(eosjs2.serialize.dateToTimePointSec(refBlock.timestamp) + 10),
         ref_block_num: refBlock.block_num,
         ref_block_prefix: refBlock.ref_block_prefix,
         max_net_usage_words: 0,
@@ -232,7 +220,7 @@ async function push_transfer() {
     console.log('transaction json->bin: ', transactionDataHex);
     console.log('transaction bin->json: ', hex_to_json(0, 'transaction', transactionDataHex));
 
-    let sig = await signatureProvider.sign({ chainId: info.chain_id, serializedTransaction: hexToUint8Array(transactionDataHex) });
+    let sig = await signatureProvider.sign({ chainId: info.chain_id, serializedTransaction: eosjs2.serialize.hexToUint8Array(transactionDataHex) });
     console.log('sig:', sig)
 
     let result = await rpc.fetch('/v1/chain/push_transaction', {

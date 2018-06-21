@@ -122,6 +122,14 @@ inline auto digest_message_ripemd160(const unsigned char* message, size_t messag
     return digest;
 }
 
+inline auto digest_r1_ripemd160(const std::array<uint8_t, 33>& data) {
+    std::array<uint8_t, 35> digest_data;
+    memcpy(digest_data.data(), data.data(), data.size());
+    digest_data[33] = 'R';
+    digest_data[34] = '1';
+    return digest_message_ripemd160(digest_data.data(), digest_data.size());
+}
+
 inline public_key string_to_public_key(const std::string& s) {
     if (s.size() >= 3 && std::string_view{s.c_str(), 3} == "EOS") {
         auto whole = base58_to_binary<37>({s.c_str() + 3, s.size() - 3});
@@ -129,6 +137,15 @@ inline public_key string_to_public_key(const std::string& s) {
         static_assert(whole.size() == key.data.size() + 4);
         memcpy(key.data.data(), whole.data(), key.data.size());
         auto ripe_digest = digest_message_ripemd160(key.data.data(), key.data.size());
+        if (memcmp(ripe_digest.data(), whole.data() + key.data.size(), 4))
+            throw std::runtime_error("Key checksum doesn't match");
+        return key;
+    } else if (s.size() >= 7 && std::string_view{s.c_str(), 7} == "PUB_R1_") {
+        auto whole = base58_to_binary<37>({s.c_str() + 7, s.size() - 7});
+        public_key key{public_key_type::r1};
+        static_assert(whole.size() == key.data.size() + 4);
+        memcpy(key.data.data(), whole.data(), key.data.size());
+        auto ripe_digest = digest_r1_ripemd160(key.data);
         if (memcmp(ripe_digest.data(), whole.data() + key.data.size(), 4))
             throw std::runtime_error("Key checksum doesn't match");
         return key;
@@ -144,6 +161,12 @@ inline std::string public_key_to_string(const public_key& key) {
         memcpy(whole.data(), key.data.data(), key.data.size());
         memcpy(whole.data() + key.data.size(), ripe_digest.data(), 4);
         return "EOS" + binary_to_base58(whole);
+    } else if (key.type == public_key_type::r1) {
+        auto ripe_digest = digest_r1_ripemd160(key.data);
+        std::array<uint8_t, 37> whole;
+        memcpy(whole.data(), key.data.data(), key.data.size());
+        memcpy(whole.data() + key.data.size(), ripe_digest.data(), 4);
+        return "PUB_R1_" + binary_to_base58(whole);
     } else {
         throw std::runtime_error("unrecognized public key format");
     }
