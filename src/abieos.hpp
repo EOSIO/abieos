@@ -1071,7 +1071,7 @@ bool bin_to_native(T& obj) {
         return false;
     while (!state.stack.empty()) {
         auto& x = state.stack.back();
-        if (!x.ser->bin_to_native(state, x.obj, false))
+        if (!x.ser || !x.ser->bin_to_native(state, x.obj, false))
             return false;
     }
     return true;
@@ -1087,7 +1087,7 @@ inline bool receive_event(struct json_to_native_state& state, event_type event, 
     auto& x = state.stack.back();
     if (trace_json_to_native_event)
         printf("(event %d)\n", event);
-    return x.ser->json_to_native(x.obj, state, event, false);
+    return x.ser && x.ser->json_to_native(x.obj, state, event, false);
 }
 
 template <typename T>
@@ -1375,10 +1375,7 @@ inline bool receive_event(struct json_to_bin_state& state, event_type event, boo
     auto* type = state.stack.back().type;
     if (start)
         state.stack.clear();
-    if (type->ser)
-        return type->ser->json_to_bin(state, type, event, start);
-    else
-        return false;
+    return type->ser && type->ser->json_to_bin(state, type, event, start);
 }
 
 inline bool json_to_bin(std::vector<char>& bin, const abi_type* type, std::string_view json) {
@@ -1449,10 +1446,7 @@ inline bool json_to_bin(pseudo_object*, json_to_bin_state& state, const abi_type
         if (trace_json_to_bin)
             printf("%*sfield %d/%d: %s (event %d)\n", int(state.stack.size() * 4), "", int(stack_entry.position),
                    int(type->fields.size()), std::string{field.name}.c_str(), event);
-        if (field.type->ser)
-            return field.type->ser->json_to_bin(state, field.type, event, true);
-        else
-            return false;
+        return field.type->ser && field.type->ser->json_to_bin(state, field.type, event, true);
     }
 }
 
@@ -1478,10 +1472,7 @@ inline bool json_to_bin(pseudo_array*, json_to_bin_state& state, const abi_type*
     ++stack_entry.position;
     if (trace_json_to_bin)
         printf("%*sitem (event %d)\n", int(state.stack.size() * 4), "", event);
-    if (type->array_of->ser)
-        return type->array_of->ser->json_to_bin(state, type->array_of, event, true);
-    else
-        return false;
+    return type->array_of->ser && type->array_of->ser->json_to_bin(state, type->array_of, event, true);
 }
 
 template <typename T>
@@ -1537,11 +1528,12 @@ inline bool bin_to_json(input_buffer& bin, const abi_type* type, std::string& de
     rapidjson::StringBuffer buffer{};
     rapidjson::Writer<rapidjson::StringBuffer> writer{buffer};
     bin_to_json_state state{bin, writer};
-    if (!type->ser->bin_to_json(state, type, true))
+    if (!type->ser || !type->ser->bin_to_json(state, type, true))
         return false;
     if (type->filled_struct || type->array_of)
         while (!state.stack.empty())
-            if (!state.stack.back().type->ser->bin_to_json(state, state.stack.back().type, false))
+            if (!state.stack.back().type->ser ||
+                !state.stack.back().type->ser->bin_to_json(state, state.stack.back().type, false))
                 return false;
     dest = buffer.GetString();
     return true;
@@ -1562,11 +1554,7 @@ inline bool bin_to_json(pseudo_object*, bin_to_json_state& state, const abi_type
             printf("%*sfield %d/%d: %s\n", int(state.stack.size() * 4), "", int(stack_entry.position),
                    int(type->fields.size()), std::string{field.name}.c_str());
         state.writer.Key(field.name.c_str(), field.name.length());
-        if (field.type->ser)
-            return field.type->ser->bin_to_json(state, field.type, true);
-        else
-            return false;
-        return true;
+        return field.type->ser && field.type->ser->bin_to_json(state, field.type, true);
     } else {
         if (trace_bin_to_json)
             printf("%*s}\n", int((state.stack.size() - 1) * 4), "");
@@ -1590,10 +1578,7 @@ inline bool bin_to_json(pseudo_array*, bin_to_json_state& state, const abi_type*
         if (trace_bin_to_json)
             printf("%*sitem %d/%d %p %s\n", int(state.stack.size() * 4), "", int(stack_entry.position),
                    int(stack_entry.array_size), type->array_of->ser, type->array_of->name.c_str());
-        if (type->array_of->ser)
-            return type->array_of->ser->bin_to_json(state, type->array_of, true);
-        else
-            return false;
+        return type->array_of->ser && type->array_of->ser->bin_to_json(state, type->array_of, true);
     } else {
         if (trace_bin_to_json)
             printf("%*s]\n", int((state.stack.size()) * 4), "");
