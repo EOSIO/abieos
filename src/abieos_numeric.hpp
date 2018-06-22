@@ -102,14 +102,19 @@ std::string binary_to_base58(const std::array<uint8_t, size>& bin) {
     return result;
 }
 
-enum class public_key_type : uint8_t {
+enum class key_type : uint8_t {
     k1 = 0,
     r1 = 1,
 };
 
 struct public_key {
-    public_key_type type{};
+    key_type type{};
     std::array<uint8_t, 33> data{};
+};
+
+struct signature {
+    key_type type{};
+    std::array<uint8_t, 65> data{};
 };
 
 inline auto digest_message_ripemd160(const unsigned char* message, size_t message_len) {
@@ -122,54 +127,87 @@ inline auto digest_message_ripemd160(const unsigned char* message, size_t messag
     return digest;
 }
 
-inline auto digest_r1_ripemd160(const std::array<uint8_t, 33>& data) {
-    std::array<uint8_t, 35> digest_data;
-    memcpy(digest_data.data(), data.data(), data.size());
-    digest_data[33] = 'R';
-    digest_data[34] = '1';
-    return digest_message_ripemd160(digest_data.data(), digest_data.size());
+template <size_t size, int suffix_size>
+inline auto digest_suffix_ripemd160(const std::array<uint8_t, size>& data, const char (&suffix)[suffix_size]) {
+    std::array<unsigned char, 20> digest;
+    ripemd160::ripemd160_state self;
+    ripemd160::ripemd160_init(&self);
+    ripemd160::ripemd160_update(&self, data.data(), data.size());
+    ripemd160::ripemd160_update(&self, (uint8_t*)suffix, suffix_size - 1);
+    if (!ripemd160::ripemd160_digest(&self, digest.data()))
+        throw std::runtime_error("ripemd failed");
+    return digest;
 }
 
-inline public_key string_to_public_key(const std::string& s) {
-    if (s.size() >= 3 && std::string_view{s.c_str(), 3} == "EOS") {
-        auto whole = base58_to_binary<37>({s.c_str() + 3, s.size() - 3});
-        public_key key{public_key_type::k1};
+template <typename Key, int suffix_size>
+Key string_to_key(std::string_view s, key_type type, const char (&suffix)[suffix_size]) {
+    static constexpr auto size = std::tuple_size_v<decltype(Key::data)>;
+    auto whole = base58_to_binary<size + 4>(s);
+    Key result{type};
+    memcpy(result.data.data(), whole.data(), result.data.size());
+    auto ripe_digest = digest_suffix_ripemd160(result.data, suffix);
+    if (memcmp(ripe_digest.data(), whole.data() + result.data.size(), 4))
+        throw std::runtime_error("checksum doesn't match");
+    return result;
+}
+
+template <typename Key, int suffix_size>
+std::string key_to_string(const Key& key, const char (&suffix)[suffix_size], const char* prefix) {
+    static constexpr auto size = std::tuple_size_v<decltype(Key::data)>;
+    auto ripe_digest = digest_suffix_ripemd160(key.data, suffix);
+    std::array<uint8_t, size + 4> whole;
+    memcpy(whole.data(), key.data.data(), size);
+    memcpy(whole.data() + size, ripe_digest.data(), 4);
+    return prefix + binary_to_base58(whole);
+}
+
+inline public_key string_to_public_key(std::string_view s) {
+    if (s.size() >= 3 && s.substr(0, 3) == "EOS") {
+        auto whole = base58_to_binary<37>(s.substr(3));
+        public_key key{key_type::k1};
         static_assert(whole.size() == key.data.size() + 4);
         memcpy(key.data.data(), whole.data(), key.data.size());
         auto ripe_digest = digest_message_ripemd160(key.data.data(), key.data.size());
         if (memcmp(ripe_digest.data(), whole.data() + key.data.size(), 4))
             throw std::runtime_error("Key checksum doesn't match");
         return key;
-    } else if (s.size() >= 7 && std::string_view{s.c_str(), 7} == "PUB_R1_") {
-        auto whole = base58_to_binary<37>({s.c_str() + 7, s.size() - 7});
-        public_key key{public_key_type::r1};
-        static_assert(whole.size() == key.data.size() + 4);
-        memcpy(key.data.data(), whole.data(), key.data.size());
-        auto ripe_digest = digest_r1_ripemd160(key.data);
-        if (memcmp(ripe_digest.data(), whole.data() + key.data.size(), 4))
-            throw std::runtime_error("Key checksum doesn't match");
-        return key;
+    } else if (s.size() >= 7 && s.substr(0, 7) == "PUB_R1_") {
+        return string_to_key<public_key>(s.substr(7), key_type::r1, "R1");
     } else {
         throw std::runtime_error("unrecognized public key format");
     }
 }
 
 inline std::string public_key_to_string(const public_key& key) {
-    if (key.type == public_key_type::k1) {
+    if (key.type == key_type::k1) {
         auto ripe_digest = digest_message_ripemd160(key.data.data(), key.data.size());
         std::array<uint8_t, 37> whole;
         memcpy(whole.data(), key.data.data(), key.data.size());
         memcpy(whole.data() + key.data.size(), ripe_digest.data(), 4);
         return "EOS" + binary_to_base58(whole);
-    } else if (key.type == public_key_type::r1) {
-        auto ripe_digest = digest_r1_ripemd160(key.data);
-        std::array<uint8_t, 37> whole;
-        memcpy(whole.data(), key.data.data(), key.data.size());
-        memcpy(whole.data() + key.data.size(), ripe_digest.data(), 4);
-        return "PUB_R1_" + binary_to_base58(whole);
+    } else if (key.type == key_type::r1) {
+        return key_to_string(key, "R1", "PUB_R1_");
     } else {
         throw std::runtime_error("unrecognized public key format");
     }
+}
+
+inline signature string_to_signature(std::string_view s) {
+    if (s.size() >= 7 && s.substr(0, 7) == "SIG_K1_")
+        return string_to_key<signature>(s.substr(7), key_type::k1, "K1");
+    else if (s.size() >= 7 && s.substr(0, 7) == "SIG_R1_")
+        return string_to_key<signature>(s.substr(7), key_type::r1, "R1");
+    else
+        throw std::runtime_error("unrecognized public key format");
+}
+
+inline std::string signature_to_string(const signature& signature) {
+    if (signature.type == key_type::k1)
+        return key_to_string(signature, "K1", "SIG_K1_");
+    else if (signature.type == key_type::r1)
+        return key_to_string(signature, "R1", "SIG_R1_");
+    else
+        throw std::runtime_error("unrecognized signature format");
 }
 
 } // namespace abieos
