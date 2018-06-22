@@ -311,7 +311,11 @@ inline bool json_to_bin(bytes*, json_to_bin_state& state, const abi_type*, event
         if (s.size() & 1)
             throw std::runtime_error("odd number of hex digits");
         push_varuint32(state.bin, s.size() / 2);
-        boost::algorithm::unhex(s.begin(), s.end(), std::back_inserter(state.bin));
+        try {
+            boost::algorithm::unhex(s.begin(), s.end(), std::back_inserter(state.bin));
+        } catch (...) {
+            throw std::runtime_error("expected hex string");
+        }
         return true;
     } else
         throw std::runtime_error("expected string containing hex digits");
@@ -343,7 +347,11 @@ inline bool json_to_bin(checksum<size>*, json_to_bin_state& state, const abi_typ
         if (trace_json_to_bin)
             printf("%*schecksum\n", int(state.stack.size() * 4), "");
         std::vector<uint8_t> v;
-        boost::algorithm::unhex(s.begin(), s.end(), std::back_inserter(v));
+        try {
+            boost::algorithm::unhex(s.begin(), s.end(), std::back_inserter(v));
+        } catch (...) {
+            throw std::runtime_error("expected hex string");
+        }
         if (v.size() != size)
             throw std::runtime_error("checksum has incorrect size");
         state.bin.insert(state.bin.end(), v.begin(), v.end());
@@ -1280,6 +1288,7 @@ inline abi_type& fill_struct(std::map<type_name, abi_type>& abi_types, abi_type&
         type.fields = fill_struct(abi_types, get_type(abi_types, type.struct_def->base, depth + 1), depth + 1).fields;
     for (auto& field : type.struct_def->fields)
         type.fields.push_back(abi_field{field.name, &get_type(abi_types, field.type, depth + 1)});
+    type.filled_struct = true;
     return type;
 }
 
@@ -1313,6 +1322,8 @@ inline contract create_contract(const abi_def& abi) {
     for (auto& [_, t] : c.abi_types)
         if (t.struct_def)
             fill_struct(c.abi_types, t, 0);
+    for (auto& [_, t] : c.abi_types)
+        t.struct_def = nullptr;
     return c;
 }
 
@@ -1340,9 +1351,28 @@ inline bool json_to_bin(std::vector<char>& bin, const abi_type* type, std::strin
     state.stack.push_back({type});
     rapidjson::Reader reader;
     rapidjson::InsituStringStream ss(mutable_json.data());
-    if (!reader.Parse<rapidjson::kParseValidateEncodingFlag | rapidjson::kParseIterativeFlag |
-                      rapidjson::kParseFullPrecisionFlag>(ss, state))
-        return false;
+    try {
+        if (!reader.Parse<rapidjson::kParseValidateEncodingFlag | rapidjson::kParseIterativeFlag |
+                          rapidjson::kParseFullPrecisionFlag>(ss, state))
+            throw std::runtime_error{"failed to parse"};
+    } catch (std::exception& e) {
+        std::string s;
+        if (!state.stack.empty() && state.stack[0].type->filled_struct)
+            s += state.stack[0].type->name;
+        for (auto& entry : state.stack) {
+            if (entry.type->array_of)
+                s += "[" + std::to_string(entry.position) + "]";
+            else if (entry.type->filled_struct) {
+                if (entry.position >= 0 && entry.position < entry.type->fields.size())
+                    s += "." + entry.type->fields[entry.position].name;
+            } else
+                s += "<?>";
+        }
+        if (!s.empty())
+            s += ": ";
+        s += e.what();
+        throw std::runtime_error{s};
+    }
     size_t pos = 0;
     for (auto& insertion : state.size_insertions) {
         bin.insert(bin.end(), state.bin.begin() + pos, state.bin.begin() + insertion.position);
@@ -1356,7 +1386,7 @@ inline bool json_to_bin(std::vector<char>& bin, const abi_type* type, std::strin
 inline bool json_to_bin(pseudo_object*, json_to_bin_state& state, const abi_type* type, event_type event, bool start) {
     if (start) {
         if (event != event_type::received_start_object)
-            return false;
+            throw std::runtime_error("expected object");
         if (trace_json_to_bin)
             printf("%*s{ %d fields\n", int(state.stack.size() * 4), "", int(type->fields.size()));
         state.stack.push_back({type});
@@ -1373,7 +1403,7 @@ inline bool json_to_bin(pseudo_object*, json_to_bin_state& state, const abi_type
     }
     if (event == event_type::received_key) {
         if (++stack_entry.position >= (ptrdiff_t)type->fields.size())
-            return false; // todo: missing fields
+            throw std::runtime_error("unexpected field \"" + state.received_data.key + "\"");
         auto& field = type->fields[stack_entry.position];
         if (state.received_data.key != field.name)
             throw std::runtime_error("expected field \"" + field.name + "\"");
@@ -1393,7 +1423,7 @@ inline bool json_to_bin(pseudo_object*, json_to_bin_state& state, const abi_type
 inline bool json_to_bin(pseudo_array*, json_to_bin_state& state, const abi_type* type, event_type event, bool start) {
     if (start) {
         if (event != event_type::received_start_array)
-            return false;
+            throw std::runtime_error("expected array");
         if (trace_json_to_bin)
             printf("%*s[\n", int(state.stack.size() * 4), "");
         state.stack.push_back({type});
@@ -1431,11 +1461,19 @@ auto json_to_bin(T*, json_to_bin_state& state, const abi_type*, event_type event
     } else if (event == event_type::received_double) {
         obj = state.received_data.value_double;
     } else if (event == event_type::received_string && std::is_integral_v<T> && std::is_signed_v<T>) {
-        obj = stoll(state.received_data.value_string);
+        try {
+            obj = stoll(state.received_data.value_string);
+        } catch (...) {
+            throw std::runtime_error("expected integer in string");
+        }
     } else if (event == event_type::received_string && std::is_integral_v<T> && !std::is_signed_v<T>) {
-        obj = stoull(state.received_data.value_string);
+        try {
+            obj = stoull(state.received_data.value_string);
+        } catch (...) {
+            throw std::runtime_error("expected unsigned integer in string");
+        }
     } else {
-        return false;
+        throw std::runtime_error("expected number or boolean");
     }
     push_raw(state.bin, obj);
     return true;
@@ -1450,7 +1488,7 @@ inline bool json_to_bin(std::string*, json_to_bin_state& state, const abi_type*,
         state.bin.insert(state.bin.end(), s.begin(), s.end());
         return true;
     } else
-        return false;
+        throw std::runtime_error("expected string");
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -1465,7 +1503,7 @@ inline bool bin_to_json(input_buffer& bin, const abi_type* type, std::string& de
     bin_to_json_state state{bin, writer};
     if (!type->ser->bin_to_json(state, type, true))
         return false;
-    if (type->struct_def || type->array_of)
+    if (type->filled_struct || type->array_of)
         while (!state.stack.empty())
             if (!state.stack.back().type->ser->bin_to_json(state, state.stack.back().type, false))
                 return false;
@@ -1548,7 +1586,6 @@ auto bin_to_json(T*, bin_to_json_state& state, const abi_type*, bool start)
 }
 
 inline bool bin_to_json(std::string*, bin_to_json_state& state, const abi_type*, bool start) {
-    // 64 bit: use string !!!
     auto s = read_string(state.bin);
     return state.writer.String(s.c_str(), s.size());
 }
