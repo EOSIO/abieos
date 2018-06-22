@@ -390,6 +390,42 @@ inline bool bin_to_json(uint128*, bin_to_json_state& state, const abi_type*, boo
     return state.writer.String(result.c_str(), result.size());
 }
 
+struct int128 {
+    std::array<uint8_t, 16> value{{0}};
+};
+
+inline bool json_to_bin(int128*, json_to_bin_state& state, const abi_type*, event_type event, bool start) {
+    if (event == event_type::received_string) {
+        std::string_view s = state.received_data.value_string;
+        if (trace_json_to_bin)
+            printf("%*sint128\n", int(state.stack.size() * 4), "");
+        bool negative = false;
+        if (!s.empty() && s[0] == '-') {
+            negative = true;
+            s = s.substr(1);
+        }
+        auto value = decimal_to_binary<16>(s);
+        if (negative)
+            negate(value);
+        if (is_negative(value) != negative)
+            throw std::runtime_error("number is out of range");
+        push_raw(state.bin, value);
+        return true;
+    } else
+        throw std::runtime_error("expected string containing int128");
+}
+
+inline bool bin_to_json(int128*, bin_to_json_state& state, const abi_type*, bool start) {
+    auto v = read_bin<int128>(state.bin);
+    bool negative = is_negative(v.value);
+    if (negative)
+        negate(v.value);
+    auto result = binary_to_decimal(v.value);
+    if (negative)
+        result = "-" + result;
+    return state.writer.String(result.c_str(), result.size());
+}
+
 inline bool json_to_bin(public_key*, json_to_bin_state& state, const abi_type*, event_type event, bool start) {
     if (event == event_type::received_string) {
         auto& s = state.received_data.value_string;
@@ -1187,7 +1223,7 @@ constexpr void for_each_abi_type(F f) {
     f("uint32", (uint32_t*)nullptr);
     f("int64", (int64_t*)nullptr);
     f("uint64", (uint64_t*)nullptr);
-    // f("int128", (int128_t*)nullptr);
+    f("int128", (int128*)nullptr);
     f("uint128", (uint128*)nullptr);
     // f("varint32", (signed_int*)nullptr);
     f("varuint32", (varuint32*)nullptr);
@@ -1363,7 +1399,7 @@ inline bool json_to_bin(std::vector<char>& bin, const abi_type* type, std::strin
             if (entry.type->array_of)
                 s += "[" + std::to_string(entry.position) + "]";
             else if (entry.type->filled_struct) {
-                if (entry.position >= 0 && entry.position < entry.type->fields.size())
+                if (entry.position >= 0 && entry.position < (int)entry.type->fields.size())
                     s += "." + entry.type->fields[entry.position].name;
             } else
                 s += "<?>";

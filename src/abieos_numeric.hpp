@@ -23,6 +23,21 @@ inline constexpr auto create_base58_map() {
 inline constexpr auto base58_map = create_base58_map();
 
 template <auto size>
+bool is_negative(const std::array<uint8_t, size>& a) {
+    return a[size - 1] & 0x80;
+}
+
+template <auto size>
+void negate(std::array<uint8_t, size>& a) {
+    uint8_t carry = 1;
+    for (auto& byte : a) {
+        int x = uint8_t(~byte) + carry;
+        byte = x;
+        carry = x >> 8;
+    }
+}
+
+template <auto size>
 std::array<uint8_t, size> decimal_to_binary(std::string_view s) {
     std::array<uint8_t, size> result{{0}};
     for (auto& src_digit : s) {
