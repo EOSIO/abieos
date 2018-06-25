@@ -205,7 +205,8 @@ function check_types() {
     check_type('asset[]', '["0 FOO","0.000 FOO"]')
     check_type('asset?', 'null')
     check_type('asset?', '"0.123456 SIX"')
-    // extended_asset
+    check_type('extended_asset', '{"quantity":"0 FOO","contract":"bar"}')
+    check_type('extended_asset', '{"quantity":"0.123456 SIX","contract":"seven"}')
 }
 
 async function push_transfer() {

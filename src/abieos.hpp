@@ -1324,7 +1324,6 @@ constexpr void for_each_abi_type(F f) {
     f("symbol", (symbol*)nullptr);
     f("symbol_code", (symbol_code*)nullptr);
     f("asset", (asset*)nullptr);
-    // f("extended_asset", (extended_asset*)nullptr);
 }
 
 template <typename T>
@@ -1422,8 +1421,17 @@ inline contract create_contract(const abi_def& abi) {
     for_each_abi_type([&](const char* name, auto* p) {
         abi_type type{name};
         type.ser = &abi_serializer_for<std::decay_t<decltype(*p)>>;
-        c.abi_types.insert({type.name, std::move(type)});
+        c.abi_types.insert({name, std::move(type)});
     });
+    {
+        abi_type type{"extended_asset"};
+        type.fields.push_back(abi_field{"quantity", &get_type(c.abi_types, "asset", 0)});
+        type.fields.push_back(abi_field{"contract", &get_type(c.abi_types, "name", 0)});
+        type.filled_struct = true;
+        type.ser = &abi_serializer_for<pseudo_object>;
+        c.abi_types.insert({"extended_asset", std::move(type)});
+    }
+
     for (auto& t : abi.types) {
         if (t.new_type_name.empty())
             throw std::runtime_error("abi has a type with a missing name");
