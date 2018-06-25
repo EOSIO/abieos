@@ -126,6 +126,14 @@ function check_types() {
     check_type('varuint32', '268435457');
     check_type('varuint32', '4294967294');
     check_type('varuint32', '4294967295');
+    check_type('varint32', '0');
+    check_type('varint32', '-1');
+    check_type('varint32', '1');
+    check_type('varint32', '-2');
+    check_type('varint32', '2');
+    check_type('varint32', '-2147483647');
+    check_type('varint32', '2147483647');
+    check_type('varint32', '-2147483648');
     check_type('float32', '0.0');
     check_type('float32', '0.125');
     check_type('float32', '-0.125');

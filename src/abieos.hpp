@@ -84,11 +84,11 @@ T read_bin(input_buffer& bin) {
     return result;
 }
 
-uint32_t read_varuint(input_buffer& bin);
+uint32_t read_varuint32(input_buffer& bin);
 
 inline std::string read_string(input_buffer& bin) {
     // todo: check size against remaining bytes in bin before allocating memory
-    auto size = read_varuint(bin);
+    auto size = read_varuint32(bin);
     std::string result(size, 0);
     read_bin(bin, result.data(), size);
     return result;
@@ -326,7 +326,7 @@ inline bool json_to_bin(bytes*, json_to_bin_state& state, const abi_type*, event
 
 inline bool bin_to_json(bytes*, bin_to_json_state& state, const abi_type*, bool start) {
     // todo: check size against remaining bytes in bin before allocating memory
-    auto size = read_varuint(state.bin);
+    auto size = read_varuint32(state.bin);
     std::vector<char> raw(size);
     read_bin(state.bin, raw.data(), size);
     std::string result;
@@ -554,16 +554,6 @@ using type_name = std::string;
 
 struct varuint32 {
     uint32_t value = 0;
-
-    varuint32() = default;
-    explicit varuint32(uint32_t v) : value(v) {}
-
-    explicit operator uint32_t() { return value; }
-
-    varuint32& operator=(uint32_t v) {
-        value = v;
-        return *this;
-    }
 };
 
 inline void push_varuint32(std::vector<char>& bin, uint32_t v) {
@@ -576,7 +566,7 @@ inline void push_varuint32(std::vector<char>& bin, uint32_t v) {
     } while (val);
 }
 
-inline uint32_t read_varuint(input_buffer& bin) {
+inline uint32_t read_varuint32(input_buffer& bin) {
     uint32_t result = 0;
     int shift = 0;
     uint8_t b = 0;
@@ -589,23 +579,57 @@ inline uint32_t read_varuint(input_buffer& bin) {
 }
 
 inline bool json_to_bin(varuint32*, json_to_bin_state& state, const abi_type*, event_type event, bool start) {
-    varuint32 obj;
+    uint32_t v;
     if (event == event_type::received_bool)
-        obj = state.received_data.value_bool;
+        v = state.received_data.value_bool;
     else if (event == event_type::received_uint64)
-        obj = state.received_data.value_uint64;
+        v = state.received_data.value_uint64;
     else if (event == event_type::received_int64)
-        obj = state.received_data.value_int64;
+        v = state.received_data.value_int64;
     else if (event == event_type::received_double)
-        obj = state.received_data.value_double;
+        v = state.received_data.value_double;
     else
         throw std::runtime_error("expected number");
-    push_varuint32(state.bin, obj.value);
+    push_varuint32(state.bin, v);
     return true;
 }
 
 inline bool bin_to_json(varuint32*, bin_to_json_state& state, const abi_type*, bool start) {
-    return state.writer.Uint64(read_varuint(state.bin));
+    return state.writer.Uint64(read_varuint32(state.bin));
+}
+
+struct varint32 {
+    int32_t value = 0;
+};
+
+inline void push_varint32(std::vector<char>& bin, int32_t v) { push_varuint32(bin, uint32_t((v << 1) ^ (v >> 31))); }
+
+inline int32_t read_varint32(input_buffer& bin) {
+    uint32_t v = read_varuint32(bin);
+    if (v & 1)
+        return ((~v) >> 1) | 0x8000'0000;
+    else
+        return v >> 1;
+}
+
+inline bool json_to_bin(varint32*, json_to_bin_state& state, const abi_type*, event_type event, bool start) {
+    int32_t v;
+    if (event == event_type::received_bool)
+        v = state.received_data.value_bool;
+    else if (event == event_type::received_uint64)
+        v = state.received_data.value_uint64;
+    else if (event == event_type::received_int64)
+        v = state.received_data.value_int64;
+    else if (event == event_type::received_double)
+        v = state.received_data.value_double;
+    else
+        throw std::runtime_error("expected number");
+    push_varint32(state.bin, v);
+    return true;
+}
+
+inline bool bin_to_json(varint32*, bin_to_json_state& state, const abi_type*, bool start) {
+    return state.writer.Int64(read_varint32(state.bin));
 }
 
 struct time_point_sec {
@@ -1305,8 +1329,8 @@ constexpr void for_each_abi_type(F f) {
     f("uint64", (uint64_t*)nullptr);
     f("int128", (int128*)nullptr);
     f("uint128", (uint128*)nullptr);
-    // f("varint32", (signed_int*)nullptr);
     f("varuint32", (varuint32*)nullptr);
+    f("varint32", (varint32*)nullptr);
     f("float32", (float*)nullptr);
     f("float64", (double*)nullptr);
     f("float128", (float128*)nullptr);
@@ -1679,7 +1703,7 @@ inline bool bin_to_json(pseudo_object*, bin_to_json_state& state, const abi_type
 inline bool bin_to_json(pseudo_array*, bin_to_json_state& state, const abi_type* type, bool start) {
     if (start) {
         state.stack.push_back({type});
-        state.stack.back().array_size = read_varuint(state.bin);
+        state.stack.back().array_size = read_varuint32(state.bin);
         if (trace_bin_to_json)
             printf("%*s[ %d items\n", int(state.stack.size() * 4), "", int(state.stack.back().array_size));
         state.writer.StartArray();
