@@ -335,16 +335,17 @@ inline bool bin_to_json(bytes*, bin_to_json_state& state, const abi_type*, bool 
 }
 
 template <unsigned size>
-struct checksum {
+struct fixed_binary {
     std::array<uint8_t, size> value{{0}};
 };
 
-using checksum160 = checksum<20>;
-using checksum256 = checksum<32>;
-using checksum512 = checksum<64>;
+using float128 = fixed_binary<16>;
+using checksum160 = fixed_binary<20>;
+using checksum256 = fixed_binary<32>;
+using checksum512 = fixed_binary<64>;
 
 template <unsigned size>
-inline bool json_to_bin(checksum<size>*, json_to_bin_state& state, const abi_type*, event_type event, bool start) {
+inline bool json_to_bin(fixed_binary<size>*, json_to_bin_state& state, const abi_type*, event_type event, bool start) {
     if (event == event_type::received_string) {
         auto& s = state.received_data.value_string;
         if (trace_json_to_bin)
@@ -356,7 +357,7 @@ inline bool json_to_bin(checksum<size>*, json_to_bin_state& state, const abi_typ
             throw std::runtime_error("expected hex string");
         }
         if (v.size() != size)
-            throw std::runtime_error("checksum has incorrect size");
+            throw std::runtime_error("hex string has incorrect length");
         state.bin.insert(state.bin.end(), v.begin(), v.end());
         return true;
     } else
@@ -364,8 +365,8 @@ inline bool json_to_bin(checksum<size>*, json_to_bin_state& state, const abi_typ
 }
 
 template <unsigned size>
-inline bool bin_to_json(checksum<size>*, bin_to_json_state& state, const abi_type*, bool start) {
-    auto v = read_bin<checksum<size>>(state.bin);
+inline bool bin_to_json(fixed_binary<size>*, bin_to_json_state& state, const abi_type*, bool start) {
+    auto v = read_bin<fixed_binary<size>>(state.bin);
     std::string result;
     boost::algorithm::hex(v.value.begin(), v.value.end(), std::back_inserter(result));
     return state.writer.String(result.c_str(), result.size());
@@ -644,6 +645,82 @@ inline bool json_to_bin(time_point_sec*, json_to_bin_state& state, const abi_typ
 
 inline bool bin_to_json(time_point_sec*, bin_to_json_state& state, const abi_type*, bool start) {
     auto s = std::string{time_point_sec{read_bin<uint32_t>(state.bin)}};
+    return state.writer.String(s.c_str(), s.size());
+}
+
+struct time_point {
+    uint64_t microseconds = 0;
+
+    time_point() = default;
+
+    explicit time_point(uint64_t microseconds) : microseconds{microseconds} {}
+
+    explicit time_point(const std::string& s) {
+        auto dot = s.find('.');
+        if (dot == std::string::npos)
+            microseconds = time_point_sec{s}.utc_seconds * 1000000ull;
+        else {
+            auto ms = s.substr(dot);
+            ms[0] = '1';
+            while (ms.size() < 4)
+                ms.push_back('0');
+            microseconds = time_point_sec{s}.utc_seconds * 1000000ull + (stoull(ms) - 1000) * 1000;
+        }
+    }
+
+    explicit operator std::string() const {
+        const auto ptime = boost::posix_time::from_time_t(time_t(microseconds / 1000000));
+        auto msec = (microseconds % 1000000) / 1000 + 1000;
+        return boost::posix_time::to_iso_extended_string(ptime) + "." + std::to_string(msec).substr(1);
+    }
+};
+
+inline bool json_to_bin(time_point*, json_to_bin_state& state, const abi_type*, event_type event, bool start) {
+    if (event == event_type::received_string) {
+        time_point obj{state.received_data.value_string};
+        if (trace_json_to_bin)
+            printf("%*stime_point: %s (%llu) %s\n", int(state.stack.size() * 4), "",
+                   state.received_data.value_string.c_str(), (unsigned long long)obj.microseconds,
+                   std::string{obj}.c_str());
+        push_raw(state.bin, obj.microseconds);
+        return true;
+    } else
+        throw std::runtime_error("expected string containing time_point");
+}
+
+inline bool bin_to_json(time_point*, bin_to_json_state& state, const abi_type*, bool start) {
+    auto s = std::string{time_point{read_bin<uint64_t>(state.bin)}};
+    return state.writer.String(s.c_str(), s.size());
+}
+
+struct block_timestamp {
+    static constexpr uint16_t interval_ms = 500;
+    static constexpr uint64_t epoch_ms = 946684800000ll; // Year 2000
+    uint32_t slot;
+
+    block_timestamp() = default;
+    explicit block_timestamp(uint32_t slot) : slot(slot) {}
+    explicit block_timestamp(time_point t) { slot = (t.microseconds / 1000 - epoch_ms) / interval_ms; }
+    explicit block_timestamp(const std::string& s) : block_timestamp{time_point{s}} {}
+
+    explicit operator time_point() const { return time_point{(slot * (uint64_t)interval_ms + epoch_ms) * 1000}; }
+    explicit operator std::string() const { return std::string{time_point{*this}}; }
+}; // block_timestamp
+
+inline bool json_to_bin(block_timestamp*, json_to_bin_state& state, const abi_type*, event_type event, bool start) {
+    if (event == event_type::received_string) {
+        block_timestamp obj{state.received_data.value_string};
+        if (trace_json_to_bin)
+            printf("%*sblock_timestamp: %s (%u) %s\n", int(state.stack.size() * 4), "",
+                   state.received_data.value_string.c_str(), (unsigned)obj.slot, std::string{obj}.c_str());
+        push_raw(state.bin, obj.slot);
+        return true;
+    } else
+        throw std::runtime_error("expected string containing block_timestamp");
+}
+
+inline bool bin_to_json(block_timestamp*, bin_to_json_state& state, const abi_type*, bool start) {
+    auto s = std::string{block_timestamp{read_bin<uint32_t>(state.bin)}};
     return state.writer.String(s.c_str(), s.size());
 }
 
@@ -1232,10 +1309,10 @@ constexpr void for_each_abi_type(F f) {
     f("varuint32", (varuint32*)nullptr);
     f("float32", (float*)nullptr);
     f("float64", (double*)nullptr);
-    // f("float128", (uint128_t*)nullptr);
-    // f("time_point", (time_point*)nullptr);
+    f("float128", (float128*)nullptr);
+    f("time_point", (time_point*)nullptr);
     f("time_point_sec", (time_point_sec*)nullptr);
-    // f("block_timestamp_type", (block_timestamp_type*)nullptr);
+    f("block_timestamp_type", (block_timestamp*)nullptr);
     f("name", (name*)nullptr);
     f("bytes", (bytes*)nullptr);
     f("string", (std::string*)nullptr);

@@ -132,11 +132,23 @@ function check_types() {
     check_type('float64', '0.0');
     check_type('float64', '0.125');
     check_type('float64', '-0.125');
-    // float128
-    // time_point
+    check_type('float128', '"00000000000000000000000000000000"');
+    check_type('float128', '"FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF"');
+    check_type('float128', '"12345678ABCDEF12345678ABCDEF1234"');
     check_type('time_point_sec', '"1970-01-01T00:00:00.000"');
     check_type('time_point_sec', '"2018-06-15T19:17:47.000"');
-    // block_timestamp_type
+    check_type('time_point', '"1970-01-01T00:00:00.000"');
+    check_type('time_point', '"1970-01-01T00:00:00.001"');
+    check_type('time_point', '"1970-01-01T00:00:00.002"');
+    check_type('time_point', '"1970-01-01T00:00:00.010"');
+    check_type('time_point', '"1970-01-01T00:00:00.100"');
+    check_type('time_point', '"2018-06-15T19:17:47.000"');
+    check_type('time_point', '"2018-06-15T19:17:47.999"');
+    check_type('block_timestamp_type', '"2000-01-01T00:00:00.000"');
+    check_type('block_timestamp_type', '"2000-01-01T00:00:00.500"');
+    check_type('block_timestamp_type', '"2000-01-01T00:00:01.000"');
+    check_type('block_timestamp_type', '"2018-06-15T19:17:47.500"');
+    check_type('block_timestamp_type', '"2018-06-15T19:17:48.000"');
     check_type('name', '""', '"............."');
     check_type('name', '"1"');
     check_type('name', '"abcd"');
