@@ -114,12 +114,9 @@ extern "C" abieos_bool abieos_json_to_bin(abieos_context* context, uint64_t cont
         auto contract_it = context->contracts.find(::abieos::name{contract});
         if (contract_it == context->contracts.end())
             throw std::runtime_error("contract \"" + name_to_string(contract) + "\" is not loaded");
-        auto type_it = contract_it->second.abi_types.find(type);
-        if (type_it == contract_it->second.abi_types.end())
-            throw std::runtime_error("contract \"" + name_to_string(contract) + "\" does not have type \"" + type +
-                                     "\"");
+        auto& t = get_type(contract_it->second.abi_types, type, 0);
         context->result_bin.clear();
-        return json_to_bin(context->result_bin, &type_it->second, json);
+        return json_to_bin(context->result_bin, &t, json);
     });
 }
 
@@ -132,14 +129,11 @@ extern "C" const char* abieos_hex_to_json(abieos_context* context, uint64_t cont
         auto contract_it = context->contracts.find(::abieos::name{contract});
         if (contract_it == context->contracts.end())
             throw std::runtime_error("contract \"" + name_to_string(contract) + "\" is not loaded");
-        auto type_it = contract_it->second.abi_types.find(type);
-        if (type_it == contract_it->second.abi_types.end())
-            throw std::runtime_error("contract \"" + name_to_string(contract) + "\" does not have type \"" + type +
-                                     "\"");
+        auto& t = get_type(contract_it->second.abi_types, type, 0);
         std::vector<char> data;
         boost::algorithm::unhex(hex, hex + strlen(hex), std::back_inserter(data));
         input_buffer bin{data.data(), data.data() + data.size()};
-        if (!bin_to_json(bin, &type_it->second, context->result_str))
+        if (!bin_to_json(bin, &t, context->result_str))
             return nullptr;
         if (bin.pos != bin.end)
             throw std::runtime_error("Extra data");

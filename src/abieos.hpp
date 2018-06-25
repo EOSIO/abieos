@@ -49,6 +49,7 @@ struct root_object_wrapper {
 };
 
 // Pseudo objects never exist, except in serialized form
+struct pseudo_optional;
 struct pseudo_object;
 struct pseudo_array;
 
@@ -278,6 +279,7 @@ template <typename T>
 auto json_to_bin(T*, json_to_bin_state& state, const abi_type*, event_type event, bool start)
     -> std::enable_if_t<std::is_arithmetic_v<T>, bool>;
 bool json_to_bin(std::string*, json_to_bin_state& state, const abi_type*, event_type event, bool start);
+bool json_to_bin(pseudo_optional*, json_to_bin_state& state, const abi_type* type, event_type event, bool start);
 bool json_to_bin(pseudo_object*, json_to_bin_state& state, const abi_type* type, event_type event, bool start);
 bool json_to_bin(pseudo_array*, json_to_bin_state& state, const abi_type* type, event_type event, bool start);
 
@@ -285,6 +287,7 @@ template <typename T>
 auto bin_to_json(T*, bin_to_json_state& state, const abi_type*, bool start)
     -> std::enable_if_t<std::is_arithmetic_v<T>, bool>;
 bool bin_to_json(std::string*, bin_to_json_state& state, const abi_type*, bool start);
+bool bin_to_json(pseudo_optional*, bin_to_json_state& state, const abi_type* type, bool start);
 bool bin_to_json(pseudo_object*, bin_to_json_state& state, const abi_type* type, bool start);
 bool bin_to_json(pseudo_array*, bin_to_json_state& state, const abi_type* type, bool start);
 
@@ -1274,6 +1277,7 @@ struct abi_type {
     type_name alias_of_name{};
     const struct_def* struct_def{};
     abi_type* alias_of{};
+    abi_type* optional_of{};
     abi_type* array_of{};
     abi_type* base{};
     std::vector<abi_field> fields{};
@@ -1295,14 +1299,22 @@ inline abi_type& get_type(std::map<type_name, abi_type>& abi_types, const type_n
         throw std::runtime_error("abi recursion limit reached");
     auto it = abi_types.find(name);
     if (it == abi_types.end()) {
-        // todo: optional
-        if (ends_with(name, "[]")) {
+        if (ends_with(name, "?")) {
+            abi_type type{name};
+            type.optional_of = &get_type(abi_types, name.substr(0, name.size() - 1), depth + 1);
+            if (type.optional_of->optional_of || type.optional_of->array_of)
+                throw std::runtime_error("optional and array don't support nesting");
+            type.ser = &abi_serializer_for<pseudo_optional>;
+            return abi_types[name] = std::move(type);
+        } else if (ends_with(name, "[]")) {
             abi_type type{name};
             type.array_of = &get_type(abi_types, name.substr(0, name.size() - 2), depth + 1);
+            if (type.array_of->array_of || type.array_of->optional_of)
+                throw std::runtime_error("optional and array don't support nesting");
             type.ser = &abi_serializer_for<pseudo_array>;
             return abi_types[name] = std::move(type);
         } else
-            throw std::runtime_error("abi references unknown type \"" + name + "\"");
+            throw std::runtime_error("unknown type \"" + name + "\"");
     }
     if (it->second.alias_of)
         return *it->second.alias_of;
@@ -1414,6 +1426,15 @@ inline bool json_to_bin(std::vector<char>& bin, const abi_type* type, std::strin
     }
     bin.insert(bin.end(), state.bin.begin() + pos, state.bin.end());
     return true;
+}
+
+inline bool json_to_bin(pseudo_optional*, json_to_bin_state& state, const abi_type* type, event_type event, bool) {
+    if (event == event_type::received_null) {
+        state.bin.push_back(0);
+        return true;
+    }
+    state.bin.push_back(1);
+    return type->optional_of->ser && type->optional_of->ser->json_to_bin(state, type->optional_of, event, true);
 }
 
 inline bool json_to_bin(pseudo_object*, json_to_bin_state& state, const abi_type* type, event_type event, bool start) {
@@ -1530,12 +1551,18 @@ inline bool bin_to_json(input_buffer& bin, const abi_type* type, std::string& de
     bin_to_json_state state{bin, writer};
     if (!type->ser || !type->ser->bin_to_json(state, type, true))
         return false;
-    if (type->filled_struct || type->array_of)
-        while (!state.stack.empty())
-            if (!state.stack.back().type->ser ||
-                !state.stack.back().type->ser->bin_to_json(state, state.stack.back().type, false))
-                return false;
+    while (!state.stack.empty())
+        if (!state.stack.back().type->ser ||
+            !state.stack.back().type->ser->bin_to_json(state, state.stack.back().type, false))
+            return false;
     dest = buffer.GetString();
+    return true;
+}
+
+inline bool bin_to_json(pseudo_optional*, bin_to_json_state& state, const abi_type* type, bool) {
+    if (read_bin<uint8_t>(state.bin))
+        return type->optional_of->ser && type->optional_of->ser->bin_to_json(state, type->optional_of, true);
+    state.writer.Null();
     return true;
 }
 

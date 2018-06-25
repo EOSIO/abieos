@@ -188,6 +188,11 @@ function check_types() {
     check_type('asset', '"0.000 FOO"')
     check_type('asset', '"1.2345 SYS"')
     check_type('asset', '"-1.2345 SYS"')
+    check_type('asset[]', '[]')
+    check_type('asset[]', '["0 FOO"]')
+    check_type('asset[]', '["0 FOO","0.000 FOO"]')
+    check_type('asset?', 'null')
+    check_type('asset?', '"0.123456 SIX"')
     // extended_asset
 }
 
