@@ -448,6 +448,24 @@ inline bool bin_to_json(public_key*, bin_to_json_state& state, const abi_type*, 
     return state.writer.String(result.c_str(), result.size());
 }
 
+inline bool json_to_bin(private_key*, json_to_bin_state& state, const abi_type*, event_type event, bool start) {
+    if (event == event_type::received_string) {
+        auto& s = state.received_data.value_string;
+        if (trace_json_to_bin)
+            printf("%*sprivate_key\n", int(state.stack.size() * 4), "");
+        auto key = string_to_private_key(s);
+        push_raw(state.bin, key);
+        return true;
+    } else
+        throw std::runtime_error("expected string containing private_key");
+}
+
+inline bool bin_to_json(private_key*, bin_to_json_state& state, const abi_type*, bool start) {
+    auto v = read_bin<private_key>(state.bin);
+    auto result = private_key_to_string(v);
+    return state.writer.String(result.c_str(), result.size());
+}
+
 inline bool json_to_bin(signature*, json_to_bin_state& state, const abi_type*, event_type event, bool start) {
     if (event == event_type::received_string) {
         auto& s = state.received_data.value_string;
@@ -1344,6 +1362,7 @@ constexpr void for_each_abi_type(F f) {
     f("checksum256", (checksum256*)nullptr);
     f("checksum512", (checksum512*)nullptr);
     f("public_key", (public_key*)nullptr);
+    f("private_key", (private_key*)nullptr);
     f("signature", (signature*)nullptr);
     f("symbol", (symbol*)nullptr);
     f("symbol_code", (symbol_code*)nullptr);

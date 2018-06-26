@@ -127,6 +127,11 @@ struct public_key {
     std::array<uint8_t, 33> data{};
 };
 
+struct private_key {
+    key_type type{};
+    std::array<uint8_t, 32> data{};
+};
+
 struct signature {
     key_type type{};
     std::array<uint8_t, 65> data{};
@@ -207,13 +212,27 @@ inline std::string public_key_to_string(const public_key& key) {
     }
 }
 
+inline private_key string_to_private_key(std::string_view s) {
+    if (s.size() >= 7 && s.substr(0, 7) == "PVT_R1_")
+        return string_to_key<private_key>(s.substr(7), key_type::r1, "R1");
+    else
+        throw std::runtime_error("unrecognized private key format");
+}
+
+inline std::string private_key_to_string(const private_key& private_key) {
+    if (private_key.type == key_type::r1)
+        return key_to_string(private_key, "R1", "PVT_R1_");
+    else
+        throw std::runtime_error("unrecognized private key format");
+}
+
 inline signature string_to_signature(std::string_view s) {
     if (s.size() >= 7 && s.substr(0, 7) == "SIG_K1_")
         return string_to_key<signature>(s.substr(7), key_type::k1, "K1");
     else if (s.size() >= 7 && s.substr(0, 7) == "SIG_R1_")
         return string_to_key<signature>(s.substr(7), key_type::r1, "R1");
     else
-        throw std::runtime_error("unrecognized public key format");
+        throw std::runtime_error("unrecognized signature format");
 }
 
 inline std::string signature_to_string(const signature& signature) {
