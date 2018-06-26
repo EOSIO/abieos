@@ -48,6 +48,7 @@ function name(s: string) {
 const rpc = new eosjs2_jsonrpc.JsonRpc('http://localhost:8000', { fetch });
 const signatureProvider = new eosjs2_jssig.default(['5JtUScZK2XEp3g9gh7F8bwtPTRAkASmNrrftmx4AxDKD5K4zDnr']);
 const api = new eosjs2.Api({ rpc, signatureProvider, chainId: null });
+const js2Types = eosjs2.serialize.getTypesFromAbi(eosjs2.serialize.createInitialTypes(), transactionAbi);
 
 function json_to_hex(contract: number, type: string, data: string) {
     check(l.abieos_json_to_bin(context, contract, cstr(type), cstr(data)));
@@ -61,13 +62,27 @@ function hex_to_json(contract: number, type: string, hex: string) {
 }
 
 function check_type(type: string, data: string, expected = data) {
-    // console.log('a', data);
     let hex = json_to_hex(0, type, data);
-    // console.log('b', hex);
-    let final = hex_to_json(0, type, hex);
-    console.log(type, data, hex, final);
-    if (final !== expected)
+    let json = hex_to_json(0, type, hex);
+    console.log(type, data, hex, json);
+    if (json !== expected)
         throw new Error('conversion mismatch');
+    json = JSON.stringify(JSON.parse(json));
+
+    //console.log(type, data);
+    let js2Type = eosjs2.serialize.getType(js2Types, type);
+    let buf = new eosjs2.serialize.SerialBuffer({ textEncoder: new (require('util').TextEncoder), textDecoder: new (require('util').TextDecoder)('utf-8', { fatal: true }) });
+    js2Type.serialize(buf, JSON.parse(data));
+    let js2Hex = eosjs2.serialize.arrayToHex(buf.asUint8Array()).toUpperCase();
+    //console.log(hex)
+    //console.log(js2Hex)
+    if (js2Hex != hex)
+        throw new Error('eosjs2 hex mismatch');
+    let js2Json = JSON.stringify(js2Type.deserialize(buf));
+    //console.log(json);
+    //console.log(js2Json);
+    if (js2Json != json)
+        throw new Error('eosjs2 json mismatch');
 }
 
 function check_types() {
@@ -145,6 +160,7 @@ function check_types() {
     check_type('float128', '"12345678ABCDEF12345678ABCDEF1234"');
     check_type('time_point_sec', '"1970-01-01T00:00:00.000"');
     check_type('time_point_sec', '"2018-06-15T19:17:47.000"');
+    check_type('time_point_sec', '"2060-06-15T19:17:47.000"');
     check_type('time_point', '"1970-01-01T00:00:00.000"');
     check_type('time_point', '"1970-01-01T00:00:00.001"');
     check_type('time_point', '"1970-01-01T00:00:00.002"');
@@ -152,6 +168,7 @@ function check_types() {
     check_type('time_point', '"1970-01-01T00:00:00.100"');
     check_type('time_point', '"2018-06-15T19:17:47.000"');
     check_type('time_point', '"2018-06-15T19:17:47.999"');
+    check_type('time_point', '"2060-06-15T19:17:47.999"');
     check_type('block_timestamp_type', '"2000-01-01T00:00:00.000"');
     check_type('block_timestamp_type', '"2000-01-01T00:00:00.500"');
     check_type('block_timestamp_type', '"2000-01-01T00:00:01.000"');
