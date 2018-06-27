@@ -120,23 +120,32 @@ extern "C" abieos_bool abieos_json_to_bin(abieos_context* context, uint64_t cont
     });
 }
 
-extern "C" const char* abieos_hex_to_json(abieos_context* context, uint64_t contract, const char* type,
-                                          const char* hex) {
+extern "C" const char* abieos_bin_to_json(abieos_context* context, uint64_t contract, const char* type,
+                                          const char* data, size_t size) {
     fix_null_str(type);
-    fix_null_str(hex);
     return handle_exceptions(context, nullptr, [&]() -> const char* {
+        if (!data && size)
+            throw std::runtime_error("null data");
         context->last_error = "binary decode error";
         auto contract_it = context->contracts.find(::abieos::name{contract});
         if (contract_it == context->contracts.end())
             throw std::runtime_error("contract \"" + name_to_string(contract) + "\" is not loaded");
         auto& t = get_type(contract_it->second.abi_types, type, 0);
-        std::vector<char> data;
-        boost::algorithm::unhex(hex, hex + strlen(hex), std::back_inserter(data));
-        input_buffer bin{data.data(), data.data() + data.size()};
+        input_buffer bin{data, data + size};
         if (!bin_to_json(bin, &t, context->result_str))
             return nullptr;
         if (bin.pos != bin.end)
             throw std::runtime_error("Extra data");
         return context->result_str.c_str();
+    });
+}
+
+extern "C" const char* abieos_hex_to_json(abieos_context* context, uint64_t contract, const char* type,
+                                          const char* hex) {
+    fix_null_str(hex);
+    return handle_exceptions(context, nullptr, [&]() -> const char* {
+        std::vector<char> data;
+        boost::algorithm::unhex(hex, hex + strlen(hex), std::back_inserter(data));
+        return abieos_bin_to_json(context, contract, type, data.data(), data.size());
     });
 }

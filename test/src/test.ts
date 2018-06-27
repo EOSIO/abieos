@@ -1,6 +1,7 @@
 'use strict';
 
-const endpoint = 'http://localhost:8000';
+const rpcEndpoint = 'http://localhost:8000';
+const useRpcEndpoint = true;
 
 const fetch = require('node-fetch');
 const fastcall = require('fastcall');
@@ -45,7 +46,7 @@ function name(s: string) {
     return l.abieos_string_to_name(context, cstr(s));
 }
 
-const rpc = new eosjs2_jsonrpc.JsonRpc('http://localhost:8000', { fetch });
+const rpc = new eosjs2_jsonrpc.JsonRpc(rpcEndpoint, { fetch });
 const signatureProvider = new eosjs2_jssig.default(['5JtUScZK2XEp3g9gh7F8bwtPTRAkASmNrrftmx4AxDKD5K4zDnr']);
 const api = new eosjs2.Api({ rpc, signatureProvider, chainId: null });
 const js2Types = eosjs2.serialize.getTypesFromAbi(eosjs2.serialize.createInitialTypes(), transactionAbi);
@@ -237,6 +238,7 @@ function check_types() {
 }
 
 async function push_transfer() {
+    check(l.abieos_set_abi(context, name('eosio.token'), jsonStr((await rpc.get_abi('eosio.token')).abi)));
     check(l.abieos_json_to_bin(context, name('eosio.token'), cstr('transfer'), jsonStr({
         from: 'useraaaaaaaa',
         to: 'useraaaaaaab',
@@ -289,9 +291,9 @@ async function push_transfer() {
     try {
         check(context);
         check(l.abieos_set_abi(context, 0, jsonStr(transactionAbi)));
-        check(l.abieos_set_abi(context, name('eosio.token'), jsonStr((await rpc.get_abi('eosio.token')).abi)));
         check_types();
-        await push_transfer();
+        if (useRpcEndpoint)
+            await push_transfer();
     } catch (e) {
         console.log(e);
     }
