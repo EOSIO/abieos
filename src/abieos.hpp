@@ -589,11 +589,6 @@ inline bool bin_to_json(name*, bin_to_json_state& state, const abi_type*, bool s
     return state.writer.String(s.c_str(), s.size());
 }
 
-using action_name = name;
-using field_name = std::string;
-using table_name = name;
-using type_name = std::string;
-
 struct varuint32 {
     uint32_t value = 0;
 };
@@ -930,8 +925,8 @@ inline bool bin_to_json(asset*, bin_to_json_state& state, const abi_type*, bool 
 using extensions_type = std::vector<std::pair<uint16_t, bytes>>;
 
 struct type_def {
-    type_name new_type_name{};
-    type_name type{};
+    std::string new_type_name{};
+    std::string type{};
 };
 
 template <typename F>
@@ -941,8 +936,8 @@ constexpr void for_each_field(type_def*, F f) {
 }
 
 struct field_def {
-    field_name name{};
-    type_name type{};
+    std::string name{};
+    std::string type{};
 };
 
 template <typename F>
@@ -952,8 +947,8 @@ constexpr void for_each_field(field_def*, F f) {
 }
 
 struct struct_def {
-    type_name name{};
-    type_name base{};
+    std::string name{};
+    std::string base{};
     std::vector<field_def> fields{};
 };
 
@@ -965,8 +960,8 @@ constexpr void for_each_field(struct_def*, F f) {
 }
 
 struct action_def {
-    action_name name{};
-    type_name type{};
+    name name{};
+    std::string type{};
     std::string ricardian_contract{};
 };
 
@@ -978,11 +973,11 @@ constexpr void for_each_field(action_def*, F f) {
 }
 
 struct table_def {
-    table_name name{};
-    type_name index_type{};
-    std::vector<field_name> key_names{};
-    std::vector<type_name> key_types{};
-    type_name type{};
+    name name{};
+    std::string index_type{};
+    std::vector<std::string> key_names{};
+    std::vector<std::string> key_types{};
+    std::string type{};
 };
 
 template <typename F>
@@ -1382,13 +1377,13 @@ inline constexpr auto abi_serializer_for = abi_serializer_impl<T>{};
 ///////////////////////////////////////////////////////////////////////////////
 
 struct abi_field {
-    field_name name{};
+    std::string name{};
     struct abi_type* type{};
 };
 
 struct abi_type {
-    type_name name{};
-    type_name alias_of_name{};
+    std::string name{};
+    std::string alias_of_name{};
     const struct_def* struct_def{};
     abi_type* alias_of{};
     abi_type* optional_of{};
@@ -1401,7 +1396,7 @@ struct abi_type {
 
 struct contract {
     std::map<name, std::string> action_types;
-    std::map<type_name, abi_type> abi_types;
+    std::map<std::string, abi_type> abi_types;
 };
 
 template <int i>
@@ -1409,7 +1404,7 @@ bool ends_with(const std::string& s, const char (&suffix)[i]) {
     return s.size() >= i - 1 && !strcmp(s.c_str() + s.size() - (i - 1), suffix);
 }
 
-inline abi_type& get_type(std::map<type_name, abi_type>& abi_types, const type_name& name, int depth) {
+inline abi_type& get_type(std::map<std::string, abi_type>& abi_types, const std::string& name, int depth) {
     if (depth >= 32)
         throw std::runtime_error("abi recursion limit reached");
     auto it = abi_types.find(name);
@@ -1440,7 +1435,7 @@ inline abi_type& get_type(std::map<type_name, abi_type>& abi_types, const type_n
     return other;
 }
 
-inline abi_type& fill_struct(std::map<type_name, abi_type>& abi_types, abi_type& type, int depth) {
+inline abi_type& fill_struct(std::map<std::string, abi_type>& abi_types, abi_type& type, int depth) {
     if (depth >= 32)
         throw std::runtime_error("abi recursion limit reached");
     if (type.filled_struct)
