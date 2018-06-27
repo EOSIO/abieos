@@ -101,15 +101,12 @@ inline std::string read_string(input_buffer& bin) {
 enum class event_type {
     received_null,         // 0
     received_bool,         // 1
-    received_uint64,       // 2
-    received_int64,        // 3
-    received_double,       // 4
-    received_string,       // 5
-    received_start_object, // 6
-    received_key,          // 7
-    received_end_object,   // 8
-    received_start_array,  // 9
-    received_end_array,    // 10
+    received_string,       // 2
+    received_start_object, // 3
+    received_key,          // 4
+    received_end_object,   // 5
+    received_start_array,  // 6
+    received_end_array,    // 7
 };
 
 struct event_data {
@@ -144,20 +141,12 @@ struct json_reader_handler : public rapidjson::BaseReaderHandler<rapidjson::UTF8
         received_data.value_bool = v;
         return receive_event(get_derived(), event_type::received_bool, get_start());
     }
-    bool Int(int v) { return Int64(v); }
-    bool Uint(unsigned v) { return Uint64(v); }
-    bool Int64(int64_t v) {
-        received_data.value_int64 = v;
-        return receive_event(get_derived(), event_type::received_int64, get_start());
-    }
-    bool Uint64(uint64_t v) {
-        received_data.value_uint64 = v;
-        return receive_event(get_derived(), event_type::received_uint64, get_start());
-    }
-    bool Double(double v) {
-        received_data.value_double = v;
-        return receive_event(get_derived(), event_type::received_double, get_start());
-    }
+    bool RawNumber(const char* v, rapidjson::SizeType length, bool copy) { return String(v, length, copy); }
+    bool Int(int v) { return false; }
+    bool Uint(unsigned v) { return false; }
+    bool Int64(int64_t v) { return false; }
+    bool Uint64(uint64_t v) { return false; }
+    bool Double(double v) { return false; }
     bool String(const char* v, rapidjson::SizeType length, bool) {
         received_data.value_string = {v, length};
         return receive_event(get_derived(), event_type::received_string, get_start());
@@ -294,6 +283,38 @@ bool bin_to_json(pseudo_array*, bin_to_json_state& state, const abi_type* type, 
 ///////////////////////////////////////////////////////////////////////////////
 // serializable types
 ///////////////////////////////////////////////////////////////////////////////
+
+template <typename T, typename State>
+T json_to_number(State& state, event_type event) {
+    if (event == event_type::received_bool)
+        return state.received_data.value_bool;
+    if (event == event_type::received_string) {
+        auto check = [](auto f) {
+            using T2 = decltype(f());
+            T2 result;
+            try {
+                result = f();
+            } catch (...) {
+                throw std::runtime_error("number is out of range or has bad format");
+            }
+            if ((T2)(T)result != result)
+                throw std::runtime_error("number is out of range");
+            return result;
+        };
+        auto& s = state.received_data.value_string;
+        if (std::is_integral_v<T> && std::is_signed_v<T>)
+            return check([&] { return stoll(s); });
+        else if (std::is_integral_v<T> && !std::is_signed_v<T>) {
+            if (s.find('-') != s.npos)
+                throw std::runtime_error("expected non-negative number");
+            return check([&] { return stoull(s); });
+        } else if (std::is_same_v<T, float>)
+            return stof(s);
+        else if (std::is_same_v<T, double>)
+            return stod(s);
+    }
+    throw std::runtime_error("expected number or boolean");
+} // namespace abieos
 
 struct bytes {
     std::vector<char> data;
@@ -597,18 +618,7 @@ inline uint32_t read_varuint32(input_buffer& bin) {
 }
 
 inline bool json_to_bin(varuint32*, json_to_bin_state& state, const abi_type*, event_type event, bool start) {
-    uint32_t v;
-    if (event == event_type::received_bool)
-        v = state.received_data.value_bool;
-    else if (event == event_type::received_uint64)
-        v = state.received_data.value_uint64;
-    else if (event == event_type::received_int64)
-        v = state.received_data.value_int64;
-    else if (event == event_type::received_double)
-        v = state.received_data.value_double;
-    else
-        throw std::runtime_error("expected number");
-    push_varuint32(state.bin, v);
+    push_varuint32(state.bin, json_to_number<uint32_t>(state, event));
     return true;
 }
 
@@ -631,18 +641,7 @@ inline int32_t read_varint32(input_buffer& bin) {
 }
 
 inline bool json_to_bin(varint32*, json_to_bin_state& state, const abi_type*, event_type event, bool start) {
-    int32_t v;
-    if (event == event_type::received_bool)
-        v = state.received_data.value_bool;
-    else if (event == event_type::received_uint64)
-        v = state.received_data.value_uint64;
-    else if (event == event_type::received_int64)
-        v = state.received_data.value_int64;
-    else if (event == event_type::received_double)
-        v = state.received_data.value_double;
-    else
-        throw std::runtime_error("expected number");
-    push_varint32(state.bin, v);
+    push_varint32(state.bin, json_to_number<int32_t>(state, event));
     return true;
 }
 
@@ -1222,23 +1221,14 @@ bool json_to_native(T& obj, std::string_view json) {
     rapidjson::Reader reader;
     rapidjson::InsituStringStream ss(mutable_json.data());
     return reader.Parse<rapidjson::kParseValidateEncodingFlag | rapidjson::kParseIterativeFlag |
-                        rapidjson::kParseFullPrecisionFlag>(ss, state);
+                        rapidjson::kParseNumbersAsStringsFlag>(ss, state);
 }
 
 template <typename T>
 auto json_to_native(T& obj, json_to_native_state& state, event_type event, bool start)
     -> std::enable_if_t<std::is_arithmetic_v<T>, bool> {
 
-    if (event == event_type::received_bool)
-        obj = state.received_data.value_bool;
-    else if (event == event_type::received_uint64)
-        obj = state.received_data.value_uint64;
-    else if (event == event_type::received_int64)
-        obj = state.received_data.value_int64;
-    else if (event == event_type::received_double)
-        obj = state.received_data.value_double;
-    else
-        throw std::runtime_error("expected number or boolean");
+    obj = json_to_number<T>(state, event);
     return true;
 }
 
@@ -1526,7 +1516,7 @@ inline bool json_to_bin(std::vector<char>& bin, const abi_type* type, std::strin
     rapidjson::InsituStringStream ss(mutable_json.data());
     try {
         if (!reader.Parse<rapidjson::kParseValidateEncodingFlag | rapidjson::kParseIterativeFlag |
-                          rapidjson::kParseFullPrecisionFlag>(ss, state))
+                          rapidjson::kParseNumbersAsStringsFlag>(ss, state))
             throw std::runtime_error{"failed to parse"};
     } catch (std::exception& e) {
         std::string s;
@@ -1627,31 +1617,7 @@ inline bool json_to_bin(pseudo_array*, json_to_bin_state& state, const abi_type*
 template <typename T>
 auto json_to_bin(T*, json_to_bin_state& state, const abi_type*, event_type event, bool start)
     -> std::enable_if_t<std::is_arithmetic_v<T>, bool> {
-    T obj;
-    if (event == event_type::received_bool) {
-        obj = state.received_data.value_bool;
-    } else if (event == event_type::received_uint64) {
-        obj = state.received_data.value_uint64;
-    } else if (event == event_type::received_int64) {
-        obj = state.received_data.value_int64;
-    } else if (event == event_type::received_double) {
-        obj = state.received_data.value_double;
-    } else if (event == event_type::received_string && std::is_integral_v<T> && std::is_signed_v<T>) {
-        try {
-            obj = stoll(state.received_data.value_string);
-        } catch (...) {
-            throw std::runtime_error("expected integer in string");
-        }
-    } else if (event == event_type::received_string && std::is_integral_v<T> && !std::is_signed_v<T>) {
-        try {
-            obj = stoull(state.received_data.value_string);
-        } catch (...) {
-            throw std::runtime_error("expected unsigned integer in string");
-        }
-    } else {
-        throw std::runtime_error("expected number or boolean");
-    }
-    push_raw(state.bin, obj);
+    push_raw(state.bin, json_to_number<T>(state, event));
     return true;
 }
 
