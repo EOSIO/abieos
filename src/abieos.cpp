@@ -1,3 +1,5 @@
+// copyright defined in eosjs2/LICENSE.txt
+
 #include "abieos.h"
 #include "abieos.hpp"
 

@@ -1,3 +1,5 @@
+// copyright defined in eosjs2/LICENSE.txt
+
 #include <stddef.h>
 #include <stdint.h>
 

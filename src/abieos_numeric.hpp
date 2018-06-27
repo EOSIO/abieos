@@ -1,3 +1,5 @@
+// copyright defined in eosjs2/LICENSE.txt
+
 #include <algorithm>
 #include <array>
 #include <stdexcept>

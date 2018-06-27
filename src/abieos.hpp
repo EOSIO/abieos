@@ -1,3 +1,5 @@
+// copyright defined in eosjs2/LICENSE.txt
+
 #include <boost/algorithm/hex.hpp>
 #include <boost/date_time/posix_time/posix_time.hpp>
 #include <ctime>
