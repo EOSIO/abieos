@@ -5,7 +5,7 @@ Binary <> JSON conversion using ABIs. Compatible with languages which can interf
 ## Packing transactions
 
 1. Create a context: `abieos_create`
-1. Use `abieos_set_abi` to load [external/eosjs2/src/transaction.abi](external/eosjs2/src/transaction.abi) into contract 0.
+1. Use `abieos_set_abi` to load [eosjs2/src/transaction.abi](https://github.com/EOSIO/eosjs2/blob/master/src/transaction.abi) into contract 0.
 1. Use `abieos_set_abi` to load the contract's ABI.
 1. Use `abieos_json_to_bin` and `abieos_get_bin_hex` to convert action data to hex. Use `abieos_get_type_for_action` to get the action's type.
 1. Use `abieos_json_to_bin` and `abieos_get_bin_hex` to convert transaction to hex. Use `contract = 0` and `type = abieos_string_to_name(context, "transaction")`.
