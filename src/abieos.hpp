@@ -1400,6 +1400,7 @@ struct abi_type {
 };
 
 struct contract {
+    std::map<name, std::string> action_types;
     std::map<type_name, abi_type> abi_types;
 };
 
@@ -1456,6 +1457,8 @@ inline abi_type& fill_struct(std::map<type_name, abi_type>& abi_types, abi_type&
 
 inline contract create_contract(const abi_def& abi) {
     contract c;
+    for (auto& a : abi.actions)
+        c.action_types[a.name] = a.type;
     for_each_abi_type([&](const char* name, auto* p) {
         abi_type type{name};
         type.ser = &abi_serializer_for<std::decay_t<decltype(*p)>>;

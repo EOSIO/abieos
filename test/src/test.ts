@@ -20,6 +20,7 @@ const lib = new fastcall.Library('../build/libabieos.so')
     .function('uint64 abieos_string_to_name(void* context, char* str)')
     .function('char* abieos_name_to_string(void* context, uint64 name)')
     .function('int abieos_set_abi(void* context, uint64 contract, char* abi)')
+    .function('char* abieos_get_type_for_action(void* context, uint64 contract, uint64 action)')
     .function('int abieos_json_to_bin(void* context, uint64 contract, char* name, char* json)')
     .function('char* abieos_hex_to_json(void* context, uint64 contract, char* type, char* hex)');
 
@@ -36,6 +37,7 @@ function check(result: any) {
 function checkPtr(result: any) {
     if (result.isNull())
         throw new Error(l.abieos_get_error(context).readCString());
+    return result;
 }
 
 function jsonStr(v: any) {
@@ -239,7 +241,8 @@ function check_types() {
 
 async function push_transfer() {
     check(l.abieos_set_abi(context, name('eosio.token'), jsonStr((await rpc.get_abi('eosio.token')).abi)));
-    check(l.abieos_json_to_bin(context, name('eosio.token'), cstr('transfer'), jsonStr({
+    let type = checkPtr(l.abieos_get_type_for_action(context, name('eosio.token'), name('transfer')));
+    check(l.abieos_json_to_bin(context, name('eosio.token'), type, jsonStr({
         from: 'useraaaaaaaa',
         to: 'useraaaaaaab',
         quantity: '0.0001 SYS',

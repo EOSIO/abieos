@@ -107,6 +107,21 @@ extern "C" abieos_bool abieos_set_abi(abieos_context* context, uint64_t contract
     });
 }
 
+extern "C" const char* abieos_get_type_for_action(abieos_context* context, uint64_t contract, uint64_t action) {
+    return handle_exceptions(context, nullptr, [&] {
+        auto contract_it = context->contracts.find(::abieos::name{contract});
+        if (contract_it == context->contracts.end())
+            throw std::runtime_error("contract \"" + name_to_string(contract) + "\" is not loaded");
+        auto& c = contract_it->second;
+
+        auto action_it = c.action_types.find(name{action});
+        if (action_it == c.action_types.end())
+            throw std::runtime_error("contract \"" + name_to_string(contract) + "\" does not have action \"" +
+                                     name_to_string(action) + "\"");
+        return action_it->second.c_str();
+    });
+}
+
 extern "C" abieos_bool abieos_json_to_bin(abieos_context* context, uint64_t contract, const char* type,
                                           const char* json) {
     fix_null_str(type);
