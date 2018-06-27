@@ -18,6 +18,8 @@ inline constexpr bool trace_json_to_bin = false;
 inline constexpr bool trace_json_to_bin_event = false;
 inline constexpr bool trace_bin_to_json = false;
 
+inline constexpr size_t max_stack_size = 128;
+
 template <typename T>
 inline constexpr bool is_vector_v = false;
 
@@ -120,7 +122,6 @@ struct event_data {
 
 bool receive_event(struct json_to_native_state&, event_type, bool start);
 bool receive_event(struct json_to_bin_state&, event_type, bool start);
-bool receive_event(struct bin_to_json_state&, event_type, bool start);
 
 template <typename Derived>
 struct json_reader_handler : public rapidjson::BaseReaderHandler<rapidjson::UTF8<>, Derived> {
@@ -1205,6 +1206,8 @@ bool bin_to_native(T& obj) {
 inline bool receive_event(struct json_to_native_state& state, event_type event, bool) {
     if (state.stack.empty())
         throw std::runtime_error("extra data");
+    if (state.stack.size() > max_stack_size)
+        throw std::runtime_error("recursion limit reached");
     auto& x = state.stack.back();
     if (trace_json_to_native_event)
         printf("(event %d)\n", event);
@@ -1505,6 +1508,8 @@ inline bool receive_event(struct json_to_bin_state& state, event_type event, boo
     auto* type = state.stack.back().type;
     if (start)
         state.stack.clear();
+    if (state.stack.size() > max_stack_size)
+        throw std::runtime_error("recursion limit reached");
     return type->ser && type->ser->json_to_bin(state, type, event, start);
 }
 
@@ -1645,10 +1650,13 @@ inline bool bin_to_json(input_buffer& bin, const abi_type* type, std::string& de
     bin_to_json_state state{bin, writer};
     if (!type->ser || !type->ser->bin_to_json(state, type, true))
         return false;
-    while (!state.stack.empty())
+    while (!state.stack.empty()) {
         if (!state.stack.back().type->ser ||
             !state.stack.back().type->ser->bin_to_json(state, state.stack.back().type, false))
             return false;
+        if (state.stack.size() > max_stack_size)
+            throw std::runtime_error("recursion limit reached");
+    }
     dest = buffer.GetString();
     return true;
 }
