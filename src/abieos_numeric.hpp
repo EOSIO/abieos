@@ -1,4 +1,4 @@
-// copyright defined in eosjs2/LICENSE.txt
+// copyright defined in abieos/LICENSE.txt
 
 #include <algorithm>
 #include <array>

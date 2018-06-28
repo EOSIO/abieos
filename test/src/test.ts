@@ -1,7 +1,9 @@
+// copyright defined in abieos/LICENSE.txt
+
 'use strict';
 
 const rpcEndpoint = 'http://localhost:8000';
-const useRpcEndpoint = true;
+const useRpcEndpoint = false;
 
 const fetch = require('node-fetch');
 const fastcall = require('fastcall');
