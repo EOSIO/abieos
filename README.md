@@ -2,6 +2,8 @@
 
 Binary <> JSON conversion using ABIs. Compatible with languages which can interface to C; see [src/abieos.h](src/abieos.h).
 
+Alpha release. Feedback requested.
+
 ## Packing transactions
 
 1. Create a context: `abieos_create`
