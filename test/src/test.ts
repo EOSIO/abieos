@@ -7,10 +7,27 @@ const useRpcEndpoint = false;
 
 const fetch = require('node-fetch');
 const fastcall = require('fastcall');
-const transactionAbi = require('json-loader!../../external/eosjs2/src/transaction.abi');
-import * as eosjs2 from '../../external/eosjs2/src/index';
+const transactionAbi = require('../../external/eosjs2/src/transaction.abi.json');
+import * as eosjs2 from '../../external/eosjs2/src/eosjs2-api';
 import * as eosjs2_jsonrpc from '../../external/eosjs2/src/eosjs2-jsonrpc';
 import * as eosjs2_jssig from '../../external/eosjs2/src/eosjs2-jssig';
+
+const useTokenHexApi = true;
+const tokenHexApi =
+    '0e656f73696f3a3a6162692f312e30010c6163636f756e745f6e616d65046e61' +
+    '6d6505087472616e7366657200040466726f6d0c6163636f756e745f6e616d65' +
+    '02746f0c6163636f756e745f6e616d65087175616e7469747905617373657404' +
+    '6d656d6f06737472696e67066372656174650002066973737565720c6163636f' +
+    '756e745f6e616d650e6d6178696d756d5f737570706c79056173736574056973' +
+    '737565000302746f0c6163636f756e745f6e616d65087175616e746974790561' +
+    '73736574046d656d6f06737472696e67076163636f756e7400010762616c616e' +
+    '63650561737365740e63757272656e63795f7374617473000306737570706c79' +
+    '0561737365740a6d61785f737570706c79056173736574066973737565720c61' +
+    '63636f756e745f6e616d6503000000572d3ccdcd087472616e73666572000000' +
+    '000000a531760569737375650000000000a86cd4450663726561746500020000' +
+    '00384f4d113203693634010863757272656e6379010675696e74363407616363' +
+    '6f756e740000000000904dc603693634010863757272656e6379010675696e74' +
+    '36340e63757272656e63795f7374617473000000';
 
 const lib = new fastcall.Library('../build/libabieos.so')
     .function('void* abieos_create()')
@@ -22,6 +39,7 @@ const lib = new fastcall.Library('../build/libabieos.so')
     .function('uint64 abieos_string_to_name(void* context, char* str)')
     .function('char* abieos_name_to_string(void* context, uint64 name)')
     .function('int abieos_set_abi(void* context, uint64 contract, char* abi)')
+    .function('int abieos_set_abi_hex(void* context, uint64 contract, char* hex)')
     .function('char* abieos_get_type_for_action(void* context, uint64 contract, uint64 action)')
     .function('int abieos_json_to_bin(void* context, uint64 contract, char* name, char* json)')
     .function('char* abieos_hex_to_json(void* context, uint64 contract, char* type, char* hex)');
@@ -242,7 +260,10 @@ function check_types() {
 }
 
 async function push_transfer() {
-    check(l.abieos_set_abi(context, name('eosio.token'), jsonStr((await rpc.get_abi('eosio.token')).abi)));
+    if (useTokenHexApi)
+        check(l.abieos_set_abi_hex(context, name('eosio.token'), cstr(tokenHexApi)));
+    else
+        check(l.abieos_set_abi(context, name('eosio.token'), jsonStr((await rpc.get_abi('eosio.token')).abi)));
     let type = checkPtr(l.abieos_get_type_for_action(context, name('eosio.token'), name('transfer')));
     check(l.abieos_json_to_bin(context, name('eosio.token'), type, jsonStr({
         from: 'useraaaaaaaa',
@@ -280,7 +301,11 @@ async function push_transfer() {
     console.log('transaction json->bin: ', transactionDataHex);
     console.log('transaction bin->json: ', hex_to_json(0, 'transaction', transactionDataHex));
 
-    let sig = await signatureProvider.sign({ chainId: info.chain_id, serializedTransaction: eosjs2.serialize.hexToUint8Array(transactionDataHex) });
+    let sig = await signatureProvider.sign({
+        chainId: info.chain_id,
+        requiredKeys: await signatureProvider.getAvailableKeys(),
+        serializedTransaction: eosjs2.serialize.hexToUint8Array(transactionDataHex)
+    });
     console.log('sig:', sig)
 
     let result = await rpc.fetch('/v1/chain/push_transaction', {

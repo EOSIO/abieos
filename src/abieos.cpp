@@ -107,6 +107,29 @@ extern "C" abieos_bool abieos_set_abi(abieos_context* context, uint64_t contract
     });
 }
 
+extern "C" abieos_bool abieos_set_abi_bin(abieos_context* context, uint64_t contract, const char* data, size_t size) {
+    return handle_exceptions(context, false, [&] {
+        context->last_error = "abi parse error";
+        if (!data || !size)
+            throw std::runtime_error("no data");
+        abi_def def{};
+        if (!bin_to_native(def, {data, data + size}))
+            return false;
+        auto c = create_contract(def);
+        context->contracts.insert({name{contract}, std::move(c)});
+        return true;
+    });
+}
+
+extern "C" abieos_bool abieos_set_abi_hex(abieos_context* context, uint64_t contract, const char* hex) {
+    fix_null_str(hex);
+    return handle_exceptions(context, false, [&] {
+        std::vector<char> data;
+        boost::algorithm::unhex(hex, hex + strlen(hex), std::back_inserter(data));
+        return abieos_set_abi_bin(context, contract, data.data(), data.size());
+    });
+}
+
 extern "C" const char* abieos_get_type_for_action(abieos_context* context, uint64_t contract, uint64_t action) {
     return handle_exceptions(context, nullptr, [&] {
         auto contract_it = context->contracts.find(::abieos::name{contract});
@@ -141,8 +164,8 @@ extern "C" const char* abieos_bin_to_json(abieos_context* context, uint64_t cont
                                           const char* data, size_t size) {
     fix_null_str(type);
     return handle_exceptions(context, nullptr, [&]() -> const char* {
-        if (!data && size)
-            throw std::runtime_error("null data");
+        if (!data || !size)
+            throw std::runtime_error("no data");
         context->last_error = "binary decode error";
         auto contract_it = context->contracts.find(::abieos::name{contract});
         if (contract_it == context->contracts.end())
