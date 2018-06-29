@@ -47,11 +47,6 @@ auto& member_from_void(member_ptr<P>, void* p) {
     return class_from_void(P, p)->*P;
 }
 
-template <typename T>
-struct root_object_wrapper {
-    T& obj;
-};
-
 // Pseudo objects never exist, except in serialized form
 struct pseudo_optional;
 struct pseudo_object;
@@ -250,8 +245,6 @@ bool bin_to_native(T& obj);
 template <typename T>
 bool bin_to_native(bin_to_native_state& state, T& obj, bool start);
 bool bin_to_native(bin_to_native_state& state, std::string& obj, bool start);
-template <typename T>
-bool bin_to_native(bin_to_native_state& state, root_object_wrapper<T>& wrapper, bool start);
 
 template <typename T>
 auto json_to_native(T& obj, json_to_native_state& state, event_type event, bool start)
@@ -264,8 +257,6 @@ bool json_to_native(std::vector<T>& obj, json_to_native_state& state, event_type
 template <typename First, typename Second>
 bool json_to_native(std::pair<First, Second>& obj, json_to_native_state& state, event_type event, bool start);
 bool json_to_native(std::string& obj, json_to_native_state& state, event_type event, bool start);
-template <typename T>
-bool json_to_native(root_object_wrapper<T>& obj, json_to_native_state& state, event_type event, bool start);
 
 template <typename T>
 auto json_to_bin(T*, json_to_bin_state& state, const abi_type*, event_type event, bool start)
@@ -1156,11 +1147,6 @@ bool serialize_pair(State& state, std::pair<First, Second>& v, bool start, F f) 
 }
 
 template <typename T>
-bool bin_to_native(bin_to_native_state& state, root_object_wrapper<T>& wrapper, bool start) {
-    return false;
-}
-
-template <typename T>
 bool bin_to_native(bin_to_native_state& state, T& obj, bool start) {
     static_assert(std::is_arithmetic_v<T> || std::is_class_v<T>);
     if constexpr (std::is_arithmetic_v<T>) {
@@ -1200,24 +1186,24 @@ bool bin_to_native(T& obj) {
 // json_to_native
 ///////////////////////////////////////////////////////////////////////////////
 
-inline bool receive_event(struct json_to_native_state& state, event_type event, bool) {
+inline bool receive_event(struct json_to_native_state& state, event_type event, bool start) {
     if (state.stack.empty())
         throw std::runtime_error("extra data");
     if (state.stack.size() > max_stack_size)
         throw std::runtime_error("recursion limit reached");
-    auto& x = state.stack.back();
     if (trace_json_to_native_event)
         printf("(event %d)\n", event);
-    return x.ser && x.ser->json_to_native(x.obj, state, event, false);
+    auto x = state.stack.back();
+    if (start)
+        state.stack.clear();
+    return x.ser && x.ser->json_to_native(x.obj, state, event, start);
 }
 
 template <typename T>
 bool json_to_native(T& obj, std::string_view json) {
     std::string mutable_json{json};
     json_to_native_state state;
-    root_object_wrapper<T> wrapper{obj};
-    if (!json_to_native(wrapper, state, event_type::received_start_object, true))
-        return false;
+    state.stack.push_back(native_stack_entry{&obj, &native_serializer_for<T>, 0});
     rapidjson::Reader reader;
     rapidjson::InsituStringStream ss(mutable_json.data());
     return reader.Parse<rapidjson::kParseValidateEncodingFlag | rapidjson::kParseIterativeFlag |
@@ -1230,17 +1216,6 @@ auto json_to_native(T& obj, json_to_native_state& state, event_type event, bool 
 
     obj = json_to_number<T>(state, event);
     return true;
-}
-
-template <typename T>
-bool json_to_native(root_object_wrapper<T>& wrapper, json_to_native_state& state, event_type event, bool start) {
-    if (start) {
-        state.stack.push_back({&wrapper, &native_serializer_for<root_object_wrapper<T>>});
-        return true;
-    } else if (event == event_type::received_start_object)
-        return json_to_native(wrapper.obj, state, event, true);
-    else
-        throw std::runtime_error("expected object");
 }
 
 template <typename T>
