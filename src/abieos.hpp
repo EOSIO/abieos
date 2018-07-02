@@ -87,8 +87,9 @@ T read_bin(input_buffer& bin) {
 uint32_t read_varuint32(input_buffer& bin);
 
 inline std::string read_string(input_buffer& bin) {
-    // todo: check size against remaining bytes in bin before allocating memory
     auto size = read_varuint32(bin);
+    if (size > bin.end - bin.pos)
+        throw std::runtime_error("invalid string size");
     std::string result(size, 0);
     read_bin(bin, result.data(), size);
     return result;
@@ -341,8 +342,9 @@ inline bool json_to_bin(bytes*, json_to_bin_state& state, const abi_type*, event
 }
 
 inline bool bin_to_json(bytes*, bin_to_json_state& state, const abi_type*, bool start) {
-    // todo: check size against remaining bytes in bin before allocating memory
     auto size = read_varuint32(state.bin);
+    if (size > state.bin.end - state.bin.pos)
+        throw std::runtime_error("invalid bytes size");
     std::vector<char> raw(size);
     read_bin(state.bin, raw.data(), size);
     std::string result;
