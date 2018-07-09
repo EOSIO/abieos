@@ -560,7 +560,7 @@ inline bool json_to_native(name& obj, json_to_native_state& state, event_type ev
         obj.value = string_to_name(state.received_data.value_string.c_str());
         if (trace_json_to_native)
             printf("%*sname: %s (%08llx) %s\n", int(state.stack.size() * 4), "",
-                   state.received_data.value_string.c_str(), obj.value, std::string{obj}.c_str());
+                   state.received_data.value_string.c_str(), (unsigned long long)obj.value, std::string{obj}.c_str());
         return true;
     } else
         throw std::runtime_error("expected string containing name");
@@ -571,7 +571,7 @@ inline bool json_to_bin(name*, json_to_bin_state& state, const abi_type*, event_
         name obj{string_to_name(state.received_data.value_string.c_str())};
         if (trace_json_to_bin)
             printf("%*sname: %s (%08llx) %s\n", int(state.stack.size() * 4), "",
-                   state.received_data.value_string.c_str(), obj.value, std::string{obj}.c_str());
+                   state.received_data.value_string.c_str(), (unsigned long long)obj.value, std::string{obj}.c_str());
         push_raw(state.bin, obj.value);
         return true;
     } else
@@ -954,7 +954,7 @@ constexpr void for_each_field(struct_def*, F f) {
 }
 
 struct action_def {
-    name name{};
+    ::abieos::name name{};
     std::string type{};
     std::string ricardian_contract{};
 };
@@ -967,7 +967,7 @@ constexpr void for_each_field(action_def*, F f) {
 }
 
 struct table_def {
-    name name{};
+    ::abieos::name name{};
     std::string index_type{};
     std::vector<std::string> key_names{};
     std::vector<std::string> key_types{};
@@ -1202,7 +1202,7 @@ inline bool receive_event(struct json_to_native_state& state, event_type event, 
     if (state.stack.size() > max_stack_size)
         throw std::runtime_error("recursion limit reached");
     if (trace_json_to_native_event)
-        printf("(event %d)\n", event);
+        printf("(event %d)\n", (int)event);
     auto x = state.stack.back();
     if (start)
         state.stack.clear();
@@ -1258,7 +1258,7 @@ auto json_to_native(T& obj, json_to_native_state& state, event_type event, bool 
         auto& field_ser = native_field_serializers_for<T>[stack_entry.position];
         if (trace_json_to_native)
             printf("%*sfield %d/%d: %s (event %d)\n", int(state.stack.size() * 4), "", int(stack_entry.position),
-                   int(native_field_serializers_for<T>.size()), std::string{field_ser.name}.c_str(), event);
+                   int(native_field_serializers_for<T>.size()), std::string{field_ser.name}.c_str(), (int)event);
         return field_ser.methods->json_to_native(&obj, state, event, true);
     } else {
         return true;
@@ -1282,7 +1282,7 @@ bool json_to_native(std::vector<T>& v, json_to_native_state& state, event_type e
         return true;
     }
     if (trace_json_to_native)
-        printf("%*sitem %d (event %d)\n", int(state.stack.size() * 4), "", int(v.size()), event);
+        printf("%*sitem %d (event %d)\n", int(state.stack.size() * 4), "", int(v.size()), (int)event);
     v.emplace_back();
     return json_to_native(v.back(), state, event, true);
 }
@@ -1369,7 +1369,7 @@ struct abi_field {
 struct abi_type {
     std::string name{};
     std::string alias_of_name{};
-    const struct_def* struct_def{};
+    const ::abieos::struct_def* struct_def{};
     abi_type* alias_of{};
     abi_type* optional_of{};
     abi_type* array_of{};
@@ -1489,7 +1489,7 @@ inline bool receive_event(struct json_to_bin_state& state, event_type event, boo
     if (state.stack.empty())
         return false;
     if (trace_json_to_bin_event)
-        printf("(event %d %d)\n", event, start);
+        printf("(event %d %d)\n", (int)event, start);
     auto* type = state.stack.back().type;
     if (start)
         state.stack.clear();
@@ -1574,7 +1574,7 @@ inline bool json_to_bin(pseudo_object*, json_to_bin_state& state, const abi_type
         auto& field = type->fields[stack_entry.position];
         if (trace_json_to_bin)
             printf("%*sfield %d/%d: %s (event %d)\n", int(state.stack.size() * 4), "", int(stack_entry.position),
-                   int(type->fields.size()), std::string{field.name}.c_str(), event);
+                   int(type->fields.size()), std::string{field.name}.c_str(), (int)event);
         return field.type->ser && field.type->ser->json_to_bin(state, field.type, event, true);
     }
 }
@@ -1600,7 +1600,7 @@ inline bool json_to_bin(pseudo_array*, json_to_bin_state& state, const abi_type*
     }
     ++stack_entry.position;
     if (trace_json_to_bin)
-        printf("%*sitem (event %d)\n", int(state.stack.size() * 4), "", event);
+        printf("%*sitem (event %d)\n", int(state.stack.size() * 4), "", (int)event);
     return type->array_of->ser && type->array_of->ser->json_to_bin(state, type->array_of, event, true);
 }
 

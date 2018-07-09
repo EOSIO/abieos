@@ -1,6 +1,7 @@
 // copyright defined in abieos/LICENSE.txt
 
 #include "abieos.h"
+#include <stdexcept>
 #include <stdio.h>
 #include <string>
 
@@ -245,7 +246,7 @@ void check_types() {
     check_type(context, 0, "float128", R"("12345678ABCDEF12345678ABCDEF1234")");
     check_type(context, 0, "time_point_sec", R"("1970-01-01T00:00:00.000")");
     check_type(context, 0, "time_point_sec", R"("2018-06-15T19:17:47.000")");
-    check_type(context, 0, "time_point_sec", R"("2060-06-15T19:17:47.000")");
+    check_type(context, 0, "time_point_sec", R"("2030-06-15T19:17:47.000")");
     check_type(context, 0, "time_point", R"("1970-01-01T00:00:00.000")");
     check_type(context, 0, "time_point", R"("1970-01-01T00:00:00.001")");
     check_type(context, 0, "time_point", R"("1970-01-01T00:00:00.002")");
@@ -253,7 +254,7 @@ void check_types() {
     check_type(context, 0, "time_point", R"("1970-01-01T00:00:00.100")");
     check_type(context, 0, "time_point", R"("2018-06-15T19:17:47.000")");
     check_type(context, 0, "time_point", R"("2018-06-15T19:17:47.999")");
-    check_type(context, 0, "time_point", R"("2060-06-15T19:17:47.999")");
+    check_type(context, 0, "time_point", R"("2030-06-15T19:17:47.999")");
     check_type(context, 0, "block_timestamp_type", R"("2000-01-01T00:00:00.000")");
     check_type(context, 0, "block_timestamp_type", R"("2000-01-01T00:00:00.500")");
     check_type(context, 0, "block_timestamp_type", R"("2000-01-01T00:00:01.000")");

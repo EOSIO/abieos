@@ -53,3 +53,19 @@ Example transaction data for `abieos_json_to_bin`:
     "transaction_extensions":[]
 }
 ```
+
+## Ubuntu 16.04 with gcc 8.1.0
+
+* Install these. You may have to build them yourself from source or find a PPA. Make them the default.
+  * gcc 8.1.0
+  * cmake 3.11.3
+* `sudo apt install libboost-dev libboost-date-time-dev`
+* remove this from CMakeLists.txt (2 places): `-fsanitize=address,undefined`
+
+```
+mkdir build
+cd build
+cmake ..
+make
+./test
+```
