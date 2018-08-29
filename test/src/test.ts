@@ -218,18 +218,30 @@ function check_types() {
     check_type('checksum256', '"0987654321ABCDEF0987654321FFFF1234567890ABCDEF001234567890ABCDEF"');
     check_type('checksum512', '"00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000"');
     check_type('checksum512', '"0987654321ABCDEF0987654321FFFF1234567890ABCDEF001234567890ABCDEF0987654321ABCDEF0987654321FFFF1234567890ABCDEF001234567890ABCDEF"');
-    check_type('public_key', '"EOS1111111111111111111111111111111114T1Anm"')
-    check_type('public_key', '"EOS11111111111111111111111115qCHTcgbQwptSz99m"')
-    check_type('public_key', '"EOS111111111111111114ZrjxJnU1LA5xSyrWMNuXTrYSJ57"')
-    check_type('public_key', '"EOS1111111113diW7pnisfdBvHTXP7wvW5k5Ky1e5DVuF23dosU"')
-    check_type('public_key', '"EOS11DsZ6Lyr1aXpm9aBqqgV4iFJpNbSw5eE9LLTwNAxqjJgmjgbT"')
-    check_type('public_key', '"EOS12wkBET2rRgE8pahuaczxKbmv7ciehqsne57F9gtzf1PVYNMRa2"')
-    check_type('public_key', '"EOS1yp8ebBuKZ13orqUrZsGsP49e6K3ThVK1nLutxSyU5j9SaXz9a"')
-    check_type('public_key', '"EOS9adaAMuB9v8yX1mZ5PtoB6VFSCeqRGjASd8ZTM6VUkiHL7mue4K"')
-    check_type('public_key', '"EOS69X3383RzBZj41k73CSjUNXM5MYGpnDxyPnWUKPEtYQmTBWz4D"')
-    check_type('public_key', '"EOS7yBtksm8Kkg85r4in4uCbfN77uRwe82apM8jjbhFVDgEgz3w8S"')
-    check_type('public_key', '"EOS7WnhaKwHpbSidYuh2DF1qAExTRUtPEdZCaZqt75cKcixuQUtdA"')
-    check_type('public_key', '"EOS7Bn1YDeZ18w2N9DU4KAJxZDt6hk3L7eUwFRAc1hb5bp6xJwxNV"')
+    check_type('public_key', '"EOS1111111111111111111111111111111114T1Anm"', '"PUB_K1_11111111111111111111111111111111149Mr2R"');
+    check_type('public_key', '"EOS11111111111111111111111115qCHTcgbQwptSz99m"', '"PUB_K1_11111111111111111111111115qCHTcgbQwpvP72Uq"');
+    check_type('public_key', '"EOS111111111111111114ZrjxJnU1LA5xSyrWMNuXTrYSJ57"', '"PUB_K1_111111111111111114ZrjxJnU1LA5xSyrWMNuXTrVub2r"');
+    check_type('public_key', '"EOS1111111113diW7pnisfdBvHTXP7wvW5k5Ky1e5DVuF23dosU"', '"PUB_K1_1111111113diW7pnisfdBvHTXP7wvW5k5Ky1e5DVuF4PizpM"');
+    check_type('public_key', '"EOS11DsZ6Lyr1aXpm9aBqqgV4iFJpNbSw5eE9LLTwNAxqjJgmjgbT"', '"PUB_K1_11DsZ6Lyr1aXpm9aBqqgV4iFJpNbSw5eE9LLTwNAxqjJgXSdB8"');
+    check_type('public_key', '"EOS12wkBET2rRgE8pahuaczxKbmv7ciehqsne57F9gtzf1PVYNMRa2"', '"PUB_K1_12wkBET2rRgE8pahuaczxKbmv7ciehqsne57F9gtzf1PVb7Rf7o"');
+    check_type('public_key', '"EOS1yp8ebBuKZ13orqUrZsGsP49e6K3ThVK1nLutxSyU5j9SaXz9a"', '"PUB_K1_1yp8ebBuKZ13orqUrZsGsP49e6K3ThVK1nLutxSyU5j9Tx1r96"');
+    check_type('public_key', '"EOS9adaAMuB9v8yX1mZ5PtoB6VFSCeqRGjASd8ZTM6VUkiHL7mue4K"', '"PUB_K1_9adaAMuB9v8yX1mZ5PtoB6VFSCeqRGjASd8ZTM6VUkiHLB5XEdw"');
+    check_type('public_key', '"EOS69X3383RzBZj41k73CSjUNXM5MYGpnDxyPnWUKPEtYQmTBWz4D"', '"PUB_K1_69X3383RzBZj41k73CSjUNXM5MYGpnDxyPnWUKPEtYQmVzqTY7"');
+    check_type('public_key', '"EOS7yBtksm8Kkg85r4in4uCbfN77uRwe82apM8jjbhFVDgEgz3w8S"', '"PUB_K1_7yBtksm8Kkg85r4in4uCbfN77uRwe82apM8jjbhFVDgEcarGb8"');
+    check_type('public_key', '"EOS7WnhaKwHpbSidYuh2DF1qAExTRUtPEdZCaZqt75cKcixuQUtdA"', '"PUB_K1_7WnhaKwHpbSidYuh2DF1qAExTRUtPEdZCaZqt75cKcixtU7gEn"');
+    check_type('public_key', '"EOS7Bn1YDeZ18w2N9DU4KAJxZDt6hk3L7eUwFRAc1hb5bp6xJwxNV"', '"PUB_K1_7Bn1YDeZ18w2N9DU4KAJxZDt6hk3L7eUwFRAc1hb5bp6uEBZA8"');
+    check_type('public_key', '"PUB_K1_11111111111111111111111111111111149Mr2R"');
+    check_type('public_key', '"PUB_K1_11111111111111111111111115qCHTcgbQwpvP72Uq"');
+    check_type('public_key', '"PUB_K1_111111111111111114ZrjxJnU1LA5xSyrWMNuXTrVub2r"');
+    check_type('public_key', '"PUB_K1_1111111113diW7pnisfdBvHTXP7wvW5k5Ky1e5DVuF4PizpM"');
+    check_type('public_key', '"PUB_K1_11DsZ6Lyr1aXpm9aBqqgV4iFJpNbSw5eE9LLTwNAxqjJgXSdB8"');
+    check_type('public_key', '"PUB_K1_12wkBET2rRgE8pahuaczxKbmv7ciehqsne57F9gtzf1PVb7Rf7o"');
+    check_type('public_key', '"PUB_K1_1yp8ebBuKZ13orqUrZsGsP49e6K3ThVK1nLutxSyU5j9Tx1r96"');
+    check_type('public_key', '"PUB_K1_9adaAMuB9v8yX1mZ5PtoB6VFSCeqRGjASd8ZTM6VUkiHLB5XEdw"');
+    check_type('public_key', '"PUB_K1_69X3383RzBZj41k73CSjUNXM5MYGpnDxyPnWUKPEtYQmVzqTY7"');
+    check_type('public_key', '"PUB_K1_7yBtksm8Kkg85r4in4uCbfN77uRwe82apM8jjbhFVDgEcarGb8"');
+    check_type('public_key', '"PUB_K1_7WnhaKwHpbSidYuh2DF1qAExTRUtPEdZCaZqt75cKcixtU7gEn"');
+    check_type('public_key', '"PUB_K1_7Bn1YDeZ18w2N9DU4KAJxZDt6hk3L7eUwFRAc1hb5bp6uEBZA8"');
     check_type('public_key', '"PUB_R1_1111111111111111111111111111111116amPNj"')
     check_type('public_key', '"PUB_R1_67vQGPDMCR4gbqYV3hkfNz3BfzRmmSj27kFDKrwDbaZKtaX36u"')
     check_type('public_key', '"PUB_R1_6FPFZqw5ahYrR9jD96yDbbDNTdKtNqRbze6oTDLntrsANgQKZu"')
@@ -304,7 +316,8 @@ async function push_transfer() {
     let sig = await signatureProvider.sign({
         chainId: info.chain_id,
         requiredKeys: await signatureProvider.getAvailableKeys(),
-        serializedTransaction: eosjs2.serialize.hexToUint8Array(transactionDataHex)
+        serializedTransaction: eosjs2.serialize.hexToUint8Array(transactionDataHex),
+        abis: [],
     });
     console.log('sig:', sig)
 
