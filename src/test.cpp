@@ -285,18 +285,42 @@ void check_types() {
     check_type(
         context, 0, "checksum512",
         R"("0987654321ABCDEF0987654321FFFF1234567890ABCDEF001234567890ABCDEF0987654321ABCDEF0987654321FFFF1234567890ABCDEF001234567890ABCDEF")");
-    check_type(context, 0, "public_key", R"("EOS1111111111111111111111111111111114T1Anm")");
-    check_type(context, 0, "public_key", R"("EOS11111111111111111111111115qCHTcgbQwptSz99m")");
-    check_type(context, 0, "public_key", R"("EOS111111111111111114ZrjxJnU1LA5xSyrWMNuXTrYSJ57")");
-    check_type(context, 0, "public_key", R"("EOS1111111113diW7pnisfdBvHTXP7wvW5k5Ky1e5DVuF23dosU")");
-    check_type(context, 0, "public_key", R"("EOS11DsZ6Lyr1aXpm9aBqqgV4iFJpNbSw5eE9LLTwNAxqjJgmjgbT")");
-    check_type(context, 0, "public_key", R"("EOS12wkBET2rRgE8pahuaczxKbmv7ciehqsne57F9gtzf1PVYNMRa2")");
-    check_type(context, 0, "public_key", R"("EOS1yp8ebBuKZ13orqUrZsGsP49e6K3ThVK1nLutxSyU5j9SaXz9a")");
-    check_type(context, 0, "public_key", R"("EOS9adaAMuB9v8yX1mZ5PtoB6VFSCeqRGjASd8ZTM6VUkiHL7mue4K")");
-    check_type(context, 0, "public_key", R"("EOS69X3383RzBZj41k73CSjUNXM5MYGpnDxyPnWUKPEtYQmTBWz4D")");
-    check_type(context, 0, "public_key", R"("EOS7yBtksm8Kkg85r4in4uCbfN77uRwe82apM8jjbhFVDgEgz3w8S")");
-    check_type(context, 0, "public_key", R"("EOS7WnhaKwHpbSidYuh2DF1qAExTRUtPEdZCaZqt75cKcixuQUtdA")");
-    check_type(context, 0, "public_key", R"("EOS7Bn1YDeZ18w2N9DU4KAJxZDt6hk3L7eUwFRAc1hb5bp6xJwxNV")");
+    check_type(context, 0, "public_key", R"("EOS1111111111111111111111111111111114T1Anm")",
+               R"("PUB_K1_11111111111111111111111111111111149Mr2R")");
+    check_type(context, 0, "public_key", R"("EOS11111111111111111111111115qCHTcgbQwptSz99m")",
+               R"("PUB_K1_11111111111111111111111115qCHTcgbQwpvP72Uq")");
+    check_type(context, 0, "public_key", R"("EOS111111111111111114ZrjxJnU1LA5xSyrWMNuXTrYSJ57")",
+               R"("PUB_K1_111111111111111114ZrjxJnU1LA5xSyrWMNuXTrVub2r")");
+    check_type(context, 0, "public_key", R"("EOS1111111113diW7pnisfdBvHTXP7wvW5k5Ky1e5DVuF23dosU")",
+               R"("PUB_K1_1111111113diW7pnisfdBvHTXP7wvW5k5Ky1e5DVuF4PizpM")");
+    check_type(context, 0, "public_key", R"("EOS11DsZ6Lyr1aXpm9aBqqgV4iFJpNbSw5eE9LLTwNAxqjJgmjgbT")",
+               R"("PUB_K1_11DsZ6Lyr1aXpm9aBqqgV4iFJpNbSw5eE9LLTwNAxqjJgXSdB8")");
+    check_type(context, 0, "public_key", R"("EOS12wkBET2rRgE8pahuaczxKbmv7ciehqsne57F9gtzf1PVYNMRa2")",
+               R"("PUB_K1_12wkBET2rRgE8pahuaczxKbmv7ciehqsne57F9gtzf1PVb7Rf7o")");
+    check_type(context, 0, "public_key", R"("EOS1yp8ebBuKZ13orqUrZsGsP49e6K3ThVK1nLutxSyU5j9SaXz9a")",
+               R"("PUB_K1_1yp8ebBuKZ13orqUrZsGsP49e6K3ThVK1nLutxSyU5j9Tx1r96")");
+    check_type(context, 0, "public_key", R"("EOS9adaAMuB9v8yX1mZ5PtoB6VFSCeqRGjASd8ZTM6VUkiHL7mue4K")",
+               R"("PUB_K1_9adaAMuB9v8yX1mZ5PtoB6VFSCeqRGjASd8ZTM6VUkiHLB5XEdw")");
+    check_type(context, 0, "public_key", R"("EOS69X3383RzBZj41k73CSjUNXM5MYGpnDxyPnWUKPEtYQmTBWz4D")",
+               R"("PUB_K1_69X3383RzBZj41k73CSjUNXM5MYGpnDxyPnWUKPEtYQmVzqTY7")");
+    check_type(context, 0, "public_key", R"("EOS7yBtksm8Kkg85r4in4uCbfN77uRwe82apM8jjbhFVDgEgz3w8S")",
+               R"("PUB_K1_7yBtksm8Kkg85r4in4uCbfN77uRwe82apM8jjbhFVDgEcarGb8")");
+    check_type(context, 0, "public_key", R"("EOS7WnhaKwHpbSidYuh2DF1qAExTRUtPEdZCaZqt75cKcixuQUtdA")",
+               R"("PUB_K1_7WnhaKwHpbSidYuh2DF1qAExTRUtPEdZCaZqt75cKcixtU7gEn")");
+    check_type(context, 0, "public_key", R"("EOS7Bn1YDeZ18w2N9DU4KAJxZDt6hk3L7eUwFRAc1hb5bp6xJwxNV")",
+               R"("PUB_K1_7Bn1YDeZ18w2N9DU4KAJxZDt6hk3L7eUwFRAc1hb5bp6uEBZA8")");
+    check_type(context, 0, "public_key", R"("PUB_K1_11111111111111111111111111111111149Mr2R")");
+    check_type(context, 0, "public_key", R"("PUB_K1_11111111111111111111111115qCHTcgbQwpvP72Uq")");
+    check_type(context, 0, "public_key", R"("PUB_K1_111111111111111114ZrjxJnU1LA5xSyrWMNuXTrVub2r")");
+    check_type(context, 0, "public_key", R"("PUB_K1_1111111113diW7pnisfdBvHTXP7wvW5k5Ky1e5DVuF4PizpM")");
+    check_type(context, 0, "public_key", R"("PUB_K1_11DsZ6Lyr1aXpm9aBqqgV4iFJpNbSw5eE9LLTwNAxqjJgXSdB8")");
+    check_type(context, 0, "public_key", R"("PUB_K1_12wkBET2rRgE8pahuaczxKbmv7ciehqsne57F9gtzf1PVb7Rf7o")");
+    check_type(context, 0, "public_key", R"("PUB_K1_1yp8ebBuKZ13orqUrZsGsP49e6K3ThVK1nLutxSyU5j9Tx1r96")");
+    check_type(context, 0, "public_key", R"("PUB_K1_9adaAMuB9v8yX1mZ5PtoB6VFSCeqRGjASd8ZTM6VUkiHLB5XEdw")");
+    check_type(context, 0, "public_key", R"("PUB_K1_69X3383RzBZj41k73CSjUNXM5MYGpnDxyPnWUKPEtYQmVzqTY7")");
+    check_type(context, 0, "public_key", R"("PUB_K1_7yBtksm8Kkg85r4in4uCbfN77uRwe82apM8jjbhFVDgEcarGb8")");
+    check_type(context, 0, "public_key", R"("PUB_K1_7WnhaKwHpbSidYuh2DF1qAExTRUtPEdZCaZqt75cKcixtU7gEn")");
+    check_type(context, 0, "public_key", R"("PUB_K1_7Bn1YDeZ18w2N9DU4KAJxZDt6hk3L7eUwFRAc1hb5bp6uEBZA8")");
     check_type(context, 0, "public_key", R"("PUB_R1_1111111111111111111111111111111116amPNj")");
     check_type(context, 0, "public_key", R"("PUB_R1_67vQGPDMCR4gbqYV3hkfNz3BfzRmmSj27kFDKrwDbaZKtaX36u")");
     check_type(context, 0, "public_key", R"("PUB_R1_6FPFZqw5ahYrR9jD96yDbbDNTdKtNqRbze6oTDLntrsANgQKZu")");

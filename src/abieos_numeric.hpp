@@ -193,6 +193,8 @@ inline public_key string_to_public_key(std::string_view s) {
         if (memcmp(ripe_digest.data(), whole.data() + key.data.size(), 4))
             throw std::runtime_error("Key checksum doesn't match");
         return key;
+    } else if (s.size() >= 7 && s.substr(0, 7) == "PUB_K1_") {
+        return string_to_key<public_key>(s.substr(7), key_type::k1, "K1");
     } else if (s.size() >= 7 && s.substr(0, 7) == "PUB_R1_") {
         return string_to_key<public_key>(s.substr(7), key_type::r1, "R1");
     } else {
@@ -202,11 +204,7 @@ inline public_key string_to_public_key(std::string_view s) {
 
 inline std::string public_key_to_string(const public_key& key) {
     if (key.type == key_type::k1) {
-        auto ripe_digest = digest_message_ripemd160(key.data.data(), key.data.size());
-        std::array<uint8_t, 37> whole;
-        memcpy(whole.data(), key.data.data(), key.data.size());
-        memcpy(whole.data() + key.data.size(), ripe_digest.data(), 4);
-        return "EOS" + binary_to_base58(whole);
+        return key_to_string(key, "K1", "PUB_K1_");
     } else if (key.type == key_type::r1) {
         return key_to_string(key, "R1", "PUB_R1_");
     } else {
