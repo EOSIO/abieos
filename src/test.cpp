@@ -152,16 +152,22 @@ T check_context(abieos_context* context, T value) {
 }
 
 void check_type(abieos_context* context, uint64_t contract, const char* type, const char* data,
-                const char* expected = nullptr) {
+                const char* expected = nullptr, bool check_ordered = true) {
     if (!expected)
         expected = data;
     // printf("%s %s\n", type, data);
-    check_context(context, abieos_json_to_bin(context, contract, type, data));
-    std::string hex = check_context(context, abieos_get_bin_hex(context));
-    // printf("%s\n", hex.c_str());
-    std::string result = check_context(context, abieos_hex_to_json(context, contract, type, hex.c_str()));
+    check_context(context, abieos_json_to_bin_reorderable(context, contract, type, data));
+    std::string reorderable_hex = check_context(context, abieos_get_bin_hex(context));
+    if (check_ordered) {
+        check_context(context, abieos_json_to_bin(context, contract, type, data));
+        std::string ordered_hex = check_context(context, abieos_get_bin_hex(context));
+        if (reorderable_hex != ordered_hex)
+            throw std::runtime_error("mismatch between reorderable_hex, ordered_hex");
+    }
+    // printf("%s\n", reorderable_hex.c_str());
+    std::string result = check_context(context, abieos_hex_to_json(context, contract, type, reorderable_hex.c_str()));
     // printf("%s\n", result.c_str());
-    printf("%s %s %s %s\n", type, data, hex.c_str(), result.c_str());
+    // printf("%s %s %s %s\n", type, data, reorderable_hex.c_str(), result.c_str());
     if (result != expected)
         throw std::runtime_error("mismatch");
 }
@@ -181,6 +187,10 @@ void check_types() {
     check_type(context, 0, "uint8", R"(1)");
     check_type(context, 0, "uint8", R"(254)");
     check_type(context, 0, "uint8", R"(255)");
+    check_type(context, 0, "uint8[]", R"([])");
+    check_type(context, 0, "uint8[]", R"([10])");
+    check_type(context, 0, "uint8[]", R"([10,9])");
+    check_type(context, 0, "uint8[]", R"([10,9,8])");
     check_type(context, 0, "int16", R"(0)");
     check_type(context, 0, "int16", R"(32767)");
     check_type(context, 0, "int16", R"(-32768)");
@@ -359,12 +369,23 @@ void check_types() {
         context, 0, "transaction",
         R"({"expiration":"2009-02-13T23:31:31.000","ref_block_num":1234,"ref_block_prefix":5678,"max_net_usage_words":0,"max_cpu_usage_ms":0,"delay_sec":0,"context_free_actions":[],"actions":[{"account":"eosio.token","name":"transfer","authorization":[{"actor":"useraaaaaaaa","permission":"active"}],"data":"608C31C6187315D6708C31C6187315D60100000000000000045359530000000000"}],"transaction_extensions":[]})");
 
+    check_type( //
+        context, token, "transfer",
+        R"({"to":"useraaaaaaab","memo":"test memo","from":"useraaaaaaaa","quantity":"0.0001 SYS"})",
+        R"({"from":"useraaaaaaaa","to":"useraaaaaaab","quantity":"0.0001 SYS","memo":"test memo"})", false);
+    check_type(
+        context, 0, "transaction",
+        R"({"ref_block_num":1234,"ref_block_prefix":5678,"expiration":"2009-02-13T23:31:31.000","max_net_usage_words":0,"max_cpu_usage_ms":0,"delay_sec":0,"context_free_actions":[],"actions":[{"account":"eosio.token","name":"transfer","authorization":[{"actor":"useraaaaaaaa","permission":"active"}],"data":"608C31C6187315D6708C31C6187315D60100000000000000045359530000000000"}],"transaction_extensions":[]})",
+        R"({"expiration":"2009-02-13T23:31:31.000","ref_block_num":1234,"ref_block_prefix":5678,"max_net_usage_words":0,"max_cpu_usage_ms":0,"delay_sec":0,"context_free_actions":[],"actions":[{"account":"eosio.token","name":"transfer","authorization":[{"actor":"useraaaaaaaa","permission":"active"}],"data":"608C31C6187315D6708C31C6187315D60100000000000000045359530000000000"}],"transaction_extensions":[]})",
+        false);
+
     abieos_destroy(context);
 }
 
 int main() {
     try {
         check_types();
+        printf("\nok\n\n");
         return 0;
     } catch (std::exception& e) {
         printf("error: %s\n", e.what());

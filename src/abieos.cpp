@@ -160,6 +160,25 @@ extern "C" abieos_bool abieos_json_to_bin(abieos_context* context, uint64_t cont
     });
 }
 
+extern "C" abieos_bool abieos_json_to_bin_reorderable(abieos_context* context, uint64_t contract, const char* type,
+                                                      const char* json) {
+    fix_null_str(type);
+    fix_null_str(json);
+    return handle_exceptions(context, false, [&] {
+        context->last_error = "json parse error";
+        auto contract_it = context->contracts.find(::abieos::name{contract});
+        if (contract_it == context->contracts.end())
+            throw std::runtime_error("contract \"" + name_to_string(contract) + "\" is not loaded");
+        auto& t = get_type(contract_it->second.abi_types, type, 0);
+        context->result_bin.clear();
+        ::abieos::jvalue value;
+        if (!json_to_jvalue(value, json))
+            return false;
+        auto result = json_to_bin(context->result_bin, &t, value);
+        return result;
+    });
+}
+
 extern "C" const char* abieos_bin_to_json(abieos_context* context, uint64_t contract, const char* type,
                                           const char* data, size_t size) {
     fix_null_str(type);

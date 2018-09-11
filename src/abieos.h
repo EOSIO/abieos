@@ -49,6 +49,10 @@ const char* abieos_get_type_for_action(abieos_context* context, uint64_t contrac
 // Convert json to binary. Use abieos_get_bin_* to retrieve result. Returns false on error.
 abieos_bool abieos_json_to_bin(abieos_context* context, uint64_t contract, const char* type, const char* json);
 
+// Convert json to binary. Allow json field reordering. Use abieos_get_bin_* to retrieve result. Returns false on error.
+abieos_bool abieos_json_to_bin_reorderable(abieos_context* context, uint64_t contract, const char* type,
+                                           const char* json);
+
 // Convert binary to json. The context owns the returned string. Returns null on error; use abieos_get_error to retrieve
 // error.
 const char* abieos_bin_to_json(abieos_context* context, uint64_t contract, const char* type, const char* data,
