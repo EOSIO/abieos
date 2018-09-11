@@ -700,7 +700,9 @@ struct varint32 {
     int32_t value = 0;
 };
 
-inline void push_varint32(std::vector<char>& bin, int32_t v) { push_varuint32(bin, uint32_t((v << 1) ^ (v >> 31))); }
+inline void push_varint32(std::vector<char>& bin, int32_t v) {
+    push_varuint32(bin, (uint32_t(v) << 1) ^ uint32_t(v >> 31));
+}
 
 inline int32_t read_varint32(input_buffer& bin) {
     uint32_t v = read_varuint32(bin);
