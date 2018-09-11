@@ -8,6 +8,7 @@
     },
     "include": [
         "src/*.ts",
-        "../external/eosjs2/src/*.ts"
+        "../external/eosjs2/src/eosjs2-numeric.ts",
+        "../external/eosjs2/src/eosjs2-serialize.ts"
     ]
 }
