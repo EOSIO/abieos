@@ -57,6 +57,12 @@ auto& member_from_void(member_ptr<P>, void* p) {
 struct pseudo_optional;
 struct pseudo_object;
 struct pseudo_array;
+struct pseudo_variant;
+
+template <typename T>
+struct might_not_exist {
+    T value{};
+};
 
 template <typename T>
 void push_raw(std::vector<char>& bin, const T& obj) {
@@ -226,6 +232,7 @@ struct json_to_bin_stack_entry {
     const struct abi_type* type = nullptr;
     int position = -1;
     size_t size_insertion_index = 0;
+    size_t variant_type_index = 0;
 };
 
 struct bin_to_json_stack_entry {
@@ -314,6 +321,8 @@ bool bin_to_native(std::vector<T>& v, bin_to_native_state& state, bool start);
 template <typename First, typename Second>
 bool bin_to_native(std::pair<First, Second>& obj, bin_to_native_state& state, bool start);
 bool bin_to_native(std::string& obj, bin_to_native_state& state, bool);
+template <typename T>
+bool bin_to_native(might_not_exist<T>& obj, bin_to_native_state& state, bool);
 
 template <typename T>
 auto json_to_native(T& obj, json_to_native_state& state, event_type event, bool start)
@@ -326,10 +335,13 @@ bool json_to_native(std::vector<T>& obj, json_to_native_state& state, event_type
 template <typename First, typename Second>
 bool json_to_native(std::pair<First, Second>& obj, json_to_native_state& state, event_type event, bool start);
 bool json_to_native(std::string& obj, json_to_native_state& state, event_type event, bool start);
+template <typename T>
+bool json_to_native(might_not_exist<T>& obj, json_to_native_state& state, event_type event, bool start);
 
 inline bool json_to_bin(pseudo_optional*, jvalue_to_bin_state& state, const abi_type* type, event_type event, bool);
 bool json_to_bin(pseudo_object*, jvalue_to_bin_state& state, const abi_type* type, event_type event, bool start);
 bool json_to_bin(pseudo_array*, jvalue_to_bin_state& state, const abi_type* type, event_type event, bool start);
+bool json_to_bin(pseudo_variant*, jvalue_to_bin_state& state, const abi_type* type, event_type event, bool start);
 template <typename T>
 auto json_to_bin(T*, jvalue_to_bin_state& state, const abi_type*, event_type event, bool start)
     -> std::enable_if_t<std::is_arithmetic_v<T>, bool>;
@@ -342,6 +354,7 @@ bool json_to_bin(std::string*, json_to_bin_state& state, const abi_type*, event_
 bool json_to_bin(pseudo_optional*, json_to_bin_state& state, const abi_type* type, event_type event, bool start);
 bool json_to_bin(pseudo_object*, json_to_bin_state& state, const abi_type* type, event_type event, bool start);
 bool json_to_bin(pseudo_array*, json_to_bin_state& state, const abi_type* type, event_type event, bool start);
+bool json_to_bin(pseudo_variant*, json_to_bin_state& state, const abi_type* type, event_type event, bool start);
 
 template <typename T>
 auto bin_to_json(T*, bin_to_json_state& state, const abi_type*, bool start)
@@ -350,6 +363,7 @@ bool bin_to_json(std::string*, bin_to_json_state& state, const abi_type*, bool s
 bool bin_to_json(pseudo_optional*, bin_to_json_state& state, const abi_type* type, bool start);
 bool bin_to_json(pseudo_object*, bin_to_json_state& state, const abi_type* type, bool start);
 bool bin_to_json(pseudo_array*, bin_to_json_state& state, const abi_type* type, bool start);
+bool bin_to_json(pseudo_variant*, bin_to_json_state& state, const abi_type* type, bool start);
 
 ///////////////////////////////////////////////////////////////////////////////
 // serializable types
@@ -1091,6 +1105,17 @@ constexpr void for_each_field(error_message*, F f) {
     f("error_msg", member_ptr<&error_message::error_msg>{});
 }
 
+struct variant_def {
+    std::string name{};
+    std::vector<std::string> types{};
+};
+
+template <typename F>
+constexpr void for_each_field(variant_def*, F f) {
+    f("name", member_ptr<&variant_def::name>{});
+    f("types", member_ptr<&variant_def::types>{});
+}
+
 struct abi_def {
     std::string version{"eosio::abi/1.0"};
     std::vector<type_def> types{};
@@ -1100,6 +1125,7 @@ struct abi_def {
     std::vector<clause_pair> ricardian_clauses{};
     std::vector<error_message> error_messages{};
     extensions_type abi_extensions{};
+    might_not_exist<std::vector<variant_def>> variants{};
 };
 
 template <typename F>
@@ -1112,6 +1138,7 @@ constexpr void for_each_field(abi_def*, F f) {
     f("ricardian_clauses", member_ptr<&abi_def::ricardian_clauses>{});
     f("error_messages", member_ptr<&abi_def::error_messages>{});
     f("abi_extensions", member_ptr<&abi_def::abi_extensions>{});
+    f("variants", member_ptr<&abi_def::variants>{});
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -1380,6 +1407,13 @@ inline bool bin_to_native(std::string& obj, bin_to_native_state& state, bool) {
     return true;
 }
 
+template <typename T>
+bool bin_to_native(might_not_exist<T>& obj, bin_to_native_state& state, bool start) {
+    if (state.bin.pos == state.bin.end)
+        return true;
+    return bin_to_native(obj.value, state, start);
+}
+
 ///////////////////////////////////////////////////////////////////////////////
 // json_to_native
 ///////////////////////////////////////////////////////////////////////////////
@@ -1490,6 +1524,11 @@ inline bool json_to_native(std::string& obj, json_to_native_state& state, event_
         throw std::runtime_error("expected string");
 }
 
+template <typename T>
+bool json_to_native(might_not_exist<T>& obj, json_to_native_state& state, event_type event, bool start) {
+    return json_to_native(obj.value, state, event, start);
+}
+
 ///////////////////////////////////////////////////////////////////////////////
 // abi serializer implementations
 ///////////////////////////////////////////////////////////////////////////////
@@ -1561,12 +1600,14 @@ struct abi_type {
     std::string name{};
     std::string alias_of_name{};
     const ::abieos::struct_def* struct_def{};
+    const ::abieos::variant_def* variant_def{};
     abi_type* alias_of{};
     abi_type* optional_of{};
     abi_type* array_of{};
     abi_type* base{};
     std::vector<abi_field> fields{};
     bool filled_struct{};
+    bool filled_variant{};
     const abi_serializer* ser{};
 };
 
@@ -1626,6 +1667,19 @@ inline abi_type& fill_struct(std::map<std::string, abi_type>& abi_types, abi_typ
     return type;
 }
 
+inline abi_type& fill_variant(std::map<std::string, abi_type>& abi_types, abi_type& type, int depth) {
+    if (depth >= 32)
+        throw std::runtime_error("abi recursion limit reached");
+    if (type.filled_variant)
+        return type;
+    if (!type.variant_def)
+        throw std::runtime_error("abi type \"" + type.name + "\" is not a variant");
+    for (auto& t : type.variant_def->types)
+        type.fields.push_back(abi_field{t, &get_type(abi_types, t, depth + 1)});
+    type.filled_variant = true;
+    return type;
+}
+
 inline contract create_contract(const abi_def& abi) {
     contract c;
     for (auto& a : abi.actions)
@@ -1661,14 +1715,29 @@ inline contract create_contract(const abi_def& abi) {
         if (!inserted)
             throw std::runtime_error("abi redefines type \"" + s.name + "\"");
     }
+    for (auto& v : abi.variants.value) {
+        if (v.name.empty())
+            throw std::runtime_error("abi has a variant with a missing name");
+        abi_type type{v.name};
+        type.variant_def = &v;
+        type.ser = &abi_serializer_for<pseudo_variant>;
+        auto [_, inserted] = c.abi_types.insert({v.name, std::move(type)});
+        if (!inserted)
+            throw std::runtime_error("abi redefines type \"" + v.name + "\"");
+    }
     for (auto& [_, t] : c.abi_types)
         if (!t.alias_of_name.empty())
             t.alias_of = &get_type(c.abi_types, t.alias_of_name, 0);
-    for (auto& [_, t] : c.abi_types)
+    for (auto& [_, t] : c.abi_types) {
         if (t.struct_def)
             fill_struct(c.abi_types, t, 0);
-    for (auto& [_, t] : c.abi_types)
+        else if (t.variant_def)
+            fill_variant(c.abi_types, t, 0);
+    }
+    for (auto& [_, t] : c.abi_types) {
         t.struct_def = nullptr;
+        t.variant_def = nullptr;
+    }
     return c;
 }
 
@@ -1697,8 +1766,11 @@ inline bool json_to_bin(std::vector<char>& bin, const abi_type* type, const jval
             else if (entry.type->filled_struct) {
                 if (entry.position >= 0 && entry.position < (int)entry.type->fields.size())
                     s += "." + entry.type->fields[entry.position].name;
-            } else
+            } else if (entry.type->filled_variant) {
+                s += "<variant>";
+            } else {
                 s += "<?>";
+            }
         }
         if (!s.empty())
             s += ": ";
@@ -1771,6 +1843,40 @@ inline bool json_to_bin(pseudo_array*, jvalue_to_bin_state& state, const abi_typ
         printf("%*sitem (event %d)\n", int(state.stack.size() * 4), "", (int)event);
     return type->array_of->ser &&
            type->array_of->ser->json_to_bin(state, type->array_of, get_event_type(*state.received_value), true);
+}
+
+inline bool json_to_bin(pseudo_variant*, jvalue_to_bin_state& state, const abi_type* type, event_type event,
+                        bool start) {
+    if (start) {
+        if (!state.received_value || !boost::get<jarray>(&state.received_value->value))
+            throw std::runtime_error(R"(expected variant: ["type", value])");
+        auto& arr = boost::get<jarray>(state.received_value->value);
+        auto* typeName = boost::get<std::string>(&arr[0].value);
+        if (arr.size() != 2 || !typeName)
+            throw std::runtime_error(R"(expected variant: ["type", value])");
+        if (trace_jvalue_to_bin)
+            printf("%*s[ variant %s\n", int(state.stack.size() * 4), "", typeName->c_str());
+        state.stack.push_back({type, state.received_value, 0});
+        return true;
+    }
+    auto& stack_entry = state.stack.back();
+    auto& arr = boost::get<jarray>(stack_entry.value->value);
+    if (stack_entry.position == 0) {
+        auto& typeName = boost::get<std::string>(arr[0].value);
+        auto it = std::find_if(stack_entry.type->fields.begin(), stack_entry.type->fields.end(),
+                               [&](auto& field) { return field.name == typeName; });
+        if (it == stack_entry.type->fields.end())
+            throw std::runtime_error("type is not valid for this variant");
+        push_varuint32(state.bin, it - stack_entry.type->fields.begin());
+        state.received_value = &arr[++stack_entry.position];
+        return it->type->ser &&
+               it->type->ser->json_to_bin(state, it->type, get_event_type(*state.received_value), true);
+    } else {
+        if (trace_jvalue_to_bin)
+            printf("%*s]\n", int((state.stack.size() - 1) * 4), "");
+        state.stack.pop_back();
+        return true;
+    }
 }
 
 template <typename T>
@@ -1915,6 +2021,47 @@ inline bool json_to_bin(pseudo_array*, json_to_bin_state& state, const abi_type*
     return type->array_of->ser && type->array_of->ser->json_to_bin(state, type->array_of, event, true);
 }
 
+inline bool json_to_bin(pseudo_variant*, json_to_bin_state& state, const abi_type* type, event_type event, bool start) {
+    if (start) {
+        if (event != event_type::received_start_array)
+            throw std::runtime_error(R"(expected variant: ["type", value])");
+        if (trace_json_to_bin)
+            printf("%*s[ variant\n", int(state.stack.size() * 4), "");
+        state.stack.push_back({type});
+        return true;
+    }
+    auto& stack_entry = state.stack.back();
+    ++stack_entry.position;
+    if (event == event_type::received_end_array) {
+        if (stack_entry.position != 2)
+            throw std::runtime_error(R"(expected variant: ["type", value])");
+        if (trace_json_to_bin)
+            printf("%*s]\n", int((state.stack.size() - 1) * 4), "");
+        state.stack.pop_back();
+        return true;
+    }
+    if (stack_entry.position == 0) {
+        if (event == event_type::received_string) {
+            auto& typeName = state.get_string();
+            if (trace_json_to_bin)
+                printf("%*stype: %s\n", int(state.stack.size() * 4), "", typeName.c_str());
+            auto it = std::find_if(stack_entry.type->fields.begin(), stack_entry.type->fields.end(),
+                                   [&](auto& field) { return field.name == typeName; });
+            if (it == stack_entry.type->fields.end())
+                throw std::runtime_error("type is not valid for this variant");
+            stack_entry.variant_type_index = it - stack_entry.type->fields.begin();
+            push_varuint32(state.bin, stack_entry.variant_type_index);
+            return true;
+        } else
+            throw std::runtime_error(R"(expected variant: ["type", value])");
+    } else if (stack_entry.position == 1) {
+        auto& field = stack_entry.type->fields[stack_entry.variant_type_index];
+        return field.type->ser && field.type->ser->json_to_bin(state, field.type, event, true);
+    } else {
+        throw std::runtime_error(R"(expected variant: ["type", value])");
+    }
+}
+
 template <typename T>
 auto json_to_bin(T*, json_to_bin_state& state, const abi_type*, event_type event, bool start)
     -> std::enable_if_t<std::is_arithmetic_v<T>, bool> {
@@ -2004,6 +2151,31 @@ inline bool bin_to_json(pseudo_array*, bin_to_json_state& state, const abi_type*
             printf("%*sitem %d/%d %p %s\n", int(state.stack.size() * 4), "", int(stack_entry.position),
                    int(stack_entry.array_size), type->array_of->ser, type->array_of->name.c_str());
         return type->array_of->ser && type->array_of->ser->bin_to_json(state, type->array_of, true);
+    } else {
+        if (trace_bin_to_json)
+            printf("%*s]\n", int((state.stack.size()) * 4), "");
+        state.stack.pop_back();
+        state.writer.EndArray();
+        return true;
+    }
+}
+
+inline bool bin_to_json(pseudo_variant*, bin_to_json_state& state, const abi_type* type, bool start) {
+    if (start) {
+        state.stack.push_back({type});
+        if (trace_bin_to_json)
+            printf("%*s[ variant\n", int(state.stack.size() * 4), "");
+        state.writer.StartArray();
+        return true;
+    }
+    auto& stack_entry = state.stack.back();
+    if (++stack_entry.position == 0) {
+        auto index = read_varuint32(state.bin);
+        if (index >= stack_entry.type->fields.size())
+            throw std::runtime_error("invalid variant type index");
+        auto& f = stack_entry.type->fields[index];
+        state.writer.String(f.name.c_str());
+        return f.type->ser && f.type->ser->bin_to_json(state, f.type, true);
     } else {
         if (trace_bin_to_json)
             printf("%*s]\n", int((state.stack.size()) * 4), "");

@@ -20,6 +20,39 @@ const char tokenHexApi[] = "0e656f73696f3a3a6162692f312e30010c6163636f756e745f6e
                            "6f756e740000000000904dc603693634010863757272656e6379010675696e74"
                            "36340e63757272656e63795f7374617473000000";
 
+const char testAbi[] = R"({
+    "structs": [
+        {
+            "name": "s1",
+            "fields": [
+                {
+                    "name": "x1",
+                    "type": "int8"
+                }
+            ]
+        },
+        {
+            "name": "s2",
+            "fields": [
+                {
+                    "name": "y1",
+                    "type": "int8"
+                },
+                {
+                    "name": "y2",
+                    "type": "int8"
+                }
+            ]
+        }
+    ],
+    "variants": [
+        {
+            "name": "v1",
+            "types": ["int8","s1","s2"]
+        }
+    ]
+})";
+
 const char transactionAbi[] = R"({
     "types": [
         {
@@ -175,8 +208,10 @@ void check_type(abieos_context* context, uint64_t contract, const char* type, co
 void check_types() {
     auto context = check(abieos_create());
     auto token = check_context(context, abieos_string_to_name(context, "eosio.token"));
+    auto testAbiName = check_context(context, abieos_string_to_name(context, "test.abi"));
     check_context(context, abieos_set_abi(context, 0, transactionAbi));
     check_context(context, abieos_set_abi_hex(context, token, tokenHexApi));
+    check_context(context, abieos_set_abi(context, testAbiName, testAbi));
 
     check_type(context, 0, "bool", R"(true)");
     check_type(context, 0, "bool", R"(false)");
@@ -378,6 +413,10 @@ void check_types() {
         R"({"ref_block_num":1234,"ref_block_prefix":5678,"expiration":"2009-02-13T23:31:31.000","max_net_usage_words":0,"max_cpu_usage_ms":0,"delay_sec":0,"context_free_actions":[],"actions":[{"account":"eosio.token","name":"transfer","authorization":[{"actor":"useraaaaaaaa","permission":"active"}],"data":"608C31C6187315D6708C31C6187315D60100000000000000045359530000000000"}],"transaction_extensions":[]})",
         R"({"expiration":"2009-02-13T23:31:31.000","ref_block_num":1234,"ref_block_prefix":5678,"max_net_usage_words":0,"max_cpu_usage_ms":0,"delay_sec":0,"context_free_actions":[],"actions":[{"account":"eosio.token","name":"transfer","authorization":[{"actor":"useraaaaaaaa","permission":"active"}],"data":"608C31C6187315D6708C31C6187315D60100000000000000045359530000000000"}],"transaction_extensions":[]})",
         false);
+
+    check_type(context, testAbiName, "v1", R"(["int8",7])");
+    check_type(context, testAbiName, "v1", R"(["s1",{"x1":6}])");
+    check_type(context, testAbiName, "v1", R"(["s2",{"y1":5,"y2":4}])");
 
     abieos_destroy(context);
 }
