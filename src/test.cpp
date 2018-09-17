@@ -36,11 +36,41 @@ const char testAbi[] = R"({
             "fields": [
                 {
                     "name": "y1",
-                    "type": "int8"
+                    "type": "int8$"
                 },
                 {
                     "name": "y2",
-                    "type": "int8"
+                    "type": "int8$"
+                }
+            ]
+        },
+        {
+            "name": "s3",
+            "fields": [
+                {
+                    "name": "z1",
+                    "type": "int8$"
+                },
+                {
+                    "name": "z2",
+                    "type": "v1$"
+                },
+                {
+                    "name": "z3",
+                    "type": "s2$"
+                }
+            ]
+        },
+        {
+            "name": "s4",
+            "fields": [
+                {
+                    "name": "a1",
+                    "type": "int8?$"
+                },
+                {
+                    "name": "b1",
+                    "type": "int8[]$"
                 }
             ]
         }
@@ -417,6 +447,19 @@ void check_types() {
     check_type(context, testAbiName, "v1", R"(["int8",7])");
     check_type(context, testAbiName, "v1", R"(["s1",{"x1":6}])");
     check_type(context, testAbiName, "v1", R"(["s2",{"y1":5,"y2":4}])");
+
+    check_type(context, testAbiName, "s3", R"({})");
+    check_type(context, testAbiName, "s3", R"({"z1":7})");
+    check_type(context, testAbiName, "s3", R"({"z1":7,"z2":["int8",6]})");
+    check_type(context, testAbiName, "s3", R"({"z1":7,"z2":["int8",6],"z3":{}})", R"({"z1":7,"z2":["int8",6]})");
+    check_type(context, testAbiName, "s3", R"({"z1":7,"z2":["int8",6],"z3":{"y1":9}})");
+    check_type(context, testAbiName, "s3", R"({"z1":7,"z2":["int8",6],"z3":{"y1":9,"y2":10}})");
+
+    check_type(context, testAbiName, "s4", R"({})");
+    check_type(context, testAbiName, "s4", R"({"a1":null})");
+    check_type(context, testAbiName, "s4", R"({"a1":7})");
+    check_type(context, testAbiName, "s4", R"({"a1":null,"b1":[]})");
+    check_type(context, testAbiName, "s4", R"({"a1":null,"b1":[5,6,7]})");
 
     abieos_destroy(context);
 }

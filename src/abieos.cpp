@@ -183,8 +183,8 @@ extern "C" const char* abieos_bin_to_json(abieos_context* context, uint64_t cont
                                           const char* data, size_t size) {
     fix_null_str(type);
     return handle_exceptions(context, nullptr, [&]() -> const char* {
-        if (!data || !size)
-            throw std::runtime_error("no data");
+        if (!data)
+            size = 0;
         context->last_error = "binary decode error";
         auto contract_it = context->contracts.find(::abieos::name{contract});
         if (contract_it == context->contracts.end())
