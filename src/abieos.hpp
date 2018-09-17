@@ -871,7 +871,7 @@ bool json_to_bin(block_timestamp*, State& state, bool, const abi_type*, event_ty
         push_raw(state.bin, obj.slot);
         return true;
     } else
-        throw std::runtime_error("expected string containing block_timestamp");
+        throw std::runtime_error("expected string containing block_timestamp_type");
 }
 
 inline bool bin_to_json(block_timestamp*, bin_to_json_state& state, bool, const abi_type*, bool start) {
@@ -1676,7 +1676,7 @@ inline abi_type& get_type(std::map<std::string, abi_type>& abi_types, const std:
             abi_type type{name};
             type.extension_of = &get_type(abi_types, name.substr(0, name.size() - 1), depth + 1);
             if (type.extension_of->extension_of)
-                throw std::runtime_error("extension ($) of extension not supported");
+                throw std::runtime_error("binary extensions ($) may not contain binary extensions ($)");
             type.ser = &abi_serializer_for<pseudo_extension>;
             return abi_types[name] = std::move(type);
         } else
@@ -1967,7 +1967,7 @@ inline bool receive_event(struct json_to_bin_state& state, event_type event, boo
         return false;
     if (trace_json_to_bin_event)
         printf("(event %d %d)\n", (int)event, start);
-    auto& entry = state.stack.back();
+    auto entry = state.stack.back();
     auto* type = entry.type;
     if (start)
         state.stack.clear();

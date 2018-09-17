@@ -235,6 +235,26 @@ void check_type(abieos_context* context, uint64_t contract, const char* type, co
         throw std::runtime_error("mismatch");
 }
 
+template <typename F>
+void check_except(const std::string& s, F f) {
+    bool ok = false;
+    try {
+        f();
+    } catch (std::exception& e) {
+        if (e.what() == s)
+            ok = true;
+        else
+            throw std::runtime_error("expected exception: " + s + " got: " + e.what());
+    }
+    if (!ok)
+        throw std::runtime_error("expected exception: " + s);
+}
+
+template <typename F>
+void check_error(abieos_context* context, const std::string& s, F f) {
+    check_except(s, [&] { check_context(context, f()); });
+}
+
 void check_types() {
     auto context = check(abieos_create());
     auto token = check_context(context, abieos_string_to_name(context, "eosio.token"));
@@ -245,6 +265,12 @@ void check_types() {
 
     check_type(context, 0, "bool", R"(true)");
     check_type(context, 0, "bool", R"(false)");
+    check_error(context, "read past end", [&] { return abieos_hex_to_json(context, 0, "bool", ""); });
+    check_error(context, "failed to parse", [&] { return abieos_json_to_bin(context, 0, "bool", R"(trues)"); });
+    check_error(context, "expected number or boolean",
+                [&] { return abieos_json_to_bin(context, 0, "bool", R"(null)"); });
+    check_error(context, "number is out of range or has bad format",
+                [&] { return abieos_json_to_bin(context, 0, "bool", R"("foo")"); });
     check_type(context, 0, "int8", R"(0)");
     check_type(context, 0, "int8", R"(127)");
     check_type(context, 0, "int8", R"(-128)");
@@ -252,6 +278,10 @@ void check_types() {
     check_type(context, 0, "uint8", R"(1)");
     check_type(context, 0, "uint8", R"(254)");
     check_type(context, 0, "uint8", R"(255)");
+    check_error(context, "number is out of range", [&] { return abieos_json_to_bin(context, 0, "int8", "128"); });
+    check_error(context, "number is out of range", [&] { return abieos_json_to_bin(context, 0, "int8", "-129"); });
+    check_error(context, "expected non-negative number", [&] { return abieos_json_to_bin(context, 0, "uint8", "-1"); });
+    check_error(context, "number is out of range", [&] { return abieos_json_to_bin(context, 0, "uint8", "256"); });
     check_type(context, 0, "uint8[]", R"([])");
     check_type(context, 0, "uint8[]", R"([10])");
     check_type(context, 0, "uint8[]", R"([10,9])");
@@ -259,13 +289,27 @@ void check_types() {
     check_type(context, 0, "int16", R"(0)");
     check_type(context, 0, "int16", R"(32767)");
     check_type(context, 0, "int16", R"(-32768)");
+    check_error(context, "read past end", [&] { return abieos_hex_to_json(context, 0, "int16", "01"); });
     check_type(context, 0, "uint16", R"(0)");
     check_type(context, 0, "uint16", R"(65535)");
+    check_error(context, "number is out of range", [&] { return abieos_json_to_bin(context, 0, "int16", "32768"); });
+    check_error(context, "number is out of range", [&] { return abieos_json_to_bin(context, 0, "int16", "-32769"); });
+    check_error(context, "expected non-negative number",
+                [&] { return abieos_json_to_bin(context, 0, "uint16", "-1"); });
+    check_error(context, "number is out of range", [&] { return abieos_json_to_bin(context, 0, "uint16", "655356"); });
     check_type(context, 0, "int32", R"(0)");
     check_type(context, 0, "int32", R"(2147483647)");
     check_type(context, 0, "int32", R"(-2147483648)");
     check_type(context, 0, "uint32", R"(0)");
     check_type(context, 0, "uint32", R"(4294967295)");
+    check_error(context, "number is out of range",
+                [&] { return abieos_json_to_bin(context, 0, "int32", "2147483648"); });
+    check_error(context, "number is out of range",
+                [&] { return abieos_json_to_bin(context, 0, "int32", "-2147483649"); });
+    check_error(context, "expected non-negative number",
+                [&] { return abieos_json_to_bin(context, 0, "uint32", "-1"); });
+    check_error(context, "number is out of range",
+                [&] { return abieos_json_to_bin(context, 0, "uint32", "4294967296"); });
     check_type(context, 0, "int64", R"(0)", R"("0")");
     check_type(context, 0, "int64", R"(1)", R"("1")");
     check_type(context, 0, "int64", R"(-1)", R"("-1")");
@@ -274,6 +318,14 @@ void check_types() {
     check_type(context, 0, "int64", R"("-9223372036854775808")");
     check_type(context, 0, "uint64", R"("0")");
     check_type(context, 0, "uint64", R"("18446744073709551615")");
+    check_error(context, "number is out of range or has bad format",
+                [&] { return abieos_json_to_bin(context, 0, "int64", "9223372036854775808"); });
+    check_error(context, "number is out of range or has bad format",
+                [&] { return abieos_json_to_bin(context, 0, "int64", "-9223372036854775809"); });
+    check_error(context, "expected non-negative number",
+                [&] { return abieos_json_to_bin(context, 0, "uint64", "-1"); });
+    check_error(context, "number is out of range or has bad format",
+                [&] { return abieos_json_to_bin(context, 0, "uint64", "18446744073709551616"); });
     check_type(context, 0, "int128", R"("0")");
     check_type(context, 0, "int128", R"("1")");
     check_type(context, 0, "int128", R"("-1")");
@@ -287,6 +339,17 @@ void check_types() {
     check_type(context, 0, "uint128", R"("18446744073709551615")");
     check_type(context, 0, "uint128", R"("340282366920938463463374607431768211454")");
     check_type(context, 0, "uint128", R"("340282366920938463463374607431768211455")");
+    check_error(context, "number is out of range",
+                [&] { return abieos_json_to_bin(context, 0, "int128", "170141183460469231731687303715884105728"); });
+    check_error(context, "number is out of range",
+                [&] { return abieos_json_to_bin(context, 0, "int128", "-170141183460469231731687303715884105729"); });
+    check_error(context, "expected string containing int128",
+                [&] { return abieos_json_to_bin(context, 0, "int128", "true"); });
+    check_error(context, "invalid number", [&] { return abieos_json_to_bin(context, 0, "uint128", "-1"); });
+    check_error(context, "number is out of range",
+                [&] { return abieos_json_to_bin(context, 0, "uint128", "340282366920938463463374607431768211456"); });
+    check_error(context, "expected string containing uint128",
+                [&] { return abieos_json_to_bin(context, 0, "uint128", "true"); });
     check_type(context, 0, "varuint32", R"(0)");
     check_type(context, 0, "varuint32", R"(127)");
     check_type(context, 0, "varuint32", R"(128)");
@@ -310,6 +373,14 @@ void check_types() {
     check_type(context, 0, "varint32", R"(-2147483647)");
     check_type(context, 0, "varint32", R"(2147483647)");
     check_type(context, 0, "varint32", R"(-2147483648)");
+    check_error(context, "number is out of range",
+                [&] { return abieos_json_to_bin(context, 0, "varint32", "2147483648"); });
+    check_error(context, "number is out of range",
+                [&] { return abieos_json_to_bin(context, 0, "varint32", "-2147483649"); });
+    check_error(context, "expected non-negative number",
+                [&] { return abieos_json_to_bin(context, 0, "varuint32", "-1"); });
+    check_error(context, "number is out of range",
+                [&] { return abieos_json_to_bin(context, 0, "varuint32", "4294967296"); });
     check_type(context, 0, "float32", R"(0.0)");
     check_type(context, 0, "float32", R"(0.125)");
     check_type(context, 0, "float32", R"(-0.125)");
@@ -322,6 +393,8 @@ void check_types() {
     check_type(context, 0, "time_point_sec", R"("1970-01-01T00:00:00.000")");
     check_type(context, 0, "time_point_sec", R"("2018-06-15T19:17:47.000")");
     check_type(context, 0, "time_point_sec", R"("2030-06-15T19:17:47.000")");
+    check_error(context, "expected string containing time_point_sec",
+                [&] { return abieos_json_to_bin(context, 0, "time_point_sec", "true"); });
     check_type(context, 0, "time_point", R"("1970-01-01T00:00:00.000")");
     check_type(context, 0, "time_point", R"("1970-01-01T00:00:00.001")");
     check_type(context, 0, "time_point", R"("1970-01-01T00:00:00.002")");
@@ -330,11 +403,15 @@ void check_types() {
     check_type(context, 0, "time_point", R"("2018-06-15T19:17:47.000")");
     check_type(context, 0, "time_point", R"("2018-06-15T19:17:47.999")");
     check_type(context, 0, "time_point", R"("2030-06-15T19:17:47.999")");
+    check_error(context, "expected string containing time_point",
+                [&] { return abieos_json_to_bin(context, 0, "time_point", "true"); });
     check_type(context, 0, "block_timestamp_type", R"("2000-01-01T00:00:00.000")");
     check_type(context, 0, "block_timestamp_type", R"("2000-01-01T00:00:00.500")");
     check_type(context, 0, "block_timestamp_type", R"("2000-01-01T00:00:01.000")");
     check_type(context, 0, "block_timestamp_type", R"("2018-06-15T19:17:47.500")");
     check_type(context, 0, "block_timestamp_type", R"("2018-06-15T19:17:48.000")");
+    check_error(context, "expected string containing block_timestamp_type",
+                [&] { return abieos_json_to_bin(context, 0, "block_timestamp_type", "true"); });
     check_type(context, 0, "name", R"("")", R"(".............")");
     check_type(context, 0, "name", R"("1")");
     check_type(context, 0, "name", R"("abcd")");
@@ -343,13 +420,21 @@ void check_types() {
     check_type(context, 0, "name", R"("..ab.cd.ef..")", R"("..ab.cd.ef")");
     check_type(context, 0, "name", R"("zzzzzzzzzzzz")");
     check_type(context, 0, "name", R"("zzzzzzzzzzzzz")", R"("zzzzzzzzzzzzj")");
+    check_error(context, "expected string containing name",
+                [&] { return abieos_json_to_bin(context, 0, "name", "true"); });
     check_type(context, 0, "bytes", R"("")");
     check_type(context, 0, "bytes", R"("00")");
     check_type(context, 0, "bytes", R"("AABBCCDDEEFF00010203040506070809")");
+    check_error(context, "odd number of hex digits", [&] { return abieos_json_to_bin(context, 0, "bytes", R"("0")"); });
+    check_error(context, "expected hex string", [&] { return abieos_json_to_bin(context, 0, "bytes", R"("yz")"); });
+    check_error(context, "expected string containing hex digits",
+                [&] { return abieos_json_to_bin(context, 0, "bytes", R"(true)"); });
+    check_error(context, "invalid bytes size", [&] { return abieos_hex_to_json(context, 0, "bytes", "01"); });
     check_type(context, 0, "string", R"("")");
     check_type(context, 0, "string", R"("z")");
     check_type(context, 0, "string", R"("This is a string.")");
     check_type(context, 0, "string", R"("' + '*'.repeat(128) + '")");
+    check_error(context, "invalid string size", [&] { return abieos_hex_to_json(context, 0, "string", "01"); });
     check_type(context, 0, "checksum160", R"("0000000000000000000000000000000000000000")");
     check_type(context, 0, "checksum160", R"("123456789ABCDEF01234567890ABCDEF70123456")");
     check_type(context, 0, "checksum256", R"("0000000000000000000000000000000000000000000000000000000000000000")");
@@ -360,6 +445,12 @@ void check_types() {
     check_type(
         context, 0, "checksum512",
         R"("0987654321ABCDEF0987654321FFFF1234567890ABCDEF001234567890ABCDEF0987654321ABCDEF0987654321FFFF1234567890ABCDEF001234567890ABCDEF")");
+    check_error(context, "expected hex string",
+                [&] { return abieos_json_to_bin(context, 0, "checksum256", R"("yz")"); });
+    check_error(context, "expected string containing hex",
+                [&] { return abieos_json_to_bin(context, 0, "checksum256", R"(true)"); });
+    check_error(context, "hex string has incorrect length",
+                [&] { return abieos_json_to_bin(context, 0, "checksum256", R"("a0")"); });
     check_type(context, 0, "public_key", R"("EOS1111111111111111111111111111111114T1Anm")",
                R"("PUB_K1_11111111111111111111111111111111149Mr2R")");
     check_type(context, 0, "public_key", R"("EOS11111111111111111111111115qCHTcgbQwptSz99m")",
@@ -400,26 +491,44 @@ void check_types() {
     check_type(context, 0, "public_key", R"("PUB_R1_67vQGPDMCR4gbqYV3hkfNz3BfzRmmSj27kFDKrwDbaZKtaX36u")");
     check_type(context, 0, "public_key", R"("PUB_R1_6FPFZqw5ahYrR9jD96yDbbDNTdKtNqRbze6oTDLntrsANgQKZu")");
     check_type(context, 0, "public_key", R"("PUB_R1_7zetsBPJwGQqgmhVjviZUfoBMktHinmTqtLczbQqrBjhaBgi6x")");
+    check_error(context, "expected string containing public_key",
+                [&] { return abieos_json_to_bin(context, 0, "public_key", "true"); });
+    check_error(context, "unrecognized public key format",
+                [&] { return abieos_json_to_bin(context, 0, "public_key", R"("foo")"); });
     check_type(context, 0, "private_key", R"("PVT_R1_PtoxLPzJZURZmPS4e26pjBiAn41mkkLPrET5qHnwDvbvqFEL6")");
     check_type(context, 0, "private_key", R"("PVT_R1_vbRKUuE34hjMVQiePj2FEjM8FvuG7yemzQsmzx89kPS9J8Coz")");
+    check_error(context, "expected string containing private_key",
+                [&] { return abieos_json_to_bin(context, 0, "private_key", "true"); });
+    check_error(context, "unrecognized private key format",
+                [&] { return abieos_json_to_bin(context, 0, "private_key", R"("foo")"); });
     check_type(
         context, 0, "signature",
         R"("SIG_K1_Kg2UKjXTX48gw2wWH4zmsZmWu3yarcfC21Bd9JPj7QoDURqiAacCHmtExPk3syPb2tFLsp1R4ttXLXgr7FYgDvKPC5RCkx")");
     check_type(
         context, 0, "signature",
         R"("SIG_R1_Kfh19CfEcQ6pxkMBz6xe9mtqKuPooaoyatPYWtwXbtwHUHU8YLzxPGvZhkqgnp82J41e9R6r5mcpnxy1wAf1w9Vyo9wybZ")");
+    check_error(context, "expected string containing signature",
+                [&] { return abieos_json_to_bin(context, 0, "signature", "true"); });
+    check_error(context, "unrecognized signature format",
+                [&] { return abieos_json_to_bin(context, 0, "signature", R"("foo")"); });
     check_type(context, 0, "symbol_code", R"("A")");
     check_type(context, 0, "symbol_code", R"("B")");
     check_type(context, 0, "symbol_code", R"("SYS")");
+    check_error(context, "expected string containing symbol_code",
+                [&] { return abieos_json_to_bin(context, 0, "symbol_code", "true"); });
     check_type(context, 0, "symbol", R"("0,A")");
     check_type(context, 0, "symbol", R"("1,Z")");
     check_type(context, 0, "symbol", R"("4,SYS")");
+    check_error(context, "expected string containing symbol",
+                [&] { return abieos_json_to_bin(context, 0, "symbol", "null"); });
     check_type(context, 0, "asset", R"("0 FOO")");
     check_type(context, 0, "asset", R"("0.0 FOO")");
     check_type(context, 0, "asset", R"("0.00 FOO")");
     check_type(context, 0, "asset", R"("0.000 FOO")");
     check_type(context, 0, "asset", R"("1.2345 SYS")");
     check_type(context, 0, "asset", R"("-1.2345 SYS")");
+    check_error(context, "expected string containing asset",
+                [&] { return abieos_json_to_bin(context, 0, "asset", "null"); });
     check_type(context, 0, "asset[]", R"([])");
     check_type(context, 0, "asset[]", R"(["0 FOO"])");
     check_type(context, 0, "asset[]", R"(["0 FOO","0.000 FOO"])");
@@ -443,6 +552,36 @@ void check_types() {
         R"({"ref_block_num":1234,"ref_block_prefix":5678,"expiration":"2009-02-13T23:31:31.000","max_net_usage_words":0,"max_cpu_usage_ms":0,"delay_sec":0,"context_free_actions":[],"actions":[{"account":"eosio.token","name":"transfer","authorization":[{"actor":"useraaaaaaaa","permission":"active"}],"data":"608C31C6187315D6708C31C6187315D60100000000000000045359530000000000"}],"transaction_extensions":[]})",
         R"({"expiration":"2009-02-13T23:31:31.000","ref_block_num":1234,"ref_block_prefix":5678,"max_net_usage_words":0,"max_cpu_usage_ms":0,"delay_sec":0,"context_free_actions":[],"actions":[{"account":"eosio.token","name":"transfer","authorization":[{"actor":"useraaaaaaaa","permission":"active"}],"data":"608C31C6187315D6708C31C6187315D60100000000000000045359530000000000"}],"transaction_extensions":[]})",
         false);
+
+    check_error(context, "recursion limit reached", [&] {
+        return abieos_json_to_bin_reorderable(
+            context, 0, "int8",
+            "[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[["
+            "[[[[[[[[[[[[[[[[[[[[[[[]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]"
+            "]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]");
+    });
+    check_error(context, "json parse error", [&] { return abieos_json_to_bin_reorderable(context, 0, "int8", "1,2"); });
+
+    check_error(context, "optional (?) and array ([]) don't support nesting",
+                [&] { return abieos_json_to_bin(context, 0, "int8?[]", ""); });
+    check_error(context, "optional (?) and array ([]) don't support nesting",
+                [&] { return abieos_json_to_bin(context, 0, "int8[]?", ""); });
+    check_error(context, "optional (?) may not contain binary extensions ($)",
+                [&] { return abieos_json_to_bin(context, 0, "int8$?", ""); });
+    check_error(context, "array ([]) may not contain binary extensions ($)",
+                [&] { return abieos_json_to_bin(context, 0, "int8$[]", ""); });
+    check_error(context, "binary extensions ($) may not contain binary extensions ($)",
+                [&] { return abieos_json_to_bin(context, 0, "int8$$", ""); });
+    check_error(context, "unknown type \"fee\"", [&] { return abieos_json_to_bin(context, 0, "fee", ""); });
+
+    check_error(context, "abi has a type with a missing name",
+                [&] { return abieos_set_abi(context, 0, R"({"types":[{"new_type_name":"","type":"int8"}]})"); });
+    check_error(context, "can't use extensions ($) within typedefs",
+                [&] { return abieos_set_abi(context, 0, R"({"types":[{"new_type_name":"a","type":"int8$"}]})"); });
+    check_error(context, "abi redefines type \"a\"", [&] {
+        return abieos_set_abi(context, 0,
+                              R"({"types":[{"new_type_name":"a","type":"int8"},{"new_type_name":"a","type":"int8"}]})");
+    });
 
     check_type(context, testAbiName, "v1", R"(["int8",7])");
     check_type(context, testAbiName, "v1", R"(["s1",{"x1":6}])");
