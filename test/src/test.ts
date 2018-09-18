@@ -32,9 +32,16 @@ const tokenHexApi =
 
 const testAbi = `{
         "version": "eosio::abi/1.0",
+        "types": [],
+        "actions": [],
+        "tables": [],
+        "ricardian_clauses": [],
+        "error_messages": [],
+        "abi_extensions": [],
         "structs": [
             {
                 "name": "s1",
+                "base": "",
                 "fields": [
                     {
                         "name": "x1",
@@ -44,6 +51,7 @@ const testAbi = `{
             },
             {
                 "name": "s2",
+                "base": "",
                 "fields": [
                     {
                         "name": "y1",
@@ -57,6 +65,7 @@ const testAbi = `{
             },
             {
                 "name": "s3",
+                "base": "",
                 "fields": [
                     {
                         "name": "z1",
@@ -74,6 +83,7 @@ const testAbi = `{
             },
             {
                 "name": "s4",
+                "base": "",
                 "fields": [
                     {
                         "name": "a1",
@@ -145,7 +155,16 @@ function hex_abi_to_json(hex: string): any {
         textDecoder: new (require('util').TextDecoder)('utf-8', { fatal: true }),
         array: eosjs2.serialize.hexToUint8Array(hex),
     });
-    return abiTypes.get("abi_def").deserialize(buf, new eosjs2.serialize.SerializerState, true);
+    return abiTypes.get("abi_def").deserialize(buf);
+}
+
+function json_abi_to_hex(abi: any) {
+    let buf = new eosjs2.serialize.SerialBuffer({
+        textEncoder: new (require('util').TextEncoder),
+        textDecoder: new (require('util').TextDecoder)('utf-8', { fatal: true }),
+    });
+    abiTypes.get("abi_def").serialize(buf, abi);
+    return eosjs2.serialize.arrayToHex(buf.asUint8Array());
 }
 
 function json_to_hex(contract: number, type: string, data: string) {
@@ -189,8 +208,7 @@ function check_types() {
     check(l.abieos_set_abi_hex(context, token, cstr(tokenHexApi)));
     check(l.abieos_set_abi(context, test, cstr(testAbi)));
     const tokenTypes = eosjs2.serialize.getTypesFromAbi(eosjs2.serialize.createInitialTypes(), hex_abi_to_json(tokenHexApi));
-    const testTypes = eosjs2.serialize.getTypesFromAbi(eosjs2.serialize.createInitialTypes(), JSON.parse(testAbi));
-    // todo: round-trip testAbi through json->bin->json inside eosjs2
+    const testTypes = eosjs2.serialize.getTypesFromAbi(eosjs2.serialize.createInitialTypes(), hex_abi_to_json(json_abi_to_hex(JSON.parse(testAbi))));
 
     check_type(0, js2Types, 'bool', 'true');
     check_type(0, js2Types, 'bool', 'false');
