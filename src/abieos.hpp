@@ -1142,7 +1142,7 @@ constexpr void for_each_field(variant_def*, F f) {
 }
 
 struct abi_def {
-    std::string version{"eosio::abi/1.0"};
+    std::string version{};
     std::vector<type_def> types{};
     std::vector<struct_def> structs{};
     std::vector<action_def> actions{};
@@ -1165,6 +1165,13 @@ constexpr void for_each_field(abi_def*, F f) {
     f("abi_extensions", member_ptr<&abi_def::abi_extensions>{});
     f("variants", member_ptr<&abi_def::variants>{});
 }
+
+inline void check_abi_version(const std::string& s) {
+    if (s.substr(0, 13) != "eosio::abi/1.")
+        throw std::runtime_error("unsupported abi version");
+}
+
+inline void check_abi_version(input_buffer bin) { check_abi_version(read_string(bin)); }
 
 ///////////////////////////////////////////////////////////////////////////////
 // json_to_jvalue
@@ -1425,7 +1432,7 @@ bool bin_to_native(std::pair<First, Second>& obj, bin_to_native_state& state, bo
 
 inline bool bin_to_native(std::string& obj, bin_to_native_state& state, bool) {
     auto size = read_varuint32(state.bin);
-    if (size >= state.bin.end - state.bin.pos)
+    if (size > state.bin.end - state.bin.pos)
         throw std::runtime_error("invalid string size");
     obj.resize(size);
     read_bin(state.bin, obj.data(), size);

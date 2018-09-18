@@ -1,6 +1,7 @@
 // copyright defined in abieos/LICENSE.txt
 
 #include "abieos.h"
+#include <boost/algorithm/hex.hpp>
 #include <stdexcept>
 #include <stdio.h>
 #include <string>
@@ -21,6 +22,7 @@ const char tokenHexApi[] = "0e656f73696f3a3a6162692f312e30010c6163636f756e745f6e
                            "36340e63757272656e63795f7374617473000000";
 
 const char testAbi[] = R"({
+    "version": "eosio::abi/1.0",
     "structs": [
         {
             "name": "s1",
@@ -84,6 +86,7 @@ const char testAbi[] = R"({
 })";
 
 const char transactionAbi[] = R"({
+    "version": "eosio::abi/1.0",
     "types": [
         {
             "new_type_name": "account_name",
@@ -200,6 +203,14 @@ const char transactionAbi[] = R"({
     ]
 })";
 
+std::string string_to_hex(const std::string& s) {
+    std::string result;
+    uint8_t size = s.size();
+    boost::algorithm::hex(&size, &size + 1, std::back_inserter(result));
+    boost::algorithm::hex(s.begin(), s.end(), std::back_inserter(result));
+    return result;
+}
+
 template <typename T>
 T check(T value, const char* msg = "") {
     if (!value)
@@ -262,6 +273,20 @@ void check_types() {
     check_context(context, abieos_set_abi(context, 0, transactionAbi));
     check_context(context, abieos_set_abi_hex(context, token, tokenHexApi));
     check_context(context, abieos_set_abi(context, testAbiName, testAbi));
+
+    check_error(context, "no data", [&] { return abieos_set_abi_hex(context, 8, ""); });
+    check_error(context, "unsupported abi version", [&] { return abieos_set_abi_hex(context, 8, "00"); });
+    check_error(context, "unsupported abi version",
+                [&] { return abieos_set_abi_hex(context, 8, string_to_hex("eosio::abi/9.0").c_str()); });
+    check_error(context, "read past end",
+                [&] { return abieos_set_abi_hex(context, 8, string_to_hex("eosio::abi/1.0").c_str()); });
+    check_error(context, "read past end",
+                [&] { return abieos_set_abi_hex(context, 8, string_to_hex("eosio::abi/1.1").c_str()); });
+
+    check_error(context, "unsupported abi version",
+                [&] { return abieos_set_abi(context, 8, R"({"version":"eosio::abi/9.0"})"); });
+    abieos_set_abi(context, 8, R"({"version":"eosio::abi/1.0"})");
+    abieos_set_abi(context, 8, R"({"version":"eosio::abi/1.1"})");
 
     check_type(context, 0, "bool", R"(true)");
     check_type(context, 0, "bool", R"(false)");
@@ -574,13 +599,20 @@ void check_types() {
                 [&] { return abieos_json_to_bin(context, 0, "int8$$", ""); });
     check_error(context, "unknown type \"fee\"", [&] { return abieos_json_to_bin(context, 0, "fee", ""); });
 
-    check_error(context, "abi has a type with a missing name",
-                [&] { return abieos_set_abi(context, 0, R"({"types":[{"new_type_name":"","type":"int8"}]})"); });
-    check_error(context, "can't use extensions ($) within typedefs",
-                [&] { return abieos_set_abi(context, 0, R"({"types":[{"new_type_name":"a","type":"int8$"}]})"); });
+    check_error(context, "abi has a type with a missing name", [&] {
+        return abieos_set_abi( //
+            context, 0,
+            R"({"version":"eosio::abi/1.1","types":[{"new_type_name":"","type":"int8"}]})");
+    });
+    check_error(context, "can't use extensions ($) within typedefs", [&] {
+        return abieos_set_abi( //
+            context, 0,
+            R"({"version":"eosio::abi/1.1","types":[{"new_type_name":"a","type":"int8$"}]})");
+    });
     check_error(context, "abi redefines type \"a\"", [&] {
-        return abieos_set_abi(context, 0,
-                              R"({"types":[{"new_type_name":"a","type":"int8"},{"new_type_name":"a","type":"int8"}]})");
+        return abieos_set_abi(
+            context, 0,
+            R"({"version":"eosio::abi/1.1","types":[{"new_type_name":"a","type":"int8"},{"new_type_name":"a","type":"int8"}]})");
     });
 
     check_type(context, testAbiName, "v1", R"(["int8",7])");
