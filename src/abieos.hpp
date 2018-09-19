@@ -2003,6 +2003,8 @@ inline bool json_to_bin(std::vector<char>& bin, const abi_type* type, std::strin
             else if (entry.type->filled_struct) {
                 if (entry.position >= 0 && entry.position < (int)entry.type->fields.size())
                     s += "." + entry.type->fields[entry.position].name;
+            } else if (entry.type->filled_variant) {
+                s += "<variant>";
             } else
                 s += "<?>";
         }
@@ -2053,8 +2055,10 @@ inline bool json_to_bin(pseudo_object*, json_to_bin_state& state, bool allow_ext
     if (event == event_type::received_end_object) {
         if (stack_entry.position + 1 != (ptrdiff_t)type->fields.size()) {
             auto& field = type->fields[stack_entry.position + 1];
-            if (!field.type->extension_of || !allow_extensions)
+            if (!field.type->extension_of || !allow_extensions) {
+                stack_entry.position = -1;
                 throw std::runtime_error("expected field \"" + field.name + "\"");
+            }
             ++stack_entry.position;
             state.skipped_extension = true;
             return true;
@@ -2068,8 +2072,10 @@ inline bool json_to_bin(pseudo_object*, json_to_bin_state& state, bool allow_ext
         if (++stack_entry.position >= (ptrdiff_t)type->fields.size() || state.skipped_extension)
             throw std::runtime_error("unexpected field \"" + state.received_data.key + "\"");
         auto& field = type->fields[stack_entry.position];
-        if (state.received_data.key != field.name)
+        if (state.received_data.key != field.name) {
+            stack_entry.position = -1;
             throw std::runtime_error("expected field \"" + field.name + "\"");
+        }
         return true;
     } else {
         auto& field = type->fields[stack_entry.position];
