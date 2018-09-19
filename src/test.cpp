@@ -6,7 +6,7 @@
 #include <stdio.h>
 #include <string>
 
-const char tokenHexApi[] = "0e656f73696f3a3a6162692f312e30010c6163636f756e745f6e616d65046e61"
+const char tokenHexAbi[] = "0e656f73696f3a3a6162692f312e30010c6163636f756e745f6e616d65046e61"
                            "6d6505087472616e7366657200040466726f6d0c6163636f756e745f6e616d65"
                            "02746f0c6163636f756e745f6e616d65087175616e7469747905617373657404"
                            "6d656d6f06737472696e67066372656174650002066973737565720c6163636f"
@@ -21,8 +21,13 @@ const char tokenHexApi[] = "0e656f73696f3a3a6162692f312e30010c6163636f756e745f6e
                            "6f756e740000000000904dc603693634010863757272656e6379010675696e74"
                            "36340e63757272656e63795f7374617473000000";
 
+const char testHexAbi[] = "0E656F73696F3A3A6162692F312E310004027331000102783104696E74380273"
+                          "32000202793105696E74382402793205696E7438240273330003027A3105696E"
+                          "743824027A3203763124027A3303733224027334000202613106696E74383F24"
+                          "02623107696E74385B5D240000000000010276310304696E7438027331027332";
+
 const char testAbi[] = R"({
-    "version": "eosio::abi/1.0",
+    "version": "eosio::abi/1.1",
     "structs": [
         {
             "name": "s1",
@@ -270,9 +275,11 @@ void check_types() {
     auto context = check(abieos_create());
     auto token = check_context(context, abieos_string_to_name(context, "eosio.token"));
     auto testAbiName = check_context(context, abieos_string_to_name(context, "test.abi"));
+    auto testHexAbiName = check_context(context, abieos_string_to_name(context, "test.hex"));
     check_context(context, abieos_set_abi(context, 0, transactionAbi));
-    check_context(context, abieos_set_abi_hex(context, token, tokenHexApi));
+    check_context(context, abieos_set_abi_hex(context, token, tokenHexAbi));
     check_context(context, abieos_set_abi(context, testAbiName, testAbi));
+    check_context(context, abieos_set_abi_hex(context, testHexAbiName, testHexAbi));
 
     check_error(context, "no data", [&] { return abieos_set_abi_hex(context, 8, ""); });
     check_error(context, "unsupported abi version", [&] { return abieos_set_abi_hex(context, 8, "00"); });
@@ -615,22 +622,27 @@ void check_types() {
             R"({"version":"eosio::abi/1.1","types":[{"new_type_name":"a","type":"int8"},{"new_type_name":"a","type":"int8"}]})");
     });
 
-    check_type(context, testAbiName, "v1", R"(["int8",7])");
-    check_type(context, testAbiName, "v1", R"(["s1",{"x1":6}])");
-    check_type(context, testAbiName, "v1", R"(["s2",{"y1":5,"y2":4}])");
+    auto testWith = [&](auto& abiName) {
+        check_type(context, abiName, "v1", R"(["int8",7])");
+        check_type(context, abiName, "v1", R"(["s1",{"x1":6}])");
+        check_type(context, abiName, "v1", R"(["s2",{"y1":5,"y2":4}])");
 
-    check_type(context, testAbiName, "s3", R"({})");
-    check_type(context, testAbiName, "s3", R"({"z1":7})");
-    check_type(context, testAbiName, "s3", R"({"z1":7,"z2":["int8",6]})");
-    check_type(context, testAbiName, "s3", R"({"z1":7,"z2":["int8",6],"z3":{}})", R"({"z1":7,"z2":["int8",6]})");
-    check_type(context, testAbiName, "s3", R"({"z1":7,"z2":["int8",6],"z3":{"y1":9}})");
-    check_type(context, testAbiName, "s3", R"({"z1":7,"z2":["int8",6],"z3":{"y1":9,"y2":10}})");
+        check_type(context, abiName, "s3", R"({})");
+        check_type(context, abiName, "s3", R"({"z1":7})");
+        check_type(context, abiName, "s3", R"({"z1":7,"z2":["int8",6]})");
+        check_type(context, abiName, "s3", R"({"z1":7,"z2":["int8",6],"z3":{}})", R"({"z1":7,"z2":["int8",6]})");
+        check_type(context, abiName, "s3", R"({"z1":7,"z2":["int8",6],"z3":{"y1":9}})");
+        check_type(context, abiName, "s3", R"({"z1":7,"z2":["int8",6],"z3":{"y1":9,"y2":10}})");
 
-    check_type(context, testAbiName, "s4", R"({})");
-    check_type(context, testAbiName, "s4", R"({"a1":null})");
-    check_type(context, testAbiName, "s4", R"({"a1":7})");
-    check_type(context, testAbiName, "s4", R"({"a1":null,"b1":[]})");
-    check_type(context, testAbiName, "s4", R"({"a1":null,"b1":[5,6,7]})");
+        check_type(context, abiName, "s4", R"({})");
+        check_type(context, abiName, "s4", R"({"a1":null})");
+        check_type(context, abiName, "s4", R"({"a1":7})");
+        check_type(context, abiName, "s4", R"({"a1":null,"b1":[]})");
+        check_type(context, abiName, "s4", R"({"a1":null,"b1":[5,6,7]})");
+    };
+
+    testWith(testAbiName);
+    testWith(testHexAbiName);
 
     abieos_destroy(context);
 }
