@@ -101,6 +101,7 @@ extern "C" abieos_bool abieos_set_abi(abieos_context* context, uint64_t contract
         abi_def def{};
         if (!json_to_native(def, abi))
             return false;
+        check_abi_version(def.version);
         auto c = create_contract(def);
         context->contracts.insert({name{contract}, std::move(c)});
         return true;
@@ -112,6 +113,7 @@ extern "C" abieos_bool abieos_set_abi_bin(abieos_context* context, uint64_t cont
         context->last_error = "abi parse error";
         if (!data || !size)
             throw std::runtime_error("no data");
+        check_abi_version(input_buffer{data, data + size});
         abi_def def{};
         if (!bin_to_native(def, {data, data + size}))
             return false;
@@ -183,8 +185,8 @@ extern "C" const char* abieos_bin_to_json(abieos_context* context, uint64_t cont
                                           const char* data, size_t size) {
     fix_null_str(type);
     return handle_exceptions(context, nullptr, [&]() -> const char* {
-        if (!data || !size)
-            throw std::runtime_error("no data");
+        if (!data)
+            size = 0;
         context->last_error = "binary decode error";
         auto contract_it = context->contracts.find(::abieos::name{contract});
         if (contract_it == context->contracts.end())
