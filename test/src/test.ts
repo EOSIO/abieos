@@ -32,12 +32,6 @@ const tokenHexApi =
 
 const testAbi = `{
         "version": "eosio::abi/1.0",
-        "types": [],
-        "actions": [],
-        "tables": [],
-        "ricardian_clauses": [],
-        "error_messages": [],
-        "abi_extensions": [],
         "structs": [
             {
                 "name": "s1",
@@ -145,42 +139,69 @@ function name(s: string) {
 
 const rpc = new eosjs2_jsonrpc.JsonRpc(rpcEndpoint, { fetch });
 const signatureProvider = new eosjs2_jssig.default(['5JtUScZK2XEp3g9gh7F8bwtPTRAkASmNrrftmx4AxDKD5K4zDnr']);
-const api = new eosjs2.Api({ rpc, signatureProvider, chainId: null });
+const textEncoder = new (require('util').TextEncoder);
+const textDecoder = new (require('util').TextDecoder)('utf-8', { fatal: true });
+const api = new eosjs2.Api({ rpc, signatureProvider, chainId: null, textEncoder, textDecoder });
 const abiTypes = eosjs2.serialize.getTypesFromAbi(eosjs2.serialize.createInitialTypes(), abiAbi);
 const js2Types = eosjs2.serialize.getTypesFromAbi(eosjs2.serialize.createInitialTypes(), transactionAbi);
 
-function hex_abi_to_json(hex: string): any {
-    let buf = new eosjs2.serialize.SerialBuffer({
-        textEncoder: new (require('util').TextEncoder),
-        textDecoder: new (require('util').TextDecoder)('utf-8', { fatal: true }),
-        array: eosjs2.serialize.hexToUint8Array(hex),
-    });
-    return abiTypes.get("abi_def").deserialize(buf);
+function eosjs_hex_abi_to_json(hex: string): any {
+    return api.rawAbiToJson(eosjs2.serialize.hexToUint8Array(hex));
 }
 
-function json_abi_to_hex(abi: any) {
-    let buf = new eosjs2.serialize.SerialBuffer({
-        textEncoder: new (require('util').TextEncoder),
-        textDecoder: new (require('util').TextDecoder)('utf-8', { fatal: true }),
+function eosjs_json_abi_to_hex(abi: any) {
+    let buf = new eosjs2.serialize.SerialBuffer({ textEncoder, textDecoder });
+    abiTypes.get("abi_def").serialize(buf, {
+        "types": [],
+        "actions": [],
+        "tables": [],
+        "structs": [],
+        "ricardian_clauses": [],
+        "error_messages": [],
+        "abi_extensions": [],
+        ...abi
     });
-    abiTypes.get("abi_def").serialize(buf, abi);
     return eosjs2.serialize.arrayToHex(buf.asUint8Array());
 }
 
-function json_to_hex(contract: number, type: string, data: string) {
+function abieos_json_to_hex(contract: number, type: string, data: string) {
     check(l.abieos_json_to_bin(context, contract, cstr(type), cstr(data)));
     return l.abieos_get_bin_hex(context).readCString();
 }
 
-function hex_to_json(contract: number, type: string, hex: string) {
+function abieos_hex_to_json(contract: number, type: string, hex: string) {
     let result = l.abieos_hex_to_json(context, contract, cstr(type), cstr(hex));
     checkPtr(result);
     return result.readCString();
 }
 
+function eosjs_json_to_hex(types: any, type: string, data: any) {
+    let js2Type = eosjs2.serialize.getType(types, type);
+    let buf = new eosjs2.serialize.SerialBuffer({ textEncoder, textDecoder });
+    js2Type.serialize(buf, data);
+    return eosjs2.serialize.arrayToHex(buf.asUint8Array());
+}
+
+function eosjs_hex_to_json(types: any, type: string, hex: string) {
+    let js2Type = eosjs2.serialize.getType(types, type);
+    let buf = new eosjs2.serialize.SerialBuffer({ textEncoder, textDecoder, array: eosjs2.serialize.hexToUint8Array(hex) });
+    return js2Type.deserialize(buf);
+}
+
+function check_throw(message: string, f: () => void) {
+    try {
+        f();
+    } catch (e) {
+        if (e + '' === message)
+            return;
+        throw new Error(`expected exception: ${message}, got: ${e + ''}`);
+    }
+    throw new Error(`expected exception: ${message}`);
+}
+
 function check_type(contract: number, types: any, type: string, data: string, expected = data) {
-    let hex = json_to_hex(contract, type, data);
-    let json = hex_to_json(contract, type, hex);
+    let hex = abieos_json_to_hex(contract, type, data);
+    let json = abieos_hex_to_json(contract, type, hex);
     console.log(type, data, hex, json);
     if (json !== expected)
         throw new Error('conversion mismatch');
@@ -188,14 +209,14 @@ function check_type(contract: number, types: any, type: string, data: string, ex
 
     //console.log(type, data);
     let js2Type = eosjs2.serialize.getType(types, type);
-    let buf = new eosjs2.serialize.SerialBuffer({ textEncoder: new (require('util').TextEncoder), textDecoder: new (require('util').TextDecoder)('utf-8', { fatal: true }) });
-    js2Type.serialize(buf, JSON.parse(data), new eosjs2.serialize.SerializerState, true);
+    let buf = new eosjs2.serialize.SerialBuffer({ textEncoder, textDecoder });
+    js2Type.serialize(buf, JSON.parse(data));
     let js2Hex = eosjs2.serialize.arrayToHex(buf.asUint8Array()).toUpperCase();
     //console.log(hex)
     //console.log(js2Hex)
     if (js2Hex != hex)
         throw new Error('eosjs2 hex mismatch');
-    let js2Json = JSON.stringify(js2Type.deserialize(buf, new eosjs2.serialize.SerializerState, true));
+    let js2Json = JSON.stringify(js2Type.deserialize(buf));
     //console.log(json);
     //console.log(js2Json);
     if (js2Json != json)
@@ -207,11 +228,18 @@ function check_types() {
     let test = name('test.abi');
     check(l.abieos_set_abi_hex(context, token, cstr(tokenHexApi)));
     check(l.abieos_set_abi(context, test, cstr(testAbi)));
-    const tokenTypes = eosjs2.serialize.getTypesFromAbi(eosjs2.serialize.createInitialTypes(), hex_abi_to_json(tokenHexApi));
-    const testTypes = eosjs2.serialize.getTypesFromAbi(eosjs2.serialize.createInitialTypes(), hex_abi_to_json(json_abi_to_hex(JSON.parse(testAbi))));
+    const tokenTypes = eosjs2.serialize.getTypesFromAbi(eosjs2.serialize.createInitialTypes(), eosjs_hex_abi_to_json(tokenHexApi));
+    const testTypes = eosjs2.serialize.getTypesFromAbi(eosjs2.serialize.createInitialTypes(), eosjs_hex_abi_to_json(eosjs_json_abi_to_hex(JSON.parse(testAbi))));
+
+    check_throw('Error: missing abi_def.version (type=string)', () => eosjs_hex_abi_to_json(eosjs_json_abi_to_hex({})));
+    check_throw('Error: Unsupported abi version', () => eosjs_hex_abi_to_json(eosjs_json_abi_to_hex({ version: '' })));
+    check_throw('Error: Unsupported abi version', () => eosjs_hex_abi_to_json(eosjs_json_abi_to_hex({ version: 'eosio::abi/9.0' })));
+    eosjs_hex_abi_to_json(eosjs_json_abi_to_hex({ version: 'eosio::abi/1.0' }));
+    eosjs_hex_abi_to_json(eosjs_json_abi_to_hex({ version: 'eosio::abi/1.1' }));
 
     check_type(0, js2Types, 'bool', 'true');
     check_type(0, js2Types, 'bool', 'false');
+    check_throw('Error: Read past end of buffer', () => eosjs_hex_to_json(js2Types, 'bool', ''));
     check_type(0, js2Types, 'int8', '0');
     check_type(0, js2Types, 'int8', '127');
     check_type(0, js2Types, 'int8', '-128');
@@ -241,6 +269,10 @@ function check_types() {
     check_type(0, js2Types, 'int64', '"-9223372036854775808"');
     check_type(0, js2Types, 'uint64', '"0"');
     check_type(0, js2Types, 'uint64', '"18446744073709551615"');
+    check_throw('Error: number is out of range', () => eosjs_json_to_hex(js2Types, 'int64', '9223372036854775808'));
+    check_throw('Error: number is out of range', () => eosjs_json_to_hex(js2Types, 'int64', '-9223372036854775809'));
+    check_throw('Error: invalid number', () => eosjs_json_to_hex(js2Types, 'uint64', '-1'));
+    check_throw('Error: number is out of range', () => eosjs_json_to_hex(js2Types, 'uint64', '18446744073709551616'));
     check_type(0, js2Types, 'int128', '"0"');
     check_type(0, js2Types, 'int128', '"1"');
     check_type(0, js2Types, 'int128', '"-1"');
@@ -254,6 +286,12 @@ function check_types() {
     check_type(0, js2Types, 'uint128', '"18446744073709551615"');
     check_type(0, js2Types, 'uint128', '"340282366920938463463374607431768211454"');
     check_type(0, js2Types, 'uint128', '"340282366920938463463374607431768211455"');
+    check_throw('Error: number is out of range', () => eosjs_json_to_hex(js2Types, 'int128', '170141183460469231731687303715884105728'));
+    check_throw('Error: number is out of range', () => eosjs_json_to_hex(js2Types, 'int128', '-170141183460469231731687303715884105729'));
+    check_throw('Error: invalid number', () => eosjs_json_to_hex(js2Types, 'int128', 'true'));
+    check_throw('Error: invalid number', () => eosjs_json_to_hex(js2Types, 'uint128', '-1'));
+    check_throw('Error: number is out of range', () => eosjs_json_to_hex(js2Types, 'uint128', '340282366920938463463374607431768211456'));
+    check_throw('Error: invalid number', () => eosjs_json_to_hex(js2Types, 'uint128', 'true'));
     check_type(0, js2Types, 'varuint32', '0');
     check_type(0, js2Types, 'varuint32', '127');
     check_type(0, js2Types, 'varuint32', '128');
@@ -289,6 +327,7 @@ function check_types() {
     check_type(0, js2Types, 'time_point_sec', '"1970-01-01T00:00:00.000"');
     check_type(0, js2Types, 'time_point_sec', '"2018-06-15T19:17:47.000"');
     check_type(0, js2Types, 'time_point_sec', '"2060-06-15T19:17:47.000"');
+    check_throw('Error: Invalid time format', () => eosjs_json_to_hex(js2Types, 'time_point_sec', true));
     check_type(0, js2Types, 'time_point', '"1970-01-01T00:00:00.000"');
     check_type(0, js2Types, 'time_point', '"1970-01-01T00:00:00.001"');
     check_type(0, js2Types, 'time_point', '"1970-01-01T00:00:00.002"');
@@ -297,11 +336,13 @@ function check_types() {
     check_type(0, js2Types, 'time_point', '"2018-06-15T19:17:47.000"');
     check_type(0, js2Types, 'time_point', '"2018-06-15T19:17:47.999"');
     check_type(0, js2Types, 'time_point', '"2060-06-15T19:17:47.999"');
+    check_throw('Error: Invalid time format', () => eosjs_json_to_hex(js2Types, 'time_point', true));
     check_type(0, js2Types, 'block_timestamp_type', '"2000-01-01T00:00:00.000"');
     check_type(0, js2Types, 'block_timestamp_type', '"2000-01-01T00:00:00.500"');
     check_type(0, js2Types, 'block_timestamp_type', '"2000-01-01T00:00:01.000"');
     check_type(0, js2Types, 'block_timestamp_type', '"2018-06-15T19:17:47.500"');
     check_type(0, js2Types, 'block_timestamp_type', '"2018-06-15T19:17:48.000"');
+    check_throw('Error: Invalid time format', () => eosjs_json_to_hex(js2Types, 'block_timestamp_type', true));
     check_type(0, js2Types, 'name', '""', '"............."');
     check_type(0, js2Types, 'name', '"1"');
     check_type(0, js2Types, 'name', '"abcd"');
@@ -310,9 +351,14 @@ function check_types() {
     check_type(0, js2Types, 'name', '"..ab.cd.ef.."', '"..ab.cd.ef"');
     check_type(0, js2Types, 'name', '"zzzzzzzzzzzz"');
     check_type(0, js2Types, 'name', '"zzzzzzzzzzzzz"', '"zzzzzzzzzzzzj"');
+    check_throw('Error: Expected string containing name', () => eosjs_json_to_hex(js2Types, 'name', true));
     check_type(0, js2Types, 'bytes', '""');
     check_type(0, js2Types, 'bytes', '"00"');
     check_type(0, js2Types, 'bytes', '"AABBCCDDEEFF00010203040506070809"');
+    check_throw('Error: Odd number of hex digits', () => eosjs_json_to_hex(js2Types, 'bytes', '"0"'));
+    check_throw('Error: Expected hex string', () => eosjs_json_to_hex(js2Types, 'bytes', '"yz"'));
+    check_throw('Error: Expected string containing hex digits', () => eosjs_json_to_hex(js2Types, 'bytes', true));
+    check_throw('Error: Read past end of buffer', () => eosjs_hex_to_json(js2Types, 'bytes', "01"));
     check_type(0, js2Types, 'string', '""');
     check_type(0, js2Types, 'string', '"z"');
     check_type(0, js2Types, 'string', '"This is a string."');
@@ -410,7 +456,7 @@ async function push_transfer() {
     })));
     const actionDataHex = l.abieos_get_bin_hex(context).readCString();
     console.log('action json->bin: ', actionDataHex);
-    console.log('action bin->json: ', hex_to_json(name('eosio.token'), 'transfer', actionDataHex));
+    console.log('action bin->json: ', abieos_hex_to_json(name('eosio.token'), 'transfer', actionDataHex));
 
     let info = await rpc.get_info();
     let refBlock = await rpc.get_block(info.head_block_num - 3);
@@ -436,7 +482,7 @@ async function push_transfer() {
     check(l.abieos_json_to_bin(context, 0, cstr('transaction'), jsonStr(transaction)));
     let transactionDataHex = l.abieos_get_bin_hex(context).readCString();
     console.log('transaction json->bin: ', transactionDataHex);
-    console.log('transaction bin->json: ', hex_to_json(0, 'transaction', transactionDataHex));
+    console.log('transaction bin->json: ', abieos_hex_to_json(0, 'transaction', transactionDataHex));
 
     let sig = await signatureProvider.sign({
         chainId: info.chain_id,
