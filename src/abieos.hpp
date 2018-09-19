@@ -1815,6 +1815,8 @@ inline bool json_to_bin(std::vector<char>& bin, const abi_type* type, const jval
             else if (entry.type->filled_struct) {
                 if (entry.position >= 0 && entry.position < (int)entry.type->fields.size())
                     s += "." + entry.type->fields[entry.position].name;
+            } else if (entry.type->optional_of) {
+                s += "<optional>";
             } else if (entry.type->filled_variant) {
                 s += "<variant>";
             } else {
@@ -1854,10 +1856,11 @@ inline bool json_to_bin(pseudo_object*, jvalue_to_bin_state& state, bool allow_e
         if (trace_jvalue_to_bin)
             printf("%*s{ %d fields, allow_ex=%d\n", int(state.stack.size() * 4), "", int(type->fields.size()),
                    allow_extensions);
-        state.stack.push_back({type, allow_extensions, state.received_value, 0});
+        state.stack.push_back({type, allow_extensions, state.received_value, -1});
         return true;
     }
     auto& stack_entry = state.stack.back();
+    ++stack_entry.position;
     if (stack_entry.position == (int)type->fields.size()) {
         if (trace_jvalue_to_bin)
             printf("%*s}\n", int((state.stack.size() - 1) * 4), "");
@@ -1870,12 +1873,12 @@ inline bool json_to_bin(pseudo_object*, jvalue_to_bin_state& state, bool allow_e
     if (trace_jvalue_to_bin)
         printf("%*sfield %d/%d: %s (event %d)\n", int(state.stack.size() * 4), "", int(stack_entry.position),
                int(type->fields.size()), std::string{field.name}.c_str(), (int)event);
-    ++stack_entry.position;
     if (it == obj.end()) {
         if (field.type->extension_of && allow_extensions) {
             state.skipped_extension = true;
             return true;
         }
+        stack_entry.position = -1;
         throw std::runtime_error("expected field \"" + field.name + "\"");
     }
     if (state.skipped_extension)
@@ -1894,18 +1897,19 @@ inline bool json_to_bin(pseudo_array*, jvalue_to_bin_state& state, bool, const a
             printf("%*s[ %d elements\n", int(state.stack.size() * 4), "",
                    int(boost::get<jarray>(state.received_value->value).size()));
         push_varuint32(state.bin, boost::get<jarray>(state.received_value->value).size());
-        state.stack.push_back({type, false, state.received_value, 0});
+        state.stack.push_back({type, false, state.received_value, -1});
         return true;
     }
     auto& stack_entry = state.stack.back();
     auto& arr = boost::get<jarray>(stack_entry.value->value);
+    ++stack_entry.position;
     if (stack_entry.position == (int)arr.size()) {
         if (trace_jvalue_to_bin)
             printf("%*s]\n", int((state.stack.size() - 1) * 4), "");
         state.stack.pop_back();
         return true;
     }
-    state.received_value = &arr[stack_entry.position++];
+    state.received_value = &arr[stack_entry.position];
     if (trace_jvalue_to_bin)
         printf("%*sitem (event %d)\n", int(state.stack.size() * 4), "", (int)event);
     return type->array_of->ser &&
@@ -1918,8 +1922,10 @@ inline bool json_to_bin(pseudo_variant*, jvalue_to_bin_state& state, bool allow_
         if (!state.received_value || !boost::get<jarray>(&state.received_value->value))
             throw std::runtime_error(R"(expected variant: ["type", value])");
         auto& arr = boost::get<jarray>(state.received_value->value);
+        if (arr.size() != 2)
+            throw std::runtime_error(R"(expected variant: ["type", value])");
         auto* typeName = boost::get<std::string>(&arr[0].value);
-        if (arr.size() != 2 || !typeName)
+        if (!typeName)
             throw std::runtime_error(R"(expected variant: ["type", value])");
         if (trace_jvalue_to_bin)
             printf("%*s[ variant %s\n", int(state.stack.size() * 4), "", typeName->c_str());
@@ -2003,10 +2009,13 @@ inline bool json_to_bin(std::vector<char>& bin, const abi_type* type, std::strin
             else if (entry.type->filled_struct) {
                 if (entry.position >= 0 && entry.position < (int)entry.type->fields.size())
                     s += "." + entry.type->fields[entry.position].name;
+            } else if (entry.type->optional_of) {
+                s += "<optional>";
             } else if (entry.type->filled_variant) {
                 s += "<variant>";
-            } else
+            } else {
                 s += "<?>";
+            }
         }
         if (!s.empty())
             s += ": ";

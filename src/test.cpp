@@ -735,6 +735,93 @@ void check_types() {
             R"({"x1":9,"x2":10,"x3":{"c1":4,"c2":[{"x1":7,"x2":true,"x3":{"c1":0,"c2":[],"c3":7}},{"x1":null} ]}} )");
     });
 
+    check_error(context, "expected object",
+                [&] { return abieos_json_to_bin_reorderable(context, testAbiName, "s4", "null"); });
+    check_error(context, "expected object",
+                [&] { return abieos_json_to_bin_reorderable(context, testAbiName, "s4", "[]"); });
+    check_error(context, R"(s4.a1: expected number or boolean)",
+                [&] { return abieos_json_to_bin_reorderable(context, testAbiName, "s4", R"({"a1":[]})"); });
+    check_error(context, R"(expected variant: ["type", value])",
+                [&] { return abieos_json_to_bin_reorderable(context, testAbiName, "v1", "null"); });
+    check_error(context, R"(expected variant: ["type", value])",
+                [&] { return abieos_json_to_bin_reorderable(context, testAbiName, "v1", "[]"); });
+    check_error(context, R"(expected variant: ["type", value])",
+                [&] { return abieos_json_to_bin_reorderable(context, testAbiName, "v1", R"(["x",7,5])"); });
+    check_error(context, R"(<variant>: type is not valid for this variant)",
+                [&] { return abieos_json_to_bin_reorderable(context, testAbiName, "v1", R"(["x",7])"); });
+    check_error(context, R"(expected variant: ["type", value])",
+                [&] { return abieos_json_to_bin_reorderable(context, testAbiName, "v1", R"(["int8",7,5])"); });
+    check_error(context, R"(s5: expected field "x1")",
+                [&] { return abieos_json_to_bin_reorderable(context, testAbiName, "s5", R"({})"); });
+    check_error(context, R"(s5: expected field "x2")",
+                [&] { return abieos_json_to_bin_reorderable(context, testAbiName, "s5", R"({"x1":5})"); });
+    check_error(context, R"(s5: expected field "x3")",
+                [&] { return abieos_json_to_bin_reorderable(context, testAbiName, "s5", R"({"x1":5,"x2":7})"); });
+    check_error(context, R"(s5.x1: expected number or boolean)",
+                [&] { return abieos_json_to_bin_reorderable(context, testAbiName, "s5", R"({"x1":null})"); });
+    check_error(context, R"(s5.x2: expected number or boolean)",
+                [&] { return abieos_json_to_bin_reorderable(context, testAbiName, "s5", R"({"x1":9,"x2":null})"); });
+    check_error(context, R"(s5: expected field "x3")",
+                [&] { return abieos_json_to_bin_reorderable(context, testAbiName, "s5", R"({"x1":9,"x2":10})"); });
+    check_error(context, R"(s5.x3: expected object)", [&] {
+        return abieos_json_to_bin_reorderable(context, testAbiName, "s5", R"({"x1":9,"x2":10,"x3":null})");
+    });
+    check_error(context, R"(s5.x3: expected field "c1")", [&] {
+        return abieos_json_to_bin_reorderable(context, testAbiName, "s5", R"({"x1":9,"x2":10,"x3":{}})");
+    });
+    check_error(context, R"(s5.x3: expected field "c2")", [&] {
+        return abieos_json_to_bin_reorderable(context, testAbiName, "s5", R"({"x1":9,"x2":10,"x3":{"c1":4}})");
+    });
+    check_error(context, R"(s5.x3.c2: expected array)", [&] {
+        return abieos_json_to_bin_reorderable(context, testAbiName, "s5", R"({"x1":9,"x2":10,"x3":{"c1":4,"c2":{}}})");
+    });
+    check_error(context, R"(s5.x3.c2[0]: expected object)", [&] {
+        return abieos_json_to_bin_reorderable(context, testAbiName, "s5", R"({"x1":9,"x2":10,"x3":{"c1":4,"c2":[7]}})");
+    });
+    check_error(context, R"(s5.x3.c2[0]: expected field "x1")", [&] {
+        return abieos_json_to_bin_reorderable(context, testAbiName, "s5",
+                                              R"({"x1":9,"x2":10,"x3":{"c1":4,"c2":[{}]}})");
+    });
+    check_error(context, R"(s5.x3.c2[0].x1: expected number or boolean)", [&] {
+        return abieos_json_to_bin_reorderable(context, testAbiName, "s5",
+                                              R"({"x1":9,"x2":10,"x3":{"c1":4,"c2":[{"x1":null}]}} )");
+    });
+    check_error(context, R"(s5.x3.c2[0]: expected field "x2")", [&] {
+        return abieos_json_to_bin_reorderable(context, testAbiName, "s5",
+                                              R"({"x1":9,"x2":10,"x3":{"c1":4,"c2":[{"x1":7}]}} )");
+    });
+    check_error(context, R"(s5.x3.c2[0]: expected field "x2")", [&] {
+        return abieos_json_to_bin_reorderable(context, testAbiName, "s5",
+                                              R"({"x1":9,"x2":10,"x3":{"c1":4,"c2":[{"x1":7,"x3":null}]}} )");
+    });
+    check_error(context, R"(s5.x3.c2[0].x2: expected number or boolean)", [&] {
+        return abieos_json_to_bin_reorderable(context, testAbiName, "s5",
+                                              R"({"x1":9,"x2":10,"x3":{"c1":4,"c2":[{"x1":7,"x2":null}]}} )");
+    });
+    check_error(context, R"(s5.x3.c2[0]: expected field "x3")", [&] {
+        return abieos_json_to_bin_reorderable(context, testAbiName, "s5",
+                                              R"({"x1":9,"x2":10,"x3":{"c1":4,"c2":[{"x1":7,"x2":true}]}} )");
+    });
+    check_error(context, R"(s5.x3.c2[0].x3: expected object)", [&] {
+        return abieos_json_to_bin_reorderable(context, testAbiName, "s5",
+                                              R"({"x1":9,"x2":10,"x3":{"c1":4,"c2":[{"x1":7,"x2":true,"x3":null}]}} )");
+    });
+    check_error(context, R"(s5.x3.c2[1]: expected object)", [&] {
+        return abieos_json_to_bin_reorderable(
+            context, testAbiName, "s5",
+            R"({"x1":9,"x2":10,"x3":{"c1":4,"c2":[{"x1":7,"x2":true,"x3":{"c1":0,"c2":[],"c3":7}},null]}} )");
+    });
+    check_error(context, R"(s5.x3.c2[1]: expected field "x1")", [&] {
+        return abieos_json_to_bin_reorderable(
+            context, testAbiName, "s5",
+            R"({"x1":9,"x2":10,"x3":{"c1":4,"c2":[{"x1":7,"x2":true,"x3":{"c1":0,"c2":[],"c3":7}},{} ]}} )");
+    });
+    check_error(context, R"(s5.x3.c2[1].x1: expected number or boolean)", [&] {
+        return abieos_json_to_bin_reorderable(
+            context, testAbiName, "s5",
+            R"({"x1":9,"x2":10,"x3":{"c1":4,"c2":[{"x1":7,"x2":true,"x3":{"c1":0,"c2":[],"c3":7}},{"x1":null} ]}} )");
+    });
+
     auto testWith = [&](auto& abiName) {
         check_type(context, abiName, "v1", R"(["int8",7])");
         check_type(context, abiName, "v1", R"(["s1",{"x1":6}])");
