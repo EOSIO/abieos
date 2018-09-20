@@ -390,6 +390,7 @@ function check_types() {
     check_type(0, js2Types, 'string', '"z"');
     check_type(0, js2Types, 'string', '"This is a string."');
     check_type(0, js2Types, 'string', '"' + '*'.repeat(128) + '"');
+    check_type(0, js2Types, 'string', `"\\u0000  这是一个测试  Это тест  هذا اختبار 👍"`);
     check_throw('Error: Read past end of buffer', () => eosjs_hex_to_json(js2Types, 'string', '01'));
     check_type(0, js2Types, 'checksum160', '"0000000000000000000000000000000000000000"');
     check_type(0, js2Types, 'checksum160', '"123456789ABCDEF01234567890ABCDEF70123456"');

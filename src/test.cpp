@@ -280,7 +280,7 @@ void check_type(abieos_context* context, uint64_t contract, const char* type, co
     // printf("%s\n", reorderable_hex.c_str());
     std::string result = check_context(context, abieos_hex_to_json(context, contract, type, reorderable_hex.c_str()));
     // printf("%s\n", result.c_str());
-    // printf("%s %s %s %s\n", type, data, reorderable_hex.c_str(), result.c_str());
+    printf("%s %s %s %s\n", type, data, reorderable_hex.c_str(), result.c_str());
     if (result != expected)
         throw std::runtime_error("mismatch");
 }
@@ -500,6 +500,7 @@ void check_types() {
     check_type(context, 0, "string", R"("z")");
     check_type(context, 0, "string", R"("This is a string.")");
     check_type(context, 0, "string", R"("' + '*'.repeat(128) + '")");
+    check_type(context, 0, "string", R"("\u0000  这是一个测试  Это тест  هذا اختبار 👍")");
     check_error(context, "invalid string size", [&] { return abieos_hex_to_json(context, 0, "string", "01"); });
     check_type(context, 0, "checksum160", R"("0000000000000000000000000000000000000000")");
     check_type(context, 0, "checksum160", R"("123456789ABCDEF01234567890ABCDEF70123456")");
