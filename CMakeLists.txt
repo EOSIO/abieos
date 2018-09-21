@@ -25,8 +25,8 @@ target_compile_options(test-sanitize PUBLIC -fno-omit-frame-pointer -fsanitize=a
 # add_executable(fuzzer src/fuzzer.cpp src/abieos.cpp)
 # target_include_directories(fuzzer PUBLIC external/rapidjson/include PRIVATE ${Boost_INCLUDE_DIR})
 # target_link_libraries(fuzzer Boost::date_time)
-# target_link_libraries(fuzzer -fsanitize=fuzzer,undefined,signed-integer-overflow -fstandalone-debug)
-# target_compile_options(fuzzer PRIVATE -fsanitize=fuzzer,undefined,signed-integer-overflow -fstandalone-debug)
+# target_link_libraries(fuzzer -fsanitize=fuzzer,address,undefined,signed-integer-overflow -fstandalone-debug)
+# target_compile_options(fuzzer PRIVATE -fsanitize=fuzzer,address,undefined,signed-integer-overflow -fstandalone-debug)
 
 if (CMAKE_CXX_COMPILER_ID MATCHES "Clang")
     target_compile_options(abieos PRIVATE -Wall -Wextra -Wno-unused-parameter)

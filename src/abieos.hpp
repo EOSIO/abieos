@@ -923,8 +923,11 @@ inline constexpr uint64_t string_to_symbol_code(const char* str) {
         ++str;
     uint64_t result = 0;
     uint32_t i = 0;
-    while (*str >= 'A' && *str <= 'Z')
+    while (*str >= 'A' && *str <= 'Z') {
+        if (i >= 7)
+            throw error("expected string containing symbol_code");
         result |= uint64_t(*str++) << (8 * i++);
+    }
     return result;
 }
 
@@ -1253,6 +1256,7 @@ inline bool receive_event(struct json_to_jvalue_state& state, event_type event, 
 
 inline bool json_to_jvalue(jvalue& value, std::string_view json) {
     std::string mutable_json{json};
+    mutable_json.push_back(0);
     json_to_jvalue_state state;
     state.stack.push_back({&value});
     rapidjson::Reader reader;
@@ -1501,6 +1505,7 @@ inline bool receive_event(struct json_to_native_state& state, event_type event, 
 template <typename T>
 bool json_to_native(T& obj, std::string_view json) {
     std::string mutable_json{json};
+    mutable_json.push_back(0);
     json_to_native_state state;
     state.stack.push_back(native_stack_entry{&obj, &native_serializer_for<T>, 0});
     rapidjson::Reader reader;
@@ -2030,6 +2035,7 @@ inline bool receive_event(struct json_to_bin_state& state, event_type event, boo
 
 inline bool json_to_bin(std::vector<char>& bin, const abi_type* type, std::string_view json) {
     std::string mutable_json{json};
+    mutable_json.push_back(0);
     json_to_bin_state state;
     state.stack.push_back({type, true});
     rapidjson::Reader reader;

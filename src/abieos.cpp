@@ -28,6 +28,8 @@ void set_error(abieos_context* context, const char* error) noexcept {
         context->last_error_buffer = error;
         context->last_error = context->last_error_buffer.c_str();
     } catch (...) {
+        if (!catch_all)
+            throw;
         context->last_error = "exception while recording error";
     }
 }
