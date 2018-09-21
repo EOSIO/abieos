@@ -1,10 +1,14 @@
 // copyright defined in abieos/LICENSE.txt
 
 #include "abieos.h"
+#include "fuzzer.hpp"
 #include <boost/algorithm/hex.hpp>
 #include <stdexcept>
 #include <stdio.h>
 #include <string>
+#include <vector>
+
+inline const bool generate_corpus = false;
 
 const char tokenHexAbi[] = "0e656f73696f3a3a6162692f312e30010c6163636f756e745f6e616d65046e61"
                            "6d6505087472616e7366657200040466726f6d0c6163636f756e745f6e616d65"
@@ -264,8 +268,8 @@ T check_context(abieos_context* context, T value) {
     return value;
 }
 
-void check_type(abieos_context* context, uint64_t contract, const char* type, const char* data,
-                const char* expected = nullptr, bool check_ordered = true) {
+void run_check_type(abieos_context* context, uint64_t contract, const char* type, const char* data,
+                    const char* expected = nullptr, bool check_ordered = true) {
     if (!expected)
         expected = data;
     // printf("%s %s\n", type, data);
@@ -314,6 +318,51 @@ void check_types() {
     check_context(context, abieos_set_abi_hex(context, token, tokenHexAbi));
     check_context(context, abieos_set_abi(context, testAbiName, testAbi));
     check_context(context, abieos_set_abi_hex(context, testHexAbiName, testHexAbi));
+
+    int next_id = 0;
+    auto write_corpus = [&](const std::vector<char>& v) {
+        auto f = fopen(("corpus/" + std::to_string(next_id++)).c_str(), "wb");
+        if (!f)
+            return;
+        fwrite(v.data(), v.size(), 1, f);
+        fclose(f);
+    };
+
+    auto check_type = [&](abieos_context* context, uint64_t contract, const char* type, const char* data,
+                          const char* expected = nullptr, bool check_ordered = true) {
+        if (!generate_corpus)
+            return run_check_type(context, contract, type, data, expected, check_ordered);
+
+        fuzzer_header header;
+        const char* abi;
+        if (contract == 0) {
+            header.abi_is_hex = false;
+            abi = transactionAbi;
+        } else if (contract == token) {
+            header.abi_is_hex = true;
+            abi = tokenHexAbi;
+        } else if (contract == testAbiName) {
+            header.abi_is_hex = false;
+            abi = testAbi;
+        } else if (contract == testHexAbiName) {
+            header.abi_is_hex = true;
+            abi = testHexAbi;
+        } else {
+            throw std::runtime_error("missing case in check_type");
+        }
+
+        header.operation = fuzzer_json_to_bin;
+        header.contract = contract;
+        header.abi_size = strlen(abi) + 1;
+        header.type_size = strlen(type) + 1;
+
+        std::vector<char> v;
+        v.insert(v.end(), (const char*)(&header), (const char*)(&header + 1));
+        v.insert(v.end(), abi, abi + strlen(abi) + 1);
+        v.insert(v.end(), type, type + strlen(type) + 1);
+        v.insert(v.end(), data, data + strlen(data) + 1);
+        write_corpus(v);
+    };
 
     check_error(context, "no data", [&] { return abieos_set_abi_hex(context, 8, ""); });
     check_error(context, "unsupported abi version", [&] { return abieos_set_abi_hex(context, 8, "00"); });
