@@ -1,6 +1,7 @@
 // copyright defined in abieos/LICENSE.txt
 
 #include "abieos.h"
+#include "abieos.hpp"
 #include "fuzzer.hpp"
 #include <boost/algorithm/hex.hpp>
 #include <stdexcept>
@@ -320,7 +321,21 @@ void check_types() {
     check_context(context, abieos_set_abi_hex(context, testHexAbiName, testHexAbi));
 
     int next_id = 0;
-    auto write_corpus = [&](const std::vector<char>& v) {
+    auto write_corpus = [&](bool abi_is_bin, uint8_t operation, uint64_t contract, abieos::input_buffer abi,
+                            abieos::input_buffer type, abieos::input_buffer data) {
+        fuzzer_header header;
+        header.abi_is_bin = abi_is_bin;
+        header.operation = operation;
+        header.contract = contract;
+        header.abi_size = abi.end - abi.pos;
+        header.type_size = type.end - type.pos;
+
+        std::vector<char> v;
+        v.insert(v.end(), (const char*)(&header), (const char*)(&header + 1));
+        v.insert(v.end(), abi.pos, abi.end);
+        v.insert(v.end(), type.pos, type.end);
+        v.insert(v.end(), data.pos, data.end);
+
         auto f = fopen(("corpus/" + std::to_string(next_id++)).c_str(), "wb");
         if (!f)
             return;
@@ -333,35 +348,33 @@ void check_types() {
         if (!generate_corpus)
             return run_check_type(context, contract, type, data, expected, check_ordered);
 
-        fuzzer_header header;
-        const char* abi;
+        bool abi_is_bin;
+        std::vector<char> abi;
         if (contract == 0) {
-            header.abi_is_hex = false;
-            abi = transactionAbi;
+            abi_is_bin = false;
+            abi = {transactionAbi, transactionAbi + strlen(transactionAbi)};
         } else if (contract == token) {
-            header.abi_is_hex = true;
-            abi = tokenHexAbi;
+            abi_is_bin = true;
+            boost::algorithm::unhex(tokenHexAbi, tokenHexAbi + strlen(tokenHexAbi), std::back_inserter(abi));
         } else if (contract == testAbiName) {
-            header.abi_is_hex = false;
-            abi = testAbi;
+            abi_is_bin = false;
+            abi = {testAbi, testAbi + strlen(testAbi)};
         } else if (contract == testHexAbiName) {
-            header.abi_is_hex = true;
-            abi = testHexAbi;
+            abi_is_bin = true;
+            boost::algorithm::unhex(testHexAbi, testHexAbi + strlen(testHexAbi), std::back_inserter(abi));
         } else {
             throw std::runtime_error("missing case in check_type");
         }
+        abi.push_back(0);
 
-        header.operation = fuzzer_json_to_bin;
-        header.contract = contract;
-        header.abi_size = strlen(abi) + 1;
-        header.type_size = strlen(type) + 1;
+        write_corpus(abi_is_bin, fuzzer_json_to_bin, contract, {abi.data(), abi.data() + abi.size()},
+                     {type, type + strlen(type) + 1}, {data, data + strlen(data) + 1});
 
-        std::vector<char> v;
-        v.insert(v.end(), (const char*)(&header), (const char*)(&header + 1));
-        v.insert(v.end(), abi, abi + strlen(abi) + 1);
-        v.insert(v.end(), type, type + strlen(type) + 1);
-        v.insert(v.end(), data, data + strlen(data) + 1);
-        write_corpus(v);
+        check_context(context, abieos_json_to_bin_reorderable(context, contract, type, data));
+        std::string hex = check_context(context, abieos_get_bin_hex(context));
+
+        write_corpus(abi_is_bin, fuzzer_hex_to_json, contract, {abi.data(), abi.data() + abi.size()},
+                     {type, type + strlen(type) + 1}, {hex.c_str(), hex.c_str() + hex.size() + 1});
     };
 
     check_error(context, "no data", [&] { return abieos_set_abi_hex(context, 8, ""); });

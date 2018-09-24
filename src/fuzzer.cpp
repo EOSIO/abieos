@@ -30,8 +30,8 @@ extern "C" int LLVMFuzzerTestOneInput(const char* pos, size_t size) {
 
     auto context = abieos_create();
     bool ok;
-    if (header.abi_is_hex)
-        ok = abieos_set_abi_hex(context, header.contract, abi);
+    if (header.abi_is_bin)
+        ok = abieos_set_abi_bin(context, header.contract, abi, header.abi_size);
     else
         ok = abieos_set_abi(context, header.contract, abi);
 
@@ -42,7 +42,7 @@ extern "C" int LLVMFuzzerTestOneInput(const char* pos, size_t size) {
             abieos_json_to_bin_reorderable(context, header.contract, type, data);
             // printf("%s\n", abieos_get_bin_hex(context));
         } else {
-            abieos_hex_to_json(context, header.contract, type, data);
+            abieos_bin_to_json(context, header.contract, type, data, end - data);
         }
     }
 

@@ -7,7 +7,7 @@ enum fuzzer_operation {
 };
 
 struct fuzzer_header {
-    uint8_t abi_is_hex;
+    uint8_t abi_is_bin;
     uint8_t operation;
     uint64_t contract;
     uint32_t abi_size;

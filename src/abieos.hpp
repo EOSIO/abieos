@@ -3,6 +3,7 @@
 #include <boost/algorithm/hex.hpp>
 #include <boost/container/flat_map.hpp>
 #include <boost/date_time/posix_time/posix_time.hpp>
+#include <boost/exception/diagnostic_information.hpp>
 #include <boost/variant.hpp>
 #include <ctime>
 #include <map>
@@ -88,6 +89,12 @@ template <typename T>
 void read_bin(input_buffer& bin, T& dest) {
     static_assert(std::is_trivially_copyable_v<T>);
     read_bin(bin, &dest, sizeof(dest));
+}
+
+inline void read_bin(input_buffer& bin, bool& dest) {
+    char tmp;
+    read_bin(bin, &tmp, sizeof(tmp));
+    dest = tmp;
 }
 
 template <typename T>
@@ -191,13 +198,13 @@ struct jvalue {
     boost::variant<std::nullptr_t, bool, std::string, jobject, jarray> value;
 };
 
-event_type get_event_type(std::nullptr_t) { return event_type::received_null; }
-event_type get_event_type(bool b) { return event_type::received_bool; }
-event_type get_event_type(const std::string& s) { return event_type::received_string; }
-event_type get_event_type(const jobject&) { return event_type::received_start_object; }
-event_type get_event_type(const jarray&) { return event_type::received_start_array; }
+inline event_type get_event_type(std::nullptr_t) { return event_type::received_null; }
+inline event_type get_event_type(bool b) { return event_type::received_bool; }
+inline event_type get_event_type(const std::string& s) { return event_type::received_string; }
+inline event_type get_event_type(const jobject&) { return event_type::received_start_object; }
+inline event_type get_event_type(const jarray&) { return event_type::received_start_array; }
 
-event_type get_event_type(const jvalue& value) {
+inline event_type get_event_type(const jvalue& value) {
     return boost::apply_visitor([](const auto& x) { return get_event_type(x); }, value.value);
 }
 
@@ -1847,7 +1854,7 @@ inline bool json_to_bin(std::vector<char>& bin, const abi_type* type, const jval
             }
             return true;
         } catch (boost::exception& e) {
-            throw error(diagnostic_information(e));
+            throw error(boost::diagnostic_information(e));
         }
     } catch (error& e) {
         std::string s;
@@ -2046,7 +2053,7 @@ inline bool json_to_bin(std::vector<char>& bin, const abi_type* type, std::strin
                               rapidjson::kParseNumbersAsStringsFlag>(ss, state))
                 throw error{"failed to parse"};
         } catch (boost::exception& e) {
-            throw error(diagnostic_information(e));
+            throw error(boost::diagnostic_information(e));
         }
     } catch (error& e) {
         std::string s;
