@@ -340,6 +340,8 @@ template <typename First, typename Second>
 bool bin_to_native(std::pair<First, Second>& obj, bin_to_native_state& state, bool start);
 bool bin_to_native(std::string& obj, bin_to_native_state& state, bool);
 template <typename T>
+bool bin_to_native(std::optional<T>& v, bin_to_native_state& state, bool start);
+template <typename T>
 bool bin_to_native(might_not_exist<T>& obj, bin_to_native_state& state, bool);
 
 template <typename T>
@@ -353,6 +355,8 @@ bool json_to_native(std::vector<T>& obj, json_to_native_state& state, event_type
 template <typename First, typename Second>
 bool json_to_native(std::pair<First, Second>& obj, json_to_native_state& state, event_type event, bool start);
 bool json_to_native(std::string& obj, json_to_native_state& state, event_type event, bool start);
+template <typename T>
+bool json_to_native(std::optional<T>& obj, json_to_native_state& state, event_type event, bool start);
 template <typename T>
 bool json_to_native(might_not_exist<T>& obj, json_to_native_state& state, event_type event, bool start);
 
@@ -450,6 +454,15 @@ inline bool bin_to_native(bytes& obj, bin_to_native_state& state, bool) {
     return true;
 }
 
+inline bool bin_to_native(input_buffer& obj, bin_to_native_state& state, bool) {
+    auto size = read_varuint32(state.bin);
+    if (size > state.bin.end - state.bin.pos)
+        throw error("invalid bytes size");
+    obj = {state.bin.pos, state.bin.pos + size};
+    state.bin.pos += size;
+    return true;
+}
+
 inline bool json_to_native(bytes& obj, json_to_native_state& state, event_type event, bool start) {
     if (event == event_type::received_string) {
         auto& s = state.get_string();
@@ -466,6 +479,10 @@ inline bool json_to_native(bytes& obj, json_to_native_state& state, event_type e
         return true;
     } else
         throw error("expected string containing hex digits");
+}
+
+inline bool json_to_native(input_buffer& obj, json_to_native_state& state, event_type event, bool start) {
+    throw error("can not convert json to input_buffer");
 }
 
 template <typename State>
@@ -507,6 +524,32 @@ using float128 = fixed_binary<16>;
 using checksum160 = fixed_binary<20>;
 using checksum256 = fixed_binary<32>;
 using checksum512 = fixed_binary<64>;
+
+template <unsigned size>
+bool bin_to_native(fixed_binary<size>& obj, bin_to_native_state& state, bool start) {
+    read_bin(state.bin, obj);
+    return true;
+}
+
+template <unsigned size>
+bool json_to_native(fixed_binary<size>& obj, json_to_native_state& state, event_type event, bool start) {
+    if (event == event_type::received_string) {
+        auto& s = state.get_string();
+        if (trace_json_to_native)
+            printf("%*schecksum\n", int(state.stack.size() * 4), "");
+        std::vector<uint8_t> v;
+        try {
+            boost::algorithm::unhex(s.begin(), s.end(), std::back_inserter(v));
+        } catch (...) {
+            throw error("expected hex string");
+        }
+        if (v.size() != size)
+            throw error("hex string has incorrect length");
+        memcpy(obj.value.data(), v.data(), size);
+        return true;
+    } else
+        throw error("expected string containing hex");
+}
 
 template <typename State, unsigned size>
 bool json_to_bin(fixed_binary<size>*, State& state, bool, const abi_type*, event_type event, bool start) {
@@ -1377,7 +1420,7 @@ inline constexpr auto native_field_serializers_for = create_native_field_seriali
 ///////////////////////////////////////////////////////////////////////////////
 
 template <typename T>
-bool bin_to_native(T& obj, input_buffer bin) {
+bool bin_to_native(T& obj, input_buffer& bin) {
     bin_to_native_state state{bin};
     if (!native_serializer_for<T>.bin_to_native(&obj, state, true))
         return false;
@@ -1387,6 +1430,7 @@ bool bin_to_native(T& obj, input_buffer bin) {
         if (state.stack.size() > max_stack_size)
             throw error("recursion limit reached");
     }
+    bin = state.bin;
     return true;
 }
 
@@ -1483,6 +1527,15 @@ inline bool bin_to_native(std::string& obj, bin_to_native_state& state, bool) {
     obj.resize(size);
     read_bin(state.bin, obj.data(), size);
     return true;
+}
+
+template <typename T>
+bool bin_to_native(std::optional<T>& obj, bin_to_native_state& state, bool) {
+    auto present = read_bin<bool>(state.bin);
+    if (!present)
+        return true;
+    obj.emplace();
+    return bin_to_native(*obj, state, true);
 }
 
 template <typename T>
@@ -1601,6 +1654,14 @@ inline bool json_to_native(std::string& obj, json_to_native_state& state, event_
         return true;
     } else
         throw error("expected string");
+}
+
+template <typename T>
+bool json_to_native(std::optional<T>& obj, json_to_native_state& state, event_type event, bool) {
+    if (event == event_type::received_null)
+        return true;
+    obj.emplace();
+    return json_to_native(*obj, state, event, true);
 }
 
 template <typename T>
