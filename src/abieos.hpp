@@ -518,6 +518,12 @@ inline bool bin_to_json(bytes*, bin_to_json_state& state, bool, const abi_type*,
 template <unsigned size>
 struct fixed_binary {
     std::array<uint8_t, size> value{{0}};
+
+    explicit operator std::string() const {
+        std::string result;
+        boost::algorithm::hex(value.begin(), value.end(), std::back_inserter(result));
+        return result;
+    }
 };
 
 using float128 = fixed_binary<16>;
@@ -581,6 +587,8 @@ inline bool bin_to_json(fixed_binary<size>*, bin_to_json_state& state, bool, con
 
 struct uint128 {
     std::array<uint8_t, 16> value{{0}};
+
+    explicit operator std::string() const { return binary_to_decimal(value); }
 };
 
 template <typename State>
@@ -604,6 +612,17 @@ inline bool bin_to_json(uint128*, bin_to_json_state& state, bool, const abi_type
 
 struct int128 {
     std::array<uint8_t, 16> value{{0}};
+
+    explicit operator std::string() const {
+        auto v = value;
+        bool negative = is_negative(v);
+        if (negative)
+            negate(v);
+        auto result = binary_to_decimal(v);
+        if (negative)
+            result = "-" + result;
+        return result;
+    }
 };
 
 template <typename State>
@@ -804,6 +823,16 @@ inline uint32_t read_varuint32(input_buffer& bin) {
         shift += 7;
     } while (b & 0x80);
     return result;
+}
+
+bool bin_to_native(varuint32& obj, bin_to_native_state& state, bool) {
+    obj = varuint32{read_varuint32(state.bin)};
+    return true;
+}
+
+bool json_to_native(varuint32& obj, json_to_native_state& state, event_type event, bool) {
+    obj = varuint32{json_to_number<uint32_t>(state, event)};
+    return true;
 }
 
 template <typename State>
@@ -1371,10 +1400,12 @@ inline bool json_to_jarray(jvalue& value, json_to_jvalue_state& state, event_typ
 template <typename T>
 struct native_serializer_impl : native_serializer {
     bool bin_to_native(void* v, bin_to_native_state& state, bool start) const override {
-        return ::abieos::bin_to_native(*reinterpret_cast<T*>(v), state, start);
+        using ::abieos::bin_to_native;
+        return bin_to_native(*reinterpret_cast<T*>(v), state, start);
     }
     bool json_to_native(void* v, json_to_native_state& state, event_type event, bool start) const override {
-        return ::abieos::json_to_native(*reinterpret_cast<T*>(v), state, event, start);
+        using ::abieos::json_to_native;
+        return json_to_native(*reinterpret_cast<T*>(v), state, event, start);
     }
 };
 
@@ -1385,10 +1416,12 @@ template <typename member_ptr>
 constexpr auto create_native_field_serializer_methods_impl() {
     struct impl : native_field_serializer_methods {
         bool bin_to_native(void* v, bin_to_native_state& state, bool start) const override {
-            return ::abieos::bin_to_native(member_from_void(member_ptr{}, v), state, start);
+            using ::abieos::bin_to_native;
+            return bin_to_native(member_from_void(member_ptr{}, v), state, start);
         }
         bool json_to_native(void* v, json_to_native_state& state, event_type event, bool start) const override {
-            return ::abieos::json_to_native(member_from_void(member_ptr{}, v), state, event, start);
+            using ::abieos::json_to_native;
+            return json_to_native(member_from_void(member_ptr{}, v), state, event, start);
         }
     };
     return impl{};
