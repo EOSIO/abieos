@@ -41,8 +41,20 @@ inline constexpr bool is_pair_v = false;
 template <typename First, typename Second>
 inline constexpr bool is_pair_v<std::pair<First, Second>> = true;
 
+template <typename T>
+inline constexpr bool is_optional_v = false;
+
+template <typename T>
+inline constexpr bool is_optional_v<std::optional<T>> = true;
+
+template <typename T>
+inline constexpr bool is_string_v = false;
+
+template <>
+inline constexpr bool is_string_v<std::string> = true;
+
 template <auto P>
-struct member_ptr {};
+struct member_ptr;
 
 template <class C, typename M>
 C* class_from_void(M C::*, void* v) {
@@ -50,9 +62,14 @@ C* class_from_void(M C::*, void* v) {
 }
 
 template <auto P>
-auto& member_from_void(member_ptr<P>, void* p) {
+auto& member_from_void(const member_ptr<P>&, void* p) {
     return class_from_void(P, p)->*P;
 }
+
+template <auto P>
+struct member_ptr {
+    using member_type = std::decay_t<decltype(member_from_void(std::declval<member_ptr<P>>(), std::declval<void*>()))>;
+};
 
 // Pseudo objects never exist, except in serialized form
 struct pseudo_optional;
@@ -799,6 +816,8 @@ inline bool bin_to_json(name*, bin_to_json_state& state, bool, const abi_type*, 
 
 struct varuint32 {
     uint32_t value = 0;
+
+    explicit operator std::string() const { return std::to_string(value); }
 };
 
 inline void push_varuint32(std::vector<char>& bin, uint32_t v) {
@@ -847,6 +866,8 @@ inline bool bin_to_json(varuint32*, bin_to_json_state& state, bool, const abi_ty
 
 struct varint32 {
     int32_t value = 0;
+
+    explicit operator std::string() const { return std::to_string(value); }
 };
 
 inline void push_varint32(std::vector<char>& bin, int32_t v) {
