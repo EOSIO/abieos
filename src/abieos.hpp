@@ -7,6 +7,7 @@
 #include <boost/variant.hpp>
 #include <ctime>
 #include <map>
+#include <variant>
 #include <vector>
 
 #include "abieos_numeric.hpp"
@@ -358,6 +359,8 @@ bool bin_to_native(std::pair<First, Second>& obj, bin_to_native_state& state, bo
 bool bin_to_native(std::string& obj, bin_to_native_state& state, bool);
 template <typename T>
 bool bin_to_native(std::optional<T>& v, bin_to_native_state& state, bool start);
+template <typename... Ts>
+bool bin_to_native(std::variant<Ts...>& v, bin_to_native_state& state, bool start);
 template <typename T>
 bool bin_to_native(might_not_exist<T>& obj, bin_to_native_state& state, bool);
 
@@ -374,6 +377,8 @@ bool json_to_native(std::pair<First, Second>& obj, json_to_native_state& state, 
 bool json_to_native(std::string& obj, json_to_native_state& state, event_type event, bool start);
 template <typename T>
 bool json_to_native(std::optional<T>& obj, json_to_native_state& state, event_type event, bool start);
+template <typename... Ts>
+bool json_to_native(std::variant<Ts...>& obj, json_to_native_state& state, event_type event, bool start);
 template <typename T>
 bool json_to_native(might_not_exist<T>& obj, json_to_native_state& state, event_type event, bool start);
 
@@ -675,6 +680,15 @@ inline bool bin_to_json(int128*, bin_to_json_state& state, bool, const abi_type*
     return state.writer.String(result.c_str(), result.size());
 }
 
+inline bool bin_to_native(public_key& obj, bin_to_native_state& state, bool) {
+    read_bin(state.bin, obj);
+    return true;
+}
+
+inline bool json_to_native(public_key& obj, json_to_native_state& state, event_type event, bool start) {
+    throw error("can't convert public_key");
+}
+
 template <typename State>
 bool json_to_bin(public_key*, State& state, bool, const abi_type*, event_type event, bool start) {
     if (event == event_type::received_string) {
@@ -711,6 +725,19 @@ inline bool bin_to_json(private_key*, bin_to_json_state& state, bool, const abi_
     auto v = read_bin<private_key>(state.bin);
     auto result = private_key_to_string(v);
     return state.writer.String(result.c_str(), result.size());
+}
+
+inline bool bin_to_native(signature& obj, bin_to_native_state& state, bool) {
+    read_bin(state.bin, obj);
+    return true;
+}
+
+inline bool json_to_native(signature& obj, json_to_native_state& state, event_type event, bool start) {
+    if (event == event_type::received_string) {
+        obj = string_to_signature(state.get_string());
+        return true;
+    } else
+        throw error("expected string containing signature");
 }
 
 template <typename State>
@@ -995,6 +1022,15 @@ struct block_timestamp {
     explicit operator time_point() const { return time_point{(slot * (uint64_t)interval_ms + epoch_ms) * 1000}; }
     explicit operator std::string() const { return std::string{time_point{*this}}; }
 }; // block_timestamp
+
+inline bool bin_to_native(block_timestamp& obj, bin_to_native_state& state, bool) {
+    read_bin(state.bin, obj.slot);
+    return true;
+}
+
+inline bool json_to_native(block_timestamp& obj, json_to_native_state& state, event_type event, bool start) {
+    throw error("can't convert block_timestamp");
+}
 
 template <typename State>
 bool json_to_bin(block_timestamp*, State& state, bool, const abi_type*, event_type event, bool start) {
@@ -1592,6 +1628,27 @@ bool bin_to_native(std::optional<T>& obj, bin_to_native_state& state, bool) {
     return bin_to_native(*obj, state, true);
 }
 
+template <uint32_t I, typename... Ts>
+bool bin_to_native_variant(std::variant<Ts...>& v, bin_to_native_state& state, uint32_t i) {
+    if constexpr (I < std::variant_size_v<std::variant<Ts...>>) {
+        if (i == I) {
+            auto& x = v.template emplace<std::variant_alternative_t<I, std::variant<Ts...>>>();
+            if (!bin_to_native(x, state, true))
+                return false;
+        } else {
+            bin_to_native_variant<I + 1>(v, state, i);
+        }
+    } else {
+        throw error("bad variant index");
+    }
+    return true;
+}
+
+template <typename... Ts>
+bool bin_to_native(std::variant<Ts...>& obj, bin_to_native_state& state, bool) {
+    return bin_to_native_variant<0>(obj, state, read_varuint32(state.bin));
+}
+
 template <typename T>
 bool bin_to_native(might_not_exist<T>& obj, bin_to_native_state& state, bool start) {
     if (state.bin.pos == state.bin.end)
@@ -1716,6 +1773,11 @@ bool json_to_native(std::optional<T>& obj, json_to_native_state& state, event_ty
         return true;
     obj.emplace();
     return json_to_native(*obj, state, event, true);
+}
+
+template <typename... Ts>
+bool json_to_native(std::variant<Ts...>& obj, json_to_native_state& state, event_type event, bool) {
+    throw error("can not convert json to variant");
 }
 
 template <typename T>
