@@ -382,10 +382,10 @@ bool json_to_native(std::variant<Ts...>& obj, json_to_native_state& state, event
 template <typename T>
 bool json_to_native(might_not_exist<T>& obj, json_to_native_state& state, event_type event, bool start);
 
-inline bool json_to_bin(pseudo_optional*, jvalue_to_bin_state& state, bool allow_extensions, const abi_type* type,
-                        event_type event, bool);
-inline bool json_to_bin(pseudo_extension*, jvalue_to_bin_state& state, bool allow_extensions, const abi_type* type,
-                        event_type event, bool);
+bool json_to_bin(pseudo_optional*, jvalue_to_bin_state& state, bool allow_extensions, const abi_type* type,
+                 event_type event, bool);
+bool json_to_bin(pseudo_extension*, jvalue_to_bin_state& state, bool allow_extensions, const abi_type* type,
+                 event_type event, bool);
 bool json_to_bin(pseudo_object*, jvalue_to_bin_state& state, bool allow_extensions, const abi_type* type,
                  event_type event, bool start);
 bool json_to_bin(pseudo_array*, jvalue_to_bin_state& state, bool allow_extensions, const abi_type* type,
@@ -871,12 +871,12 @@ inline uint32_t read_varuint32(input_buffer& bin) {
     return result;
 }
 
-bool bin_to_native(varuint32& obj, bin_to_native_state& state, bool) {
+inline bool bin_to_native(varuint32& obj, bin_to_native_state& state, bool) {
     obj = varuint32{read_varuint32(state.bin)};
     return true;
 }
 
-bool json_to_native(varuint32& obj, json_to_native_state& state, event_type event, bool) {
+inline bool json_to_native(varuint32& obj, json_to_native_state& state, event_type event, bool) {
     obj = varuint32{json_to_number<uint32_t>(state, event)};
     return true;
 }
