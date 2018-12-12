@@ -58,8 +58,18 @@ template <auto P>
 struct member_ptr;
 
 template <class C, typename M>
+const C* class_from_void(M C::*, const void* v) {
+    return reinterpret_cast<const C*>(v);
+}
+
+template <class C, typename M>
 C* class_from_void(M C::*, void* v) {
     return reinterpret_cast<C*>(v);
+}
+
+template <auto P>
+auto& member_from_void(const member_ptr<P>&, const void* p) {
+    return class_from_void(P, p)->*P;
 }
 
 template <auto P>
@@ -365,6 +375,12 @@ template <typename T>
 bool bin_to_native(might_not_exist<T>& obj, bin_to_native_state& state, bool);
 
 template <typename T>
+void native_to_bin(std::vector<char>& bin, const T& obj);
+inline void native_to_bin(std::vector<char>& bin, const std::string& obj);
+template <typename T>
+void native_to_bin(std::vector<char>& bin, const std::vector<T>& obj);
+
+template <typename T>
 auto json_to_native(T& obj, json_to_native_state& state, event_type event, bool start)
     -> std::enable_if_t<std::is_arithmetic_v<T>, bool>;
 template <typename T>
@@ -485,6 +501,11 @@ inline bool bin_to_native(input_buffer& obj, bin_to_native_state& state, bool) {
     return true;
 }
 
+inline void native_to_bin(std::vector<char>& bin, const bytes& obj) {
+    push_varuint32(bin, obj.data.size());
+    bin.insert(bin.end(), obj.data.begin(), obj.data.end());
+}
+
 inline bool json_to_native(bytes& obj, json_to_native_state& state, event_type event, bool start) {
     if (event == event_type::received_string) {
         auto& s = state.get_string();
@@ -557,6 +578,11 @@ template <unsigned size>
 bool bin_to_native(fixed_binary<size>& obj, bin_to_native_state& state, bool start) {
     read_bin(state.bin, obj);
     return true;
+}
+
+template <unsigned size>
+inline void native_to_bin(std::vector<char>& bin, const fixed_binary<size>& obj) {
+    bin.insert(bin.end(), obj.value.begin(), obj.value.end());
 }
 
 template <unsigned size>
@@ -812,6 +838,8 @@ inline bool bin_to_native(name& obj, bin_to_native_state& state, bool start) {
     return bin_to_native(obj.value, state, start);
 }
 
+inline void native_to_bin(std::vector<char>& bin, const name& obj) { native_to_bin(bin, obj.value); }
+
 inline bool json_to_native(name& obj, json_to_native_state& state, event_type event, bool start) {
     if (event == event_type::received_string) {
         obj.value = string_to_name(state.get_string().c_str());
@@ -875,6 +903,8 @@ inline bool bin_to_native(varuint32& obj, bin_to_native_state& state, bool) {
     obj = varuint32{read_varuint32(state.bin)};
     return true;
 }
+
+inline void native_to_bin(std::vector<char>& bin, const varuint32& obj) { push_varuint32(bin, obj.value); }
 
 inline bool json_to_native(varuint32& obj, json_to_native_state& state, event_type event, bool) {
     obj = varuint32{json_to_number<uint32_t>(state, event)};
@@ -1654,6 +1684,34 @@ bool bin_to_native(might_not_exist<T>& obj, bin_to_native_state& state, bool sta
     if (state.bin.pos == state.bin.end)
         return true;
     return bin_to_native(obj.value, state, start);
+}
+
+///////////////////////////////////////////////////////////////////////////////
+// native_to_bin
+///////////////////////////////////////////////////////////////////////////////
+
+template <typename T>
+void native_to_bin(std::vector<char>& bin, const T& obj) {
+    if constexpr (std::is_class_v<T>) {
+        for_each_field((T*)nullptr, [&](auto* name, auto member_ptr) { //
+            native_to_bin(bin, member_from_void(member_ptr, &obj));
+        });
+    } else {
+        static_assert(std::is_arithmetic_v<T>);
+        push_raw(bin, obj);
+    }
+}
+
+inline void native_to_bin(std::vector<char>& bin, const std::string& obj) {
+    push_varuint32(bin, obj.size());
+    bin.insert(bin.end(), obj.begin(), obj.end());
+}
+
+template <typename T>
+void native_to_bin(std::vector<char>& bin, const std::vector<T>& obj) {
+    push_varuint32(bin, obj.size());
+    for (auto& v : obj)
+        native_to_bin(bin, v);
 }
 
 ///////////////////////////////////////////////////////////////////////////////
