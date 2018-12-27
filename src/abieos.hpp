@@ -1021,6 +1021,8 @@ struct time_point {
     }
 };
 
+inline void native_to_bin(std::vector<char>& bin, const time_point& obj) { native_to_bin(bin, obj.microseconds); }
+
 template <typename State>
 bool json_to_bin(time_point*, State& state, bool, const abi_type*, event_type event, bool start) {
     if (event == event_type::received_string) {
