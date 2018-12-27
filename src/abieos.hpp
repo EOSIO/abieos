@@ -1058,6 +1058,8 @@ inline bool bin_to_native(block_timestamp& obj, bin_to_native_state& state, bool
     return true;
 }
 
+inline void native_to_bin(std::vector<char>& bin, const block_timestamp& obj) { native_to_bin(bin, obj.slot); }
+
 inline bool json_to_native(block_timestamp& obj, json_to_native_state& state, event_type event, bool start) {
     throw error("can't convert block_timestamp");
 }
