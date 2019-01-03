@@ -331,12 +331,12 @@ struct bin_to_json_state : json_reader_handler<bin_to_json_state> {
 };
 
 struct native_serializer {
-    virtual bool bin_to_native(void*, bin_to_native_state&, bool) const = 0;
+    virtual void bin_to_native(void*, bin_to_native_state&, bool) const = 0;
     virtual bool json_to_native(void*, json_to_native_state&, event_type, bool) const = 0;
 };
 
 struct native_field_serializer_methods {
-    virtual bool bin_to_native(void*, bin_to_native_state&, bool) const = 0;
+    virtual void bin_to_native(void*, bin_to_native_state&, bool) const = 0;
     virtual bool json_to_native(void*, json_to_native_state&, event_type, bool) const = 0;
 };
 
@@ -359,20 +359,20 @@ struct abi_serializer {
 ///////////////////////////////////////////////////////////////////////////////
 
 template <typename T>
-auto bin_to_native(T& obj, bin_to_native_state& state, bool start) -> std::enable_if_t<std::is_arithmetic_v<T>, bool>;
+auto bin_to_native(T& obj, bin_to_native_state& state, bool start) -> std::enable_if_t<std::is_arithmetic_v<T>, void>;
 template <typename T>
-auto bin_to_native(T& obj, bin_to_native_state& state, bool start) -> std::enable_if_t<std::is_class_v<T>, bool>;
+auto bin_to_native(T& obj, bin_to_native_state& state, bool start) -> std::enable_if_t<std::is_class_v<T>, void>;
 template <typename T>
-bool bin_to_native(std::vector<T>& v, bin_to_native_state& state, bool start);
+void bin_to_native(std::vector<T>& v, bin_to_native_state& state, bool start);
 template <typename First, typename Second>
-bool bin_to_native(std::pair<First, Second>& obj, bin_to_native_state& state, bool start);
-bool bin_to_native(std::string& obj, bin_to_native_state& state, bool);
+void bin_to_native(std::pair<First, Second>& obj, bin_to_native_state& state, bool start);
+void bin_to_native(std::string& obj, bin_to_native_state& state, bool);
 template <typename T>
-bool bin_to_native(std::optional<T>& v, bin_to_native_state& state, bool start);
+void bin_to_native(std::optional<T>& v, bin_to_native_state& state, bool start);
 template <typename... Ts>
-bool bin_to_native(std::variant<Ts...>& v, bin_to_native_state& state, bool start);
+void bin_to_native(std::variant<Ts...>& v, bin_to_native_state& state, bool start);
 template <typename T>
-bool bin_to_native(might_not_exist<T>& obj, bin_to_native_state& state, bool);
+void bin_to_native(might_not_exist<T>& obj, bin_to_native_state& state, bool);
 
 template <typename T>
 void native_to_bin(std::vector<char>& bin, const T& obj);
@@ -483,22 +483,20 @@ struct bytes {
 
 void push_varuint32(std::vector<char>& bin, uint32_t v);
 
-inline bool bin_to_native(bytes& obj, bin_to_native_state& state, bool) {
+inline void bin_to_native(bytes& obj, bin_to_native_state& state, bool) {
     auto size = read_varuint32(state.bin);
     if (size > state.bin.end - state.bin.pos)
         throw error("invalid bytes size");
     obj.data.resize(size);
     read_bin(state.bin, obj.data.data(), size);
-    return true;
 }
 
-inline bool bin_to_native(input_buffer& obj, bin_to_native_state& state, bool) {
+inline void bin_to_native(input_buffer& obj, bin_to_native_state& state, bool) {
     auto size = read_varuint32(state.bin);
     if (size > state.bin.end - state.bin.pos)
         throw error("invalid bytes size");
     obj = {state.bin.pos, state.bin.pos + size};
     state.bin.pos += size;
-    return true;
 }
 
 inline void native_to_bin(std::vector<char>& bin, const bytes& obj) {
@@ -575,9 +573,8 @@ using checksum256 = fixed_binary<32>;
 using checksum512 = fixed_binary<64>;
 
 template <unsigned size>
-bool bin_to_native(fixed_binary<size>& obj, bin_to_native_state& state, bool start) {
+void bin_to_native(fixed_binary<size>& obj, bin_to_native_state& state, bool start) {
     read_bin(state.bin, obj);
-    return true;
 }
 
 template <unsigned size>
@@ -706,10 +703,7 @@ inline bool bin_to_json(int128*, bin_to_json_state& state, bool, const abi_type*
     return state.writer.String(result.c_str(), result.size());
 }
 
-inline bool bin_to_native(public_key& obj, bin_to_native_state& state, bool) {
-    read_bin(state.bin, obj);
-    return true;
-}
+inline void bin_to_native(public_key& obj, bin_to_native_state& state, bool) { read_bin(state.bin, obj); }
 
 inline bool json_to_native(public_key& obj, json_to_native_state& state, event_type event, bool start) {
     throw error("can't convert public_key");
@@ -753,10 +747,7 @@ inline bool bin_to_json(private_key*, bin_to_json_state& state, bool, const abi_
     return state.writer.String(result.c_str(), result.size());
 }
 
-inline bool bin_to_native(signature& obj, bin_to_native_state& state, bool) {
-    read_bin(state.bin, obj);
-    return true;
-}
+inline void bin_to_native(signature& obj, bin_to_native_state& state, bool) { read_bin(state.bin, obj); }
 
 inline bool json_to_native(signature& obj, json_to_native_state& state, event_type event, bool start) {
     if (event == event_type::received_string) {
@@ -832,11 +823,11 @@ struct name {
     explicit operator std::string() const { return name_to_string(value); }
 };
 
+inline bool operator==(name a, name b) { return a.value == b.value; }
+inline bool operator!=(name a, name b) { return a.value != b.value; }
 inline bool operator<(name a, name b) { return a.value < b.value; }
 
-inline bool bin_to_native(name& obj, bin_to_native_state& state, bool start) {
-    return bin_to_native(obj.value, state, start);
-}
+inline void bin_to_native(name& obj, bin_to_native_state& state, bool start) { bin_to_native(obj.value, state, start); }
 
 inline void native_to_bin(std::vector<char>& bin, const name& obj) { native_to_bin(bin, obj.value); }
 
@@ -899,9 +890,8 @@ inline uint32_t read_varuint32(input_buffer& bin) {
     return result;
 }
 
-inline bool bin_to_native(varuint32& obj, bin_to_native_state& state, bool) {
+inline void bin_to_native(varuint32& obj, bin_to_native_state& state, bool) {
     obj = varuint32{read_varuint32(state.bin)};
-    return true;
 }
 
 inline void native_to_bin(std::vector<char>& bin, const varuint32& obj) { push_varuint32(bin, obj.value); }
@@ -1055,10 +1045,7 @@ struct block_timestamp {
     explicit operator std::string() const { return std::string{time_point{*this}}; }
 }; // block_timestamp
 
-inline bool bin_to_native(block_timestamp& obj, bin_to_native_state& state, bool) {
-    read_bin(state.bin, obj.slot);
-    return true;
-}
+inline void bin_to_native(block_timestamp& obj, bin_to_native_state& state, bool) { read_bin(state.bin, obj.slot); }
 
 inline void native_to_bin(std::vector<char>& bin, const block_timestamp& obj) { native_to_bin(bin, obj.slot); }
 
@@ -1490,9 +1477,9 @@ inline bool json_to_jarray(jvalue& value, json_to_jvalue_state& state, event_typ
 
 template <typename T>
 struct native_serializer_impl : native_serializer {
-    bool bin_to_native(void* v, bin_to_native_state& state, bool start) const override {
+    void bin_to_native(void* v, bin_to_native_state& state, bool start) const override {
         using ::abieos::bin_to_native;
-        return bin_to_native(*reinterpret_cast<T*>(v), state, start);
+        bin_to_native(*reinterpret_cast<T*>(v), state, start);
     }
     bool json_to_native(void* v, json_to_native_state& state, event_type event, bool start) const override {
         using ::abieos::json_to_native;
@@ -1506,9 +1493,9 @@ inline constexpr auto native_serializer_for = native_serializer_impl<T>{};
 template <typename member_ptr>
 constexpr auto create_native_field_serializer_methods_impl() {
     struct impl : native_field_serializer_methods {
-        bool bin_to_native(void* v, bin_to_native_state& state, bool start) const override {
+        void bin_to_native(void* v, bin_to_native_state& state, bool start) const override {
             using ::abieos::bin_to_native;
-            return bin_to_native(member_from_void(member_ptr{}, v), state, start);
+            bin_to_native(member_from_void(member_ptr{}, v), state, start);
         }
         bool json_to_native(void* v, json_to_native_state& state, event_type event, bool start) const override {
             using ::abieos::json_to_native;
@@ -1544,33 +1531,36 @@ inline constexpr auto native_field_serializers_for = create_native_field_seriali
 ///////////////////////////////////////////////////////////////////////////////
 
 template <typename T>
-bool bin_to_native(T& obj, input_buffer& bin) {
+void bin_to_native(T& obj, input_buffer& bin) {
     bin_to_native_state state{bin};
-    if (!native_serializer_for<T>.bin_to_native(&obj, state, true))
-        return false;
+    native_serializer_for<T>.bin_to_native(&obj, state, true);
     while (!state.stack.empty()) {
-        if (!state.stack.back().ser->bin_to_native(state.stack.back().obj, state, false))
-            return false;
+        state.stack.back().ser->bin_to_native(state.stack.back().obj, state, false);
         if (state.stack.size() > max_stack_size)
             throw error("recursion limit reached");
     }
     bin = state.bin;
-    return true;
 }
 
 template <typename T>
-auto bin_to_native(T& obj, bin_to_native_state& state, bool start) -> std::enable_if_t<std::is_arithmetic_v<T>, bool> {
+T bin_to_native(input_buffer& bin) {
+    T obj;
+    bin_to_native(obj, bin);
+    return obj;
+}
+
+template <typename T>
+auto bin_to_native(T& obj, bin_to_native_state& state, bool start) -> std::enable_if_t<std::is_arithmetic_v<T>, void> {
     read_bin(state.bin, obj);
-    return true;
 }
 
 template <typename T>
-auto bin_to_native(T& obj, bin_to_native_state& state, bool start) -> std::enable_if_t<std::is_class_v<T>, bool> {
+auto bin_to_native(T& obj, bin_to_native_state& state, bool start) -> std::enable_if_t<std::is_class_v<T>, void> {
     if (start) {
         if (trace_bin_to_native)
             printf("%*s{ %d fields\n", int(state.stack.size() * 4), "", int(native_field_serializers_for<T>.size()));
         state.stack.push_back({&obj, &native_serializer_for<T>});
-        return true;
+        return;
     }
     auto& stack_entry = state.stack.back();
     if (stack_entry.position < (ptrdiff_t)native_field_serializers_for<T>.size()) {
@@ -1579,17 +1569,16 @@ auto bin_to_native(T& obj, bin_to_native_state& state, bool start) -> std::enabl
             printf("%*sfield %d/%d: %s %p\n", int(state.stack.size() * 4), "", int(stack_entry.position),
                    int(native_field_serializers_for<T>.size()), std::string{field_ser.name}.c_str(), field_ser.methods);
         ++stack_entry.position;
-        return field_ser.methods->bin_to_native(&obj, state, true);
+        field_ser.methods->bin_to_native(&obj, state, true);
     } else {
         if (trace_bin_to_native)
             printf("%*s}\n", int((state.stack.size() - 1) * 4), "");
         state.stack.pop_back();
-        return true;
     }
 }
 
 template <typename T>
-bool bin_to_native(std::vector<T>& v, bin_to_native_state& state, bool start) {
+void bin_to_native(std::vector<T>& v, bin_to_native_state& state, bool start) {
     if (start) {
         v.clear();
         auto size = read_varuint32(state.bin);
@@ -1597,7 +1586,7 @@ bool bin_to_native(std::vector<T>& v, bin_to_native_state& state, bool start) {
             printf("%*s[ %u items\n", int(state.stack.size() * 4), "", int(size));
         state.stack.push_back({&v, &native_serializer_for<std::vector<T>>});
         state.stack.back().array_size = size;
-        return true;
+        return;
     }
     auto& stack_entry = state.stack.back();
     if (stack_entry.position < stack_entry.array_size) {
@@ -1606,60 +1595,55 @@ bool bin_to_native(std::vector<T>& v, bin_to_native_state& state, bool start) {
                    int(stack_entry.array_size));
         v.emplace_back();
         stack_entry.position = v.size();
-        return native_serializer_for<T>.bin_to_native(&v.back(), state, true);
+        native_serializer_for<T>.bin_to_native(&v.back(), state, true);
     } else {
         if (trace_bin_to_native)
             printf("%*s]\n", int((state.stack.size() - 1) * 4), "");
         state.stack.pop_back();
-        return true;
     }
-    return true;
 }
 
 template <typename First, typename Second>
-bool bin_to_native(std::pair<First, Second>& obj, bin_to_native_state& state, bool start) {
+void bin_to_native(std::pair<First, Second>& obj, bin_to_native_state& state, bool start) {
     if (start) {
         if (trace_bin_to_native)
             printf("%*s[ pair\n", int(state.stack.size() * 4), "");
         state.stack.push_back({&obj, &native_serializer_for<std::pair<First, Second>>});
-        return true;
+        return;
     }
     auto& stack_entry = state.stack.back();
     if (stack_entry.position == 0) {
         if (trace_bin_to_native)
             printf("%*sitem 0/1\n", int(state.stack.size() * 4), "");
         ++stack_entry.position;
-        return native_serializer_for<First>.bin_to_native(&obj.first, state, true);
+        native_serializer_for<First>.bin_to_native(&obj.first, state, true);
     } else if (stack_entry.position == 1) {
         if (trace_bin_to_native)
             printf("%*sitem 1/1\n", int(state.stack.size() * 4), "");
         ++stack_entry.position;
-        return native_serializer_for<Second>.bin_to_native(&obj.second, state, true);
+        native_serializer_for<Second>.bin_to_native(&obj.second, state, true);
     } else {
         if (trace_bin_to_native)
             printf("%*s]\n", int((state.stack.size() - 1) * 4), "");
         state.stack.pop_back();
-        return true;
     }
-    return true;
 }
 
-inline bool bin_to_native(std::string& obj, bin_to_native_state& state, bool) {
+inline void bin_to_native(std::string& obj, bin_to_native_state& state, bool) {
     auto size = read_varuint32(state.bin);
     if (size > state.bin.end - state.bin.pos)
         throw error("invalid string size");
     obj.resize(size);
     read_bin(state.bin, obj.data(), size);
-    return true;
 }
 
 template <typename T>
-bool bin_to_native(std::optional<T>& obj, bin_to_native_state& state, bool) {
+void bin_to_native(std::optional<T>& obj, bin_to_native_state& state, bool) {
     auto present = read_bin<bool>(state.bin);
     if (!present)
-        return true;
+        return;
     obj.emplace();
-    return bin_to_native(*obj, state, true);
+    bin_to_native(*obj, state, true);
 }
 
 template <uint32_t I, typename... Ts>
@@ -1667,27 +1651,24 @@ bool bin_to_native_variant(std::variant<Ts...>& v, bin_to_native_state& state, u
     if constexpr (I < std::variant_size_v<std::variant<Ts...>>) {
         if (i == I) {
             auto& x = v.template emplace<std::variant_alternative_t<I, std::variant<Ts...>>>();
-            if (!bin_to_native(x, state, true))
-                return false;
+            bin_to_native(x, state, true);
         } else {
             bin_to_native_variant<I + 1>(v, state, i);
         }
     } else {
         throw error("bad variant index");
     }
-    return true;
 }
 
 template <typename... Ts>
-bool bin_to_native(std::variant<Ts...>& obj, bin_to_native_state& state, bool) {
+void bin_to_native(std::variant<Ts...>& obj, bin_to_native_state& state, bool) {
     return bin_to_native_variant<0>(obj, state, read_varuint32(state.bin));
 }
 
 template <typename T>
-bool bin_to_native(might_not_exist<T>& obj, bin_to_native_state& state, bool start) {
-    if (state.bin.pos == state.bin.end)
-        return true;
-    return bin_to_native(obj.value, state, start);
+void bin_to_native(might_not_exist<T>& obj, bin_to_native_state& state, bool start) {
+    if (state.bin.pos != state.bin.end)
+        bin_to_native(obj.value, state, start);
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -2620,5 +2601,9 @@ inline bool bin_to_json(std::string*, bin_to_json_state& state, bool, const abi_
     auto s = read_string(state.bin);
     return state.writer.String(s.c_str(), s.size());
 }
+
+inline namespace literals {
+inline constexpr name operator""_n(const char* s, size_t) { return name{s}; }
+} // namespace literals
 
 } // namespace abieos

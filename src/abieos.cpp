@@ -136,8 +136,7 @@ extern "C" abieos_bool abieos_set_abi_bin(abieos_context* context, uint64_t cont
         check_abi_version(input_buffer{data, data + size});
         abi_def def{};
         input_buffer buf{data, data + size};
-        if (!bin_to_native(def, buf))
-            return false;
+        bin_to_native(def, buf);
         auto c = create_contract(def);
         context->contracts.insert({name{contract}, std::move(c)});
         return true;
