@@ -1,3 +1,5 @@
+#pragma once
+
 #include "abieos.h"
 #include <string.h>
 

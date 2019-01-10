@@ -43,6 +43,8 @@
  *   "RIPEMD-160 is big-bit-endian, little-byte-endian, and left-justified."
  */
 
+#pragma once
+
 #include <assert.h>
 #include <string.h>
 

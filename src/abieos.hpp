@@ -1,5 +1,7 @@
 // copyright defined in abieos/LICENSE.txt
 
+#pragma once
+
 #include <boost/algorithm/hex.hpp>
 #include <boost/container/flat_map.hpp>
 #include <boost/date_time/posix_time/posix_time.hpp>
