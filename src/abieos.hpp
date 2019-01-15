@@ -2,13 +2,10 @@
 
 #pragma once
 
-#include <boost/algorithm/hex.hpp>
-#include <boost/container/flat_map.hpp>
-#include <boost/date_time/posix_time/posix_time.hpp>
-#include <boost/exception/diagnostic_information.hpp>
-#include <boost/variant.hpp>
 #include <ctime>
+#include <date/date.h>
 #include <map>
+#include <optional>
 #include <variant>
 #include <vector>
 
@@ -95,6 +92,39 @@ template <typename T>
 struct might_not_exist {
     T value{};
 };
+
+template <typename SrcIt, typename DestIt>
+void hex(SrcIt begin, SrcIt end, DestIt dest) {
+    auto nibble = [&dest](uint8_t i) {
+        if (i <= 9)
+            *dest++ = '0' + i;
+        else
+            *dest++ = 'A' + i - 10;
+    };
+    while (begin != end) {
+        nibble(((uint8_t)*begin) >> 4);
+        nibble(((uint8_t)*begin) & 0xf);
+        ++begin;
+    }
+}
+
+template <typename SrcIt, typename DestIt>
+void unhex(SrcIt begin, SrcIt end, DestIt dest) {
+    auto digit = [&begin]() {
+        if (*begin >= '0' && *begin <= '9')
+            return *begin++ - '0';
+        if (*begin >= 'a' && *begin <= 'f')
+            return *begin++ - 'a' + 10;
+        if (*begin >= 'A' && *begin <= 'F')
+            return *begin++ - 'A' + 10;
+        throw error("expected hex string");
+    };
+    while (begin != end) {
+        uint8_t h = digit();
+        uint8_t l = digit();
+        *dest++ = (h << 4) | l;
+    }
+}
 
 template <typename T>
 void push_raw(std::vector<char>& bin, const T& obj) {
@@ -222,10 +252,10 @@ struct json_reader_handler : public rapidjson::BaseReaderHandler<rapidjson::UTF8
 
 struct jvalue;
 using jarray = std::vector<jvalue>;
-using jobject = boost::container::flat_map<std::string, jvalue>;
+using jobject = std::map<std::string, jvalue>;
 
 struct jvalue {
-    boost::variant<std::nullptr_t, bool, std::string, jobject, jarray> value;
+    std::variant<std::nullptr_t, bool, std::string, jobject, jarray> value;
 };
 
 inline event_type get_event_type(std::nullptr_t) { return event_type::received_null; }
@@ -235,7 +265,7 @@ inline event_type get_event_type(const jobject&) { return event_type::received_s
 inline event_type get_event_type(const jarray&) { return event_type::received_start_array; }
 
 inline event_type get_event_type(const jvalue& value) {
-    return boost::apply_visitor([](const auto& x) { return get_event_type(x); }, value.value);
+    return std::visit([](const auto& x) { return get_event_type(x); }, value.value);
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -305,13 +335,13 @@ struct jvalue_to_bin_state {
     bool get_bool() const {
         if (!received_value)
             throw error("internal error: !received_value");
-        return boost::get<bool>(received_value->value);
+        return std::get<bool>(received_value->value);
     }
 
     const std::string& get_string() const {
         if (!received_value)
             throw error("internal error: !received_value");
-        return boost::get<std::string>(received_value->value);
+        return std::get<std::string>(received_value->value);
     }
 };
 
@@ -514,11 +544,7 @@ inline bool json_to_native(bytes& obj, json_to_native_state& state, event_type e
         if (s.size() & 1)
             throw error("odd number of hex digits");
         obj.data.clear();
-        try {
-            boost::algorithm::unhex(s.begin(), s.end(), std::back_inserter(obj.data));
-        } catch (...) {
-            throw error("expected hex string");
-        }
+        unhex(s.begin(), s.end(), std::back_inserter(obj.data));
         return true;
     } else
         throw error("expected string containing hex digits");
@@ -537,11 +563,7 @@ bool json_to_bin(bytes*, State& state, bool, const abi_type*, event_type event, 
         if (s.size() & 1)
             throw error("odd number of hex digits");
         push_varuint32(state.bin, s.size() / 2);
-        try {
-            boost::algorithm::unhex(s.begin(), s.end(), std::back_inserter(state.bin));
-        } catch (...) {
-            throw error("expected hex string");
-        }
+        unhex(s.begin(), s.end(), std::back_inserter(state.bin));
         return true;
     } else
         throw error("expected string containing hex digits");
@@ -554,7 +576,7 @@ inline bool bin_to_json(bytes*, bin_to_json_state& state, bool, const abi_type*,
     std::vector<char> raw(size);
     read_bin(state.bin, raw.data(), size);
     std::string result;
-    boost::algorithm::hex(raw.begin(), raw.end(), std::back_inserter(result));
+    hex(raw.begin(), raw.end(), std::back_inserter(result));
     return state.writer.String(result.c_str(), result.size());
 }
 
@@ -564,7 +586,7 @@ struct fixed_binary {
 
     explicit operator std::string() const {
         std::string result;
-        boost::algorithm::hex(value.begin(), value.end(), std::back_inserter(result));
+        hex(value.begin(), value.end(), std::back_inserter(result));
         return result;
     }
 };
@@ -591,11 +613,7 @@ bool json_to_native(fixed_binary<size>& obj, json_to_native_state& state, event_
         if (trace_json_to_native)
             printf("%*schecksum\n", int(state.stack.size() * 4), "");
         std::vector<uint8_t> v;
-        try {
-            boost::algorithm::unhex(s.begin(), s.end(), std::back_inserter(v));
-        } catch (...) {
-            throw error("expected hex string");
-        }
+        unhex(s.begin(), s.end(), std::back_inserter(v));
         if (v.size() != size)
             throw error("hex string has incorrect length");
         memcpy(obj.value.data(), v.data(), size);
@@ -611,11 +629,7 @@ bool json_to_bin(fixed_binary<size>*, State& state, bool, const abi_type*, event
         if (trace_json_to_bin)
             printf("%*schecksum\n", int(state.stack.size() * 4), "");
         std::vector<uint8_t> v;
-        try {
-            boost::algorithm::unhex(s.begin(), s.end(), std::back_inserter(v));
-        } catch (...) {
-            throw error("expected hex string");
-        }
+        unhex(s.begin(), s.end(), std::back_inserter(v));
         if (v.size() != size)
             throw error("hex string has incorrect length");
         state.bin.insert(state.bin.end(), v.begin(), v.end());
@@ -628,7 +642,7 @@ template <unsigned size>
 inline bool bin_to_json(fixed_binary<size>*, bin_to_json_state& state, bool, const abi_type*, bool start) {
     auto v = read_bin<fixed_binary<size>>(state.bin);
     std::string result;
-    boost::algorithm::hex(v.value.begin(), v.value.end(), std::back_inserter(result));
+    hex(v.value.begin(), v.value.end(), std::back_inserter(result));
     return state.writer.String(result.c_str(), result.size());
 }
 
@@ -941,6 +955,41 @@ inline bool bin_to_json(varint32*, bin_to_json_state& state, bool, const abi_typ
     return state.writer.Int64(read_varint32(state.bin));
 }
 
+inline std::string us_to_str(uint64_t microseconds) {
+    std::string result;
+
+    auto append_uint = [&result](uint32_t value, int digits) {
+        char s[20];
+        char* ch = s;
+        while (digits--) {
+            *ch++ = '0' + (value % 10);
+            value /= 10;
+        };
+        std::reverse(s, ch);
+        result.insert(result.end(), s, ch);
+    };
+
+    std::chrono::microseconds us{microseconds};
+    date::sys_days sd(std::chrono::floor<date::days>(us));
+    auto ymd = date::year_month_day{sd};
+    uint32_t ms = (std::chrono::round<std::chrono::milliseconds>(us) - sd.time_since_epoch()).count();
+    us -= sd.time_since_epoch();
+    append_uint((int)ymd.year(), 4);
+    result.push_back('-');
+    append_uint((unsigned)ymd.month(), 2);
+    result.push_back('-');
+    append_uint((unsigned)ymd.day(), 2);
+    result.push_back('T');
+    append_uint(ms / 3600000 % 60, 2);
+    result.push_back(':');
+    append_uint(ms / 60000 % 60, 2);
+    result.push_back(':');
+    append_uint(ms / 1000 % 60, 2);
+    result.push_back('.');
+    append_uint(ms % 1000, 3);
+    return result;
+}
+
 struct time_point_sec {
     uint32_t utc_seconds = 0;
 
@@ -949,23 +998,37 @@ struct time_point_sec {
     explicit time_point_sec(uint32_t seconds) : utc_seconds{seconds} {}
 
     explicit time_point_sec(const std::string& s) {
-        try {
-            static const boost::posix_time::ptime epoch = boost::posix_time::from_time_t(0);
-            boost::posix_time::ptime pt;
-            if (s.size() >= 5 && s.at(4) == '-') // http://en.wikipedia.org/wiki/ISO_8601
-                pt = boost::date_time::parse_delimited_time<boost::posix_time::ptime>(s, 'T');
-            else
-                pt = boost::posix_time::from_iso_string(s);
-            utc_seconds = (pt - epoch).total_seconds();
-        } catch (...) {
-            throw error("expected string containing time_point_sec");
-        }
+        const char* ch = s.c_str();
+        auto parse_uint = [&](int digits) {
+            uint32_t result = 0;
+            while (digits--) {
+                if (*ch >= '0' && *ch <= '9')
+                    result = result * 10 + *ch++ - '0';
+                else
+                    throw error("expected string containing time_point_sec");
+            }
+            return result;
+        };
+        auto expect = [&](char c) {
+            if (*ch++ != c)
+                throw error("expected string containing time_point_sec");
+        };
+        auto y = parse_uint(4);
+        expect('-');
+        auto m = parse_uint(2);
+        expect('-');
+        auto d = parse_uint(2);
+        expect('T');
+        auto h = parse_uint(2);
+        expect(':');
+        auto min = parse_uint(2);
+        expect(':');
+        auto sec = parse_uint(2);
+        utc_seconds =
+            date::sys_days(date::year(y) / m / d).time_since_epoch().count() * 86400 + h * 3600 + min * 60 + sec;
     }
 
-    explicit operator std::string() {
-        const auto ptime = boost::posix_time::from_time_t(time_t(utc_seconds));
-        return boost::posix_time::to_iso_extended_string(ptime) + ".000";
-    }
+    explicit operator std::string() { return us_to_str(uint64_t(utc_seconds) * 1'000'000); }
 };
 
 template <typename State>
@@ -1006,11 +1069,7 @@ struct time_point {
         }
     }
 
-    explicit operator std::string() const {
-        const auto ptime = boost::posix_time::from_time_t(time_t(microseconds / 1000000));
-        auto msec = (microseconds % 1000000) / 1000 + 1000;
-        return boost::posix_time::to_iso_extended_string(ptime) + "." + std::to_string(msec).substr(1);
-    }
+    explicit operator std::string() const { return us_to_str(microseconds); }
 };
 
 inline void native_to_bin(std::vector<char>& bin, const time_point& obj) { native_to_bin(bin, obj.microseconds); }
@@ -1403,9 +1462,9 @@ inline bool receive_event(struct json_to_jvalue_state& state, event_type event, 
             return false;
         }
     } else {
-        if (boost::get<jobject>(&v.value))
+        if (std::holds_alternative<jobject>(v.value))
             return json_to_jobject(v, state, event, start);
-        else if (boost::get<jarray>(&v.value))
+        else if (std::holds_alternative<jarray>(v.value))
             return json_to_jarray(v, state, event, start);
         else
             throw error("extra data");
@@ -1445,7 +1504,7 @@ inline bool json_to_jobject(jvalue& value, json_to_jvalue_state& state, event_ty
     } else {
         if (trace_json_to_jvalue)
             printf("%*sfield %s (event %d)\n", int(state.stack.size() * 4), "", stack_entry.key.c_str(), (int)event);
-        auto& x = boost::get<jobject>(value.value)[stack_entry.key] = {};
+        auto& x = std::get<jobject>(value.value)[stack_entry.key] = {};
         state.stack.push_back({&x});
         return receive_event(state, event, true);
     }
@@ -1465,7 +1524,7 @@ inline bool json_to_jarray(jvalue& value, json_to_jvalue_state& state, event_typ
         state.stack.pop_back();
         return true;
     }
-    auto& v = boost::get<jarray>(value.value);
+    auto& v = std::get<jarray>(value.value);
     if (trace_json_to_jvalue)
         printf("%*sitem %d (event %d)\n", int(state.stack.size() * 4), "", int(v.size()), (int)event);
     v.emplace_back();
@@ -2065,19 +2124,15 @@ inline contract create_contract(const abi_def& abi) {
 inline bool json_to_bin(std::vector<char>& bin, const abi_type* type, const jvalue& value) {
     jvalue_to_bin_state state{bin, &value};
     try {
-        try {
-            if (!type->ser->json_to_bin(state, true, type, get_event_type(value), true))
+        if (!type->ser->json_to_bin(state, true, type, get_event_type(value), true))
+            return false;
+        while (!state.stack.empty()) {
+            auto& entry = state.stack.back();
+            if (!entry.type->ser->json_to_bin(state, entry.allow_extensions, entry.type, get_event_type(*entry.value),
+                                              false))
                 return false;
-            while (!state.stack.empty()) {
-                auto& entry = state.stack.back();
-                if (!entry.type->ser->json_to_bin(state, entry.allow_extensions, entry.type,
-                                                  get_event_type(*entry.value), false))
-                    return false;
-            }
-            return true;
-        } catch (boost::exception& e) {
-            throw error(boost::diagnostic_information(e));
         }
+        return true;
     } catch (error& e) {
         std::string s;
         if (!state.stack.empty() && state.stack[0].type->filled_struct)
@@ -2124,7 +2179,7 @@ inline bool json_to_bin(pseudo_extension*, jvalue_to_bin_state& state, bool allo
 inline bool json_to_bin(pseudo_object*, jvalue_to_bin_state& state, bool allow_extensions, const abi_type* type,
                         event_type event, bool start) {
     if (start) {
-        if (!state.received_value || !boost::get<jobject>(&state.received_value->value))
+        if (!state.received_value || !std::holds_alternative<jobject>(state.received_value->value))
             throw error("expected object");
         if (trace_jvalue_to_bin)
             printf("%*s{ %d fields, allow_ex=%d\n", int(state.stack.size() * 4), "", int(type->fields.size()),
@@ -2141,7 +2196,7 @@ inline bool json_to_bin(pseudo_object*, jvalue_to_bin_state& state, bool allow_e
         return true;
     }
     auto& field = stack_entry.type->fields[stack_entry.position];
-    auto& obj = boost::get<jobject>(stack_entry.value->value);
+    auto& obj = std::get<jobject>(stack_entry.value->value);
     auto it = obj.find(field.name);
     if (trace_jvalue_to_bin)
         printf("%*sfield %d/%d: %s (event %d)\n", int(state.stack.size() * 4), "", int(stack_entry.position),
@@ -2164,17 +2219,17 @@ inline bool json_to_bin(pseudo_object*, jvalue_to_bin_state& state, bool allow_e
 inline bool json_to_bin(pseudo_array*, jvalue_to_bin_state& state, bool, const abi_type* type, event_type event,
                         bool start) {
     if (start) {
-        if (!state.received_value || !boost::get<jarray>(&state.received_value->value))
+        if (!state.received_value || !std::holds_alternative<jarray>(state.received_value->value))
             throw error("expected array");
         if (trace_jvalue_to_bin)
             printf("%*s[ %d elements\n", int(state.stack.size() * 4), "",
-                   int(boost::get<jarray>(state.received_value->value).size()));
-        push_varuint32(state.bin, boost::get<jarray>(state.received_value->value).size());
+                   int(std::get<jarray>(state.received_value->value).size()));
+        push_varuint32(state.bin, std::get<jarray>(state.received_value->value).size());
         state.stack.push_back({type, false, state.received_value, -1});
         return true;
     }
     auto& stack_entry = state.stack.back();
-    auto& arr = boost::get<jarray>(stack_entry.value->value);
+    auto& arr = std::get<jarray>(stack_entry.value->value);
     ++stack_entry.position;
     if (stack_entry.position == (int)arr.size()) {
         if (trace_jvalue_to_bin)
@@ -2192,23 +2247,23 @@ inline bool json_to_bin(pseudo_array*, jvalue_to_bin_state& state, bool, const a
 inline bool json_to_bin(pseudo_variant*, jvalue_to_bin_state& state, bool allow_extensions, const abi_type* type,
                         event_type event, bool start) {
     if (start) {
-        if (!state.received_value || !boost::get<jarray>(&state.received_value->value))
+        if (!state.received_value || !std::holds_alternative<jarray>(state.received_value->value))
             throw error(R"(expected variant: ["type", value])");
-        auto& arr = boost::get<jarray>(state.received_value->value);
+        auto& arr = std::get<jarray>(state.received_value->value);
         if (arr.size() != 2)
             throw error(R"(expected variant: ["type", value])");
-        auto* typeName = boost::get<std::string>(&arr[0].value);
-        if (!typeName)
+        if (!std::holds_alternative<std::string>(arr[0].value))
             throw error(R"(expected variant: ["type", value])");
+        auto& typeName = std::get<std::string>(arr[0].value);
         if (trace_jvalue_to_bin)
-            printf("%*s[ variant %s\n", int(state.stack.size() * 4), "", typeName->c_str());
+            printf("%*s[ variant %s\n", int(state.stack.size() * 4), "", typeName.c_str());
         state.stack.push_back({type, allow_extensions, state.received_value, 0});
         return true;
     }
     auto& stack_entry = state.stack.back();
-    auto& arr = boost::get<jarray>(stack_entry.value->value);
+    auto& arr = std::get<jarray>(stack_entry.value->value);
     if (stack_entry.position == 0) {
-        auto& typeName = boost::get<std::string>(arr[0].value);
+        auto& typeName = std::get<std::string>(arr[0].value);
         auto it = std::find_if(stack_entry.type->fields.begin(), stack_entry.type->fields.end(),
                                [&](auto& field) { return field.name == typeName; });
         if (it == stack_entry.type->fields.end())
@@ -2270,13 +2325,9 @@ inline bool json_to_bin(std::vector<char>& bin, const abi_type* type, std::strin
     rapidjson::Reader reader;
     rapidjson::InsituStringStream ss(mutable_json.data());
     try {
-        try {
-            if (!reader.Parse<rapidjson::kParseValidateEncodingFlag | rapidjson::kParseIterativeFlag |
-                              rapidjson::kParseNumbersAsStringsFlag>(ss, state))
-                throw error{"failed to parse"};
-        } catch (boost::exception& e) {
-            throw error(boost::diagnostic_information(e));
-        }
+        if (!reader.Parse<rapidjson::kParseValidateEncodingFlag | rapidjson::kParseIterativeFlag |
+                          rapidjson::kParseNumbersAsStringsFlag>(ss, state))
+            throw error{"failed to parse"};
     } catch (error& e) {
         std::string s;
         if (!state.stack.empty() && state.stack[0].type->filled_struct)

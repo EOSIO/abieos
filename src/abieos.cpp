@@ -43,9 +43,6 @@ auto handle_exceptions(abieos_context* context, T errval, F f) noexcept -> declt
     } catch (error& e) {
         set_error(context, e.what());
         return errval;
-    } catch (boost::exception& e) {
-        set_error(context, diagnostic_information(e).c_str());
-        return errval;
     } catch (std::exception& e) {
         if (!catch_all)
             throw;
@@ -63,8 +60,6 @@ extern "C" abieos_context* abieos_create() {
     try {
         return new abieos_context{};
     } catch (error& e) {
-        return nullptr;
-    } catch (boost::exception& e) {
         return nullptr;
     } catch (...) {
         if (!catch_all)
@@ -96,8 +91,7 @@ extern "C" const char* abieos_get_bin_data(abieos_context* context) {
 extern "C" const char* abieos_get_bin_hex(abieos_context* context) {
     return handle_exceptions(context, nullptr, [&] {
         context->result_str.clear();
-        boost::algorithm::hex(context->result_bin.begin(), context->result_bin.end(),
-                              std::back_inserter(context->result_str));
+        hex(context->result_bin.begin(), context->result_bin.end(), std::back_inserter(context->result_str));
         return context->result_str.c_str();
     });
 }
@@ -147,7 +141,7 @@ extern "C" abieos_bool abieos_set_abi_hex(abieos_context* context, uint64_t cont
     fix_null_str(hex);
     return handle_exceptions(context, false, [&] {
         std::vector<char> data;
-        boost::algorithm::unhex(hex, hex + strlen(hex), std::back_inserter(data));
+        unhex(hex, hex + strlen(hex), std::back_inserter(data));
         return abieos_set_abi_bin(context, contract, data.data(), data.size());
     });
 }
@@ -226,7 +220,7 @@ extern "C" const char* abieos_hex_to_json(abieos_context* context, uint64_t cont
     fix_null_str(hex);
     return handle_exceptions(context, nullptr, [&]() -> const char* {
         std::vector<char> data;
-        boost::algorithm::unhex(hex, hex + strlen(hex), std::back_inserter(data));
+        unhex(hex, hex + strlen(hex), std::back_inserter(data));
         return abieos_bin_to_json(context, contract, type, data.data(), data.size());
     });
 }

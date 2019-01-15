@@ -4,3 +4,6 @@
 [submodule "external/eosjs"]
 	path = external/eosjs
 	url = git@github.com:EOSIO/eosjs2.git
+[submodule "external/date"]
+	path = external/date
+	url = git@github.com:HowardHinnant/date.git
