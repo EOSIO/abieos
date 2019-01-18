@@ -109,21 +109,25 @@ void hex(SrcIt begin, SrcIt end, DestIt dest) {
 }
 
 template <typename SrcIt, typename DestIt>
-void unhex(SrcIt begin, SrcIt end, DestIt dest) {
-    auto digit = [&begin]() {
+ABIEOS_NODISCARD bool unhex(std::string& error, SrcIt begin, SrcIt end, DestIt dest) {
+    auto get_digit = [&](uint8_t& nibble) {
         if (*begin >= '0' && *begin <= '9')
-            return *begin++ - '0';
-        if (*begin >= 'a' && *begin <= 'f')
-            return *begin++ - 'a' + 10;
-        if (*begin >= 'A' && *begin <= 'F')
-            return *begin++ - 'A' + 10;
-        throw error("expected hex string");
+            nibble = *begin++ - '0';
+        else if (*begin >= 'a' && *begin <= 'f')
+            nibble = *begin++ - 'a' + 10;
+        else if (*begin >= 'A' && *begin <= 'F')
+            nibble = *begin++ - 'A' + 10;
+        else
+            return set_error(error, "expected hex string");
+        return true;
     };
     while (begin != end) {
-        uint8_t h = digit();
-        uint8_t l = digit();
+        uint8_t h, l;
+        if (!get_digit(h) || !get_digit(l))
+            return false;
         *dest++ = (h << 4) | l;
     }
+    return true;
 }
 
 template <typename T>
@@ -137,42 +141,39 @@ struct input_buffer {
     const char* end = nullptr;
 };
 
-inline void read_bin(input_buffer& bin, void* dest, ptrdiff_t size) {
+ABIEOS_NODISCARD inline bool read_raw(input_buffer& bin, std::string& error, void* dest, ptrdiff_t size) {
     if (bin.end - bin.pos < size)
-        throw error("read past end");
+        return set_error(error, "read past end");
     if (size)
         memcpy(dest, bin.pos, size);
     bin.pos += size;
+    return true;
 }
 
 template <typename T>
-void read_bin(input_buffer& bin, T& dest) {
+ABIEOS_NODISCARD bool read_raw(input_buffer& bin, std::string& error, T& dest) {
     static_assert(std::is_trivially_copyable_v<T>);
-    read_bin(bin, &dest, sizeof(dest));
+    return read_raw(bin, error, &dest, sizeof(dest));
 }
 
-inline void read_bin(input_buffer& bin, bool& dest) {
+ABIEOS_NODISCARD inline bool read_raw(input_buffer& bin, std::string& error, bool& dest) {
     char tmp;
-    read_bin(bin, &tmp, sizeof(tmp));
+    if (!read_raw(bin, error, &tmp, sizeof(tmp)))
+        return false;
     dest = tmp;
+    return true;
 }
 
-template <typename T>
-T read_bin(input_buffer& bin) {
-    T result{};
-    read_bin(bin, result);
-    return result;
-}
+ABIEOS_NODISCARD bool read_varuint32(input_buffer& bin, std::string& error, uint32_t& dest);
 
-uint32_t read_varuint32(input_buffer& bin);
-
-inline std::string read_string(input_buffer& bin) {
-    auto size = read_varuint32(bin);
+ABIEOS_NODISCARD inline bool read_string(input_buffer& bin, std::string& error, std::string& dest) {
+    uint32_t size;
+    if (!read_varuint32(bin, error, size))
+        return false;
     if (size > bin.end - bin.pos)
-        throw error("invalid string size");
-    std::string result(size, 0);
-    read_bin(bin, result.data(), size);
-    return result;
+        return set_error(error, "invalid string size");
+    dest.resize(size);
+    return read_raw(bin, error, dest.data(), size);
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -196,8 +197,8 @@ struct event_data {
     std::string key{};
 };
 
-bool receive_event(struct json_to_native_state&, event_type, bool start);
-bool receive_event(struct json_to_bin_state&, event_type, bool start);
+ABIEOS_NODISCARD bool receive_event(struct json_to_native_state&, event_type, bool start);
+ABIEOS_NODISCARD bool receive_event(struct json_to_bin_state&, event_type, bool start);
 
 template <typename Derived>
 struct json_reader_handler : public rapidjson::BaseReaderHandler<rapidjson::UTF8<>, Derived> {
@@ -314,38 +315,35 @@ struct bin_to_json_stack_entry {
 };
 
 struct json_to_jvalue_state : json_reader_handler<json_to_jvalue_state> {
+    std::string& error;
     std::vector<json_to_jvalue_stack_entry> stack;
 };
 
 struct json_to_native_state : json_reader_handler<json_to_native_state> {
+    std::string& error;
     std::vector<native_stack_entry> stack;
 };
 
 struct bin_to_native_state {
+    std::string& error;
     input_buffer bin{};
     std::vector<native_stack_entry> stack{};
 };
 
 struct jvalue_to_bin_state {
+    std::string& error;
     std::vector<char>& bin;
     const jvalue* received_value = nullptr;
     std::vector<jvalue_to_bin_stack_entry> stack{};
     bool skipped_extension = false;
 
-    bool get_bool() const {
-        if (!received_value)
-            throw error("internal error: !received_value");
-        return std::get<bool>(received_value->value);
-    }
+    bool get_bool() const { return std::get<bool>(received_value->value); }
 
-    const std::string& get_string() const {
-        if (!received_value)
-            throw error("internal error: !received_value");
-        return std::get<std::string>(received_value->value);
-    }
+    const std::string& get_string() const { return std::get<std::string>(received_value->value); }
 };
 
 struct json_to_bin_state : json_reader_handler<json_to_bin_state> {
+    std::string& error;
     std::vector<char> bin;
     std::vector<size_insertion> size_insertions{};
     std::vector<json_to_bin_stack_entry> stack{};
@@ -353,23 +351,24 @@ struct json_to_bin_state : json_reader_handler<json_to_bin_state> {
 };
 
 struct bin_to_json_state : json_reader_handler<bin_to_json_state> {
+    std::string& error;
     input_buffer& bin;
     rapidjson::Writer<rapidjson::StringBuffer>& writer;
     std::vector<bin_to_json_stack_entry> stack{};
     bool skipped_extension = false;
 
-    bin_to_json_state(input_buffer& bin, rapidjson::Writer<rapidjson::StringBuffer>& writer)
-        : bin{bin}, writer{writer} {}
+    bin_to_json_state(input_buffer& bin, std::string& error, rapidjson::Writer<rapidjson::StringBuffer>& writer)
+        : error{error}, bin{bin}, writer{writer} {}
 };
 
 struct native_serializer {
-    virtual void bin_to_native(void*, bin_to_native_state&, bool) const = 0;
-    virtual bool json_to_native(void*, json_to_native_state&, event_type, bool) const = 0;
+    ABIEOS_NODISCARD virtual bool bin_to_native(void*, bin_to_native_state&, bool) const = 0;
+    ABIEOS_NODISCARD virtual bool json_to_native(void*, json_to_native_state&, event_type, bool) const = 0;
 };
 
 struct native_field_serializer_methods {
-    virtual void bin_to_native(void*, bin_to_native_state&, bool) const = 0;
-    virtual bool json_to_native(void*, json_to_native_state&, event_type, bool) const = 0;
+    ABIEOS_NODISCARD virtual bool bin_to_native(void*, bin_to_native_state&, bool) const = 0;
+    ABIEOS_NODISCARD virtual bool json_to_native(void*, json_to_native_state&, event_type, bool) const = 0;
 };
 
 struct native_field_serializer {
@@ -378,12 +377,12 @@ struct native_field_serializer {
 };
 
 struct abi_serializer {
-    virtual bool json_to_bin(jvalue_to_bin_state& state, bool allow_extensions, const abi_type* type, event_type event,
-                             bool start) const = 0;
-    virtual bool json_to_bin(json_to_bin_state& state, bool allow_extensions, const abi_type* type, event_type event,
-                             bool start) const = 0;
-    virtual bool bin_to_json(bin_to_json_state& state, bool allow_extensions, const abi_type* type,
-                             bool start) const = 0;
+    ABIEOS_NODISCARD virtual bool json_to_bin(jvalue_to_bin_state& state, bool allow_extensions, const abi_type* type,
+                                              event_type event, bool start) const = 0;
+    ABIEOS_NODISCARD virtual bool json_to_bin(json_to_bin_state& state, bool allow_extensions, const abi_type* type,
+                                              event_type event, bool start) const = 0;
+    ABIEOS_NODISCARD virtual bool bin_to_json(bin_to_json_state& state, bool allow_extensions, const abi_type* type,
+                                              bool start) const = 0;
 };
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -391,114 +390,128 @@ struct abi_serializer {
 ///////////////////////////////////////////////////////////////////////////////
 
 template <typename T>
-auto bin_to_native(T& obj, bin_to_native_state& state, bool start) -> std::enable_if_t<std::is_arithmetic_v<T>, void>;
+ABIEOS_NODISCARD auto bin_to_native(T& obj, bin_to_native_state& state, bool start)
+    -> std::enable_if_t<std::is_arithmetic_v<T>, bool>;
 template <typename T>
-auto bin_to_native(T& obj, bin_to_native_state& state, bool start) -> std::enable_if_t<std::is_class_v<T>, void>;
+ABIEOS_NODISCARD auto bin_to_native(T& obj, bin_to_native_state& state, bool start)
+    -> std::enable_if_t<std::is_class_v<T>, bool>;
 template <typename T>
-void bin_to_native(std::vector<T>& v, bin_to_native_state& state, bool start);
+ABIEOS_NODISCARD bool bin_to_native(std::vector<T>& v, bin_to_native_state& state, bool start);
 template <typename First, typename Second>
-void bin_to_native(std::pair<First, Second>& obj, bin_to_native_state& state, bool start);
-void bin_to_native(std::string& obj, bin_to_native_state& state, bool);
+ABIEOS_NODISCARD bool bin_to_native(std::pair<First, Second>& obj, bin_to_native_state& state, bool start);
+ABIEOS_NODISCARD bool bin_to_native(std::string& obj, bin_to_native_state& state, bool);
 template <typename T>
-void bin_to_native(std::optional<T>& v, bin_to_native_state& state, bool start);
+ABIEOS_NODISCARD bool bin_to_native(std::optional<T>& v, bin_to_native_state& state, bool start);
 template <typename... Ts>
-void bin_to_native(std::variant<Ts...>& v, bin_to_native_state& state, bool start);
+ABIEOS_NODISCARD bool bin_to_native(std::variant<Ts...>& v, bin_to_native_state& state, bool start);
 template <typename T>
-void bin_to_native(might_not_exist<T>& obj, bin_to_native_state& state, bool);
+ABIEOS_NODISCARD bool bin_to_native(might_not_exist<T>& obj, bin_to_native_state& state, bool);
 
 template <typename T>
 void native_to_bin(std::vector<char>& bin, const T& obj);
-inline void native_to_bin(std::vector<char>& bin, const std::string& obj);
+void native_to_bin(std::vector<char>& bin, const std::string& obj);
 template <typename T>
 void native_to_bin(std::vector<char>& bin, const std::vector<T>& obj);
 
 template <typename T>
-auto json_to_native(T& obj, json_to_native_state& state, event_type event, bool start)
+ABIEOS_NODISCARD auto json_to_native(T& obj, json_to_native_state& state, event_type event, bool start)
     -> std::enable_if_t<std::is_arithmetic_v<T>, bool>;
 template <typename T>
-auto json_to_native(T& obj, json_to_native_state& state, event_type event, bool start)
+ABIEOS_NODISCARD auto json_to_native(T& obj, json_to_native_state& state, event_type event, bool start)
     -> std::enable_if_t<std::is_class_v<T>, bool>;
 template <typename T>
-bool json_to_native(std::vector<T>& obj, json_to_native_state& state, event_type event, bool start);
+ABIEOS_NODISCARD bool json_to_native(std::vector<T>& obj, json_to_native_state& state, event_type event, bool start);
 template <typename First, typename Second>
-bool json_to_native(std::pair<First, Second>& obj, json_to_native_state& state, event_type event, bool start);
-bool json_to_native(std::string& obj, json_to_native_state& state, event_type event, bool start);
+ABIEOS_NODISCARD bool json_to_native(std::pair<First, Second>& obj, json_to_native_state& state, event_type event,
+                                     bool start);
+ABIEOS_NODISCARD bool json_to_native(std::string& obj, json_to_native_state& state, event_type event, bool start);
 template <typename T>
-bool json_to_native(std::optional<T>& obj, json_to_native_state& state, event_type event, bool start);
+ABIEOS_NODISCARD bool json_to_native(std::optional<T>& obj, json_to_native_state& state, event_type event, bool start);
 template <typename... Ts>
-bool json_to_native(std::variant<Ts...>& obj, json_to_native_state& state, event_type event, bool start);
+ABIEOS_NODISCARD bool json_to_native(std::variant<Ts...>& obj, json_to_native_state& state, event_type event,
+                                     bool start);
 template <typename T>
-bool json_to_native(might_not_exist<T>& obj, json_to_native_state& state, event_type event, bool start);
+ABIEOS_NODISCARD bool json_to_native(might_not_exist<T>& obj, json_to_native_state& state, event_type event,
+                                     bool start);
 
-bool json_to_bin(pseudo_optional*, jvalue_to_bin_state& state, bool allow_extensions, const abi_type* type,
-                 event_type event, bool);
-bool json_to_bin(pseudo_extension*, jvalue_to_bin_state& state, bool allow_extensions, const abi_type* type,
-                 event_type event, bool);
-bool json_to_bin(pseudo_object*, jvalue_to_bin_state& state, bool allow_extensions, const abi_type* type,
-                 event_type event, bool start);
-bool json_to_bin(pseudo_array*, jvalue_to_bin_state& state, bool allow_extensions, const abi_type* type,
-                 event_type event, bool start);
-bool json_to_bin(pseudo_variant*, jvalue_to_bin_state& state, bool allow_extensions, const abi_type* type,
-                 event_type event, bool start);
+ABIEOS_NODISCARD bool json_to_bin(pseudo_optional*, jvalue_to_bin_state& state, bool allow_extensions,
+                                  const abi_type* type, event_type event, bool);
+ABIEOS_NODISCARD bool json_to_bin(pseudo_extension*, jvalue_to_bin_state& state, bool allow_extensions,
+                                  const abi_type* type, event_type event, bool);
+ABIEOS_NODISCARD bool json_to_bin(pseudo_object*, jvalue_to_bin_state& state, bool allow_extensions,
+                                  const abi_type* type, event_type event, bool start);
+ABIEOS_NODISCARD bool json_to_bin(pseudo_array*, jvalue_to_bin_state& state, bool allow_extensions,
+                                  const abi_type* type, event_type event, bool start);
+ABIEOS_NODISCARD bool json_to_bin(pseudo_variant*, jvalue_to_bin_state& state, bool allow_extensions,
+                                  const abi_type* type, event_type event, bool start);
 template <typename T>
-auto json_to_bin(T*, jvalue_to_bin_state& state, bool allow_extensions, const abi_type*, event_type event, bool start)
-    -> std::enable_if_t<std::is_arithmetic_v<T>, bool>;
-bool json_to_bin(std::string*, jvalue_to_bin_state& state, bool allow_extensions, const abi_type*, event_type event,
-                 bool start);
-
-template <typename T>
-auto json_to_bin(T*, json_to_bin_state& state, bool allow_extensions, const abi_type*, event_type event, bool start)
-    -> std::enable_if_t<std::is_arithmetic_v<T>, bool>;
-bool json_to_bin(std::string*, json_to_bin_state& state, bool allow_extensions, const abi_type*, event_type event,
-                 bool start);
-bool json_to_bin(pseudo_optional*, json_to_bin_state& state, bool allow_extensions, const abi_type* type,
-                 event_type event, bool start);
-bool json_to_bin(pseudo_extension*, json_to_bin_state& state, bool allow_extensions, const abi_type* type,
-                 event_type event, bool start);
-bool json_to_bin(pseudo_object*, json_to_bin_state& state, bool allow_extensions, const abi_type* type,
-                 event_type event, bool start);
-bool json_to_bin(pseudo_array*, json_to_bin_state& state, bool allow_extensions, const abi_type* type, event_type event,
-                 bool start);
-bool json_to_bin(pseudo_variant*, json_to_bin_state& state, bool allow_extensions, const abi_type* type,
-                 event_type event, bool start);
+ABIEOS_NODISCARD auto json_to_bin(T*, jvalue_to_bin_state& state, bool allow_extensions, const abi_type*,
+                                  event_type event, bool start) -> std::enable_if_t<std::is_arithmetic_v<T>, bool>;
+ABIEOS_NODISCARD bool json_to_bin(std::string*, jvalue_to_bin_state& state, bool allow_extensions, const abi_type*,
+                                  event_type event, bool start);
 
 template <typename T>
-auto bin_to_json(T*, bin_to_json_state& state, bool allow_extensions, const abi_type*, bool start)
+ABIEOS_NODISCARD auto json_to_bin(T*, json_to_bin_state& state, bool allow_extensions, const abi_type*,
+                                  event_type event, bool start) -> std::enable_if_t<std::is_arithmetic_v<T>, bool>;
+ABIEOS_NODISCARD bool json_to_bin(std::string*, json_to_bin_state& state, bool allow_extensions, const abi_type*,
+                                  event_type event, bool start);
+ABIEOS_NODISCARD bool json_to_bin(pseudo_optional*, json_to_bin_state& state, bool allow_extensions,
+                                  const abi_type* type, event_type event, bool start);
+ABIEOS_NODISCARD bool json_to_bin(pseudo_extension*, json_to_bin_state& state, bool allow_extensions,
+                                  const abi_type* type, event_type event, bool start);
+ABIEOS_NODISCARD bool json_to_bin(pseudo_object*, json_to_bin_state& state, bool allow_extensions, const abi_type* type,
+                                  event_type event, bool start);
+ABIEOS_NODISCARD bool json_to_bin(pseudo_array*, json_to_bin_state& state, bool allow_extensions, const abi_type* type,
+                                  event_type event, bool start);
+ABIEOS_NODISCARD bool json_to_bin(pseudo_variant*, json_to_bin_state& state, bool allow_extensions,
+                                  const abi_type* type, event_type event, bool start);
+
+template <typename T>
+ABIEOS_NODISCARD auto bin_to_json(T*, bin_to_json_state& state, bool allow_extensions, const abi_type*, bool start)
     -> std::enable_if_t<std::is_arithmetic_v<T>, bool>;
-bool bin_to_json(std::string*, bin_to_json_state& state, bool allow_extensions, const abi_type*, bool start);
-bool bin_to_json(pseudo_optional*, bin_to_json_state& state, bool allow_extensions, const abi_type* type, bool start);
-bool bin_to_json(pseudo_extension*, bin_to_json_state& state, bool allow_extensions, const abi_type* type, bool start);
-bool bin_to_json(pseudo_object*, bin_to_json_state& state, bool allow_extensions, const abi_type* type, bool start);
-bool bin_to_json(pseudo_array*, bin_to_json_state& state, bool allow_extensions, const abi_type* type, bool start);
-bool bin_to_json(pseudo_variant*, bin_to_json_state& state, bool allow_extensions, const abi_type* type, bool start);
+ABIEOS_NODISCARD bool bin_to_json(std::string*, bin_to_json_state& state, bool allow_extensions, const abi_type*,
+                                  bool start);
+ABIEOS_NODISCARD bool bin_to_json(pseudo_optional*, bin_to_json_state& state, bool allow_extensions,
+                                  const abi_type* type, bool start);
+ABIEOS_NODISCARD bool bin_to_json(pseudo_extension*, bin_to_json_state& state, bool allow_extensions,
+                                  const abi_type* type, bool start);
+ABIEOS_NODISCARD bool bin_to_json(pseudo_object*, bin_to_json_state& state, bool allow_extensions, const abi_type* type,
+                                  bool start);
+ABIEOS_NODISCARD bool bin_to_json(pseudo_array*, bin_to_json_state& state, bool allow_extensions, const abi_type* type,
+                                  bool start);
+ABIEOS_NODISCARD bool bin_to_json(pseudo_variant*, bin_to_json_state& state, bool allow_extensions,
+                                  const abi_type* type, bool start);
 
 ///////////////////////////////////////////////////////////////////////////////
 // serializable types
 ///////////////////////////////////////////////////////////////////////////////
 
 template <typename T, typename State>
-T json_to_number(State& state, event_type event) {
-    if (event == event_type::received_bool)
-        return state.get_bool();
+ABIEOS_NODISCARD bool json_to_number(T& dest, State& state, event_type event) {
+    if (event == event_type::received_bool) {
+        dest = state.get_bool();
+        return true;
+    }
     if (event == event_type::received_string) {
-        auto check = [](auto f, bool check_result = true) {
+        auto check = [&](auto f, bool check_result = true) {
             using T2 = decltype(f());
             T2 result;
             try {
                 result = f();
             } catch (...) {
-                throw error("number is out of range or has bad format");
+                return set_error(state.error, "number is out of range or has bad format");
             }
             if (check_result && (T2)(T)result != result)
-                throw error("number is out of range");
-            return result;
+                return set_error(state.error, "number is out of range");
+            dest = result;
+            return true;
         };
         auto& s = state.get_string();
         if (std::is_integral_v<T> && std::is_signed_v<T>) {
             return check([&] { return stoll(s); });
         } else if (std::is_integral_v<T> && !std::is_signed_v<T>) {
             if (s.find('-') != s.npos)
-                throw error("expected non-negative number");
+                return set_error(state.error, "expected non-negative number");
             return check([&] { return stoull(s); });
         } else if (std::is_same_v<T, float>) {
             return check([&] { return stof(s); }, false);
@@ -506,7 +519,7 @@ T json_to_number(State& state, event_type event) {
             return check([&] { return stod(s); }, false);
         }
     }
-    throw error("expected number or boolean");
+    return set_error(state.error, "expected number or boolean");
 } // namespace abieos
 
 struct bytes {
@@ -515,20 +528,25 @@ struct bytes {
 
 void push_varuint32(std::vector<char>& bin, uint32_t v);
 
-inline void bin_to_native(bytes& obj, bin_to_native_state& state, bool) {
-    auto size = read_varuint32(state.bin);
+ABIEOS_NODISCARD inline bool bin_to_native(bytes& obj, bin_to_native_state& state, bool) {
+    uint32_t size;
+    if (!read_varuint32(state.bin, state.error, size))
+        return false;
     if (size > state.bin.end - state.bin.pos)
-        throw error("invalid bytes size");
+        return set_error(state, "invalid bytes size");
     obj.data.resize(size);
-    read_bin(state.bin, obj.data.data(), size);
+    return read_raw(state.bin, state.error, obj.data.data(), size);
 }
 
-inline void bin_to_native(input_buffer& obj, bin_to_native_state& state, bool) {
-    auto size = read_varuint32(state.bin);
+ABIEOS_NODISCARD inline bool bin_to_native(input_buffer& obj, bin_to_native_state& state, bool) {
+    uint32_t size;
+    if (!read_varuint32(state.bin, state.error, size))
+        return false;
     if (size > state.bin.end - state.bin.pos)
-        throw error("invalid bytes size");
+        return set_error(state, "invalid bytes size");
     obj = {state.bin.pos, state.bin.pos + size};
     state.bin.pos += size;
+    return true;
 }
 
 inline void native_to_bin(std::vector<char>& bin, const bytes& obj) {
@@ -536,45 +554,47 @@ inline void native_to_bin(std::vector<char>& bin, const bytes& obj) {
     bin.insert(bin.end(), obj.data.begin(), obj.data.end());
 }
 
-inline bool json_to_native(bytes& obj, json_to_native_state& state, event_type event, bool start) {
+ABIEOS_NODISCARD inline bool json_to_native(bytes& obj, json_to_native_state& state, event_type event, bool start) {
     if (event == event_type::received_string) {
         auto& s = state.get_string();
         if (trace_json_to_native)
             printf("%*sbytes (%d hex digits)\n", int(state.stack.size() * 4), "", int(s.size()));
         if (s.size() & 1)
-            throw error("odd number of hex digits");
+            return set_error(state, "odd number of hex digits");
         obj.data.clear();
-        unhex(s.begin(), s.end(), std::back_inserter(obj.data));
-        return true;
+        return unhex(state.error, s.begin(), s.end(), std::back_inserter(obj.data));
     } else
-        throw error("expected string containing hex digits");
+        return set_error(state, "expected string containing hex digits");
 }
 
-inline bool json_to_native(input_buffer& obj, json_to_native_state& state, event_type event, bool start) {
-    throw error("can not convert json to input_buffer");
+ABIEOS_NODISCARD inline bool json_to_native(input_buffer& obj, json_to_native_state& state, event_type event,
+                                            bool start) {
+    return set_error(state, "can not convert json to input_buffer");
 }
 
 template <typename State>
-bool json_to_bin(bytes*, State& state, bool, const abi_type*, event_type event, bool start) {
+ABIEOS_NODISCARD bool json_to_bin(bytes*, State& state, bool, const abi_type*, event_type event, bool start) {
     if (event == event_type::received_string) {
         auto& s = state.get_string();
         if (trace_json_to_bin)
             printf("%*sbytes (%d hex digits)\n", int(state.stack.size() * 4), "", int(s.size()));
         if (s.size() & 1)
-            throw error("odd number of hex digits");
+            return set_error(state, "odd number of hex digits");
         push_varuint32(state.bin, s.size() / 2);
-        unhex(s.begin(), s.end(), std::back_inserter(state.bin));
-        return true;
+        return unhex(state.error, s.begin(), s.end(), std::back_inserter(state.bin));
     } else
-        throw error("expected string containing hex digits");
+        return set_error(state, "expected string containing hex digits");
 }
 
-inline bool bin_to_json(bytes*, bin_to_json_state& state, bool, const abi_type*, bool start) {
-    auto size = read_varuint32(state.bin);
+ABIEOS_NODISCARD inline bool bin_to_json(bytes*, bin_to_json_state& state, bool, const abi_type*, bool start) {
+    uint32_t size;
+    if (!read_varuint32(state.bin, state.error, size))
+        return false;
     if (size > state.bin.end - state.bin.pos)
-        throw error("invalid bytes size");
+        return set_error(state, "invalid bytes size");
     std::vector<char> raw(size);
-    read_bin(state.bin, raw.data(), size);
+    if (!read_raw(state.bin, state.error, raw.data(), size))
+        return false;
     std::string result;
     hex(raw.begin(), raw.end(), std::back_inserter(result));
     return state.writer.String(result.c_str(), result.size());
@@ -597,8 +617,8 @@ using checksum256 = fixed_binary<32>;
 using checksum512 = fixed_binary<64>;
 
 template <unsigned size>
-void bin_to_native(fixed_binary<size>& obj, bin_to_native_state& state, bool start) {
-    read_bin(state.bin, obj);
+ABIEOS_NODISCARD bool bin_to_native(fixed_binary<size>& obj, bin_to_native_state& state, bool start) {
+    return read_raw(state.bin, state.error, obj);
 }
 
 template <unsigned size>
@@ -607,40 +627,47 @@ inline void native_to_bin(std::vector<char>& bin, const fixed_binary<size>& obj)
 }
 
 template <unsigned size>
-bool json_to_native(fixed_binary<size>& obj, json_to_native_state& state, event_type event, bool start) {
+ABIEOS_NODISCARD bool json_to_native(fixed_binary<size>& obj, json_to_native_state& state, event_type event,
+                                     bool start) {
     if (event == event_type::received_string) {
         auto& s = state.get_string();
         if (trace_json_to_native)
             printf("%*schecksum\n", int(state.stack.size() * 4), "");
         std::vector<uint8_t> v;
-        unhex(s.begin(), s.end(), std::back_inserter(v));
+        if (!unhex(state.error, s.begin(), s.end(), std::back_inserter(v)))
+            return false;
         if (v.size() != size)
-            throw error("hex string has incorrect length");
+            return set_error(state, "hex string has incorrect length");
         memcpy(obj.value.data(), v.data(), size);
         return true;
     } else
-        throw error("expected string containing hex");
+        return set_error(state, "expected string containing hex");
 }
 
 template <typename State, unsigned size>
-bool json_to_bin(fixed_binary<size>*, State& state, bool, const abi_type*, event_type event, bool start) {
+ABIEOS_NODISCARD bool json_to_bin(fixed_binary<size>*, State& state, bool, const abi_type*, event_type event,
+                                  bool start) {
     if (event == event_type::received_string) {
         auto& s = state.get_string();
         if (trace_json_to_bin)
             printf("%*schecksum\n", int(state.stack.size() * 4), "");
         std::vector<uint8_t> v;
-        unhex(s.begin(), s.end(), std::back_inserter(v));
+        if (!unhex(state.error, s.begin(), s.end(), std::back_inserter(v)))
+            return false;
         if (v.size() != size)
-            throw error("hex string has incorrect length");
+            return set_error(state, "hex string has incorrect length");
         state.bin.insert(state.bin.end(), v.begin(), v.end());
         return true;
     } else
-        throw error("expected string containing hex");
+        return set_error(state, "expected string containing hex");
 }
 
 template <unsigned size>
-inline bool bin_to_json(fixed_binary<size>*, bin_to_json_state& state, bool, const abi_type*, bool start) {
-    auto v = read_bin<fixed_binary<size>>(state.bin);
+ABIEOS_NODISCARD inline bool bin_to_json(fixed_binary<size>*, bin_to_json_state& state, bool, const abi_type*,
+                                         bool start) {
+    fixed_binary<size> v;
+    if (!read_raw(state.bin, state.error, v))
+        return false;
     std::string result;
     hex(v.value.begin(), v.value.end(), std::back_inserter(result));
     return state.writer.String(result.c_str(), result.size());
@@ -653,20 +680,24 @@ struct uint128 {
 };
 
 template <typename State>
-bool json_to_bin(uint128*, State& state, bool, const abi_type*, event_type event, bool start) {
+ABIEOS_NODISCARD bool json_to_bin(uint128*, State& state, bool, const abi_type*, event_type event, bool start) {
     if (event == event_type::received_string) {
         auto& s = state.get_string();
         if (trace_json_to_bin)
             printf("%*suint128\n", int(state.stack.size() * 4), "");
-        auto value = decimal_to_binary<16>(s);
+        std::array<uint8_t, 16> value;
+        if (!decimal_to_binary<16>(value, state.error, s))
+            return false;
         push_raw(state.bin, value);
         return true;
     } else
-        throw error("expected string containing uint128");
+        return set_error(state, "expected string containing uint128");
 }
 
-inline bool bin_to_json(uint128*, bin_to_json_state& state, bool, const abi_type*, bool start) {
-    auto v = read_bin<uint128>(state.bin);
+ABIEOS_NODISCARD inline bool bin_to_json(uint128*, bin_to_json_state& state, bool, const abi_type*, bool start) {
+    uint128 v;
+    if (!read_raw(state.bin, state.error, v))
+        return false;
     auto result = binary_to_decimal(v.value);
     return state.writer.String(result.c_str(), result.size());
 }
@@ -687,7 +718,7 @@ struct int128 {
 };
 
 template <typename State>
-bool json_to_bin(int128*, State& state, bool, const abi_type*, event_type event, bool start) {
+ABIEOS_NODISCARD bool json_to_bin(int128*, State& state, bool, const abi_type*, event_type event, bool start) {
     if (event == event_type::received_string) {
         std::string_view s = state.get_string();
         if (trace_json_to_bin)
@@ -697,19 +728,23 @@ bool json_to_bin(int128*, State& state, bool, const abi_type*, event_type event,
             negative = true;
             s = s.substr(1);
         }
-        auto value = decimal_to_binary<16>(s);
+        std::array<uint8_t, 16> value;
+        if (!decimal_to_binary<16>(value, state.error, s))
+            return false;
         if (negative)
             negate(value);
         if (is_negative(value) != negative)
-            throw error("number is out of range");
+            return set_error(state, "number is out of range");
         push_raw(state.bin, value);
         return true;
     } else
-        throw error("expected string containing int128");
+        return set_error(state, "expected string containing int128");
 }
 
-inline bool bin_to_json(int128*, bin_to_json_state& state, bool, const abi_type*, bool start) {
-    auto v = read_bin<int128>(state.bin);
+ABIEOS_NODISCARD inline bool bin_to_json(int128*, bin_to_json_state& state, bool, const abi_type*, bool start) {
+    uint128 v;
+    if (!read_raw(state.bin, state.error, v))
+        return false;
     bool negative = is_negative(v.value);
     if (negative)
         negate(v.value);
@@ -719,76 +754,98 @@ inline bool bin_to_json(int128*, bin_to_json_state& state, bool, const abi_type*
     return state.writer.String(result.c_str(), result.size());
 }
 
-inline void bin_to_native(public_key& obj, bin_to_native_state& state, bool) { read_bin(state.bin, obj); }
+ABIEOS_NODISCARD inline bool bin_to_native(public_key& obj, bin_to_native_state& state, bool) {
+    return read_raw(state.bin, state.error, obj);
+}
 
-inline bool json_to_native(public_key& obj, json_to_native_state& state, event_type event, bool start) {
-    throw error("can't convert public_key");
+ABIEOS_NODISCARD inline bool json_to_native(public_key& obj, json_to_native_state& state, event_type event,
+                                            bool start) {
+    return set_error(state, "can't convert public_key");
 }
 
 template <typename State>
-bool json_to_bin(public_key*, State& state, bool, const abi_type*, event_type event, bool start) {
+ABIEOS_NODISCARD bool json_to_bin(public_key*, State& state, bool, const abi_type*, event_type event, bool start) {
     if (event == event_type::received_string) {
         auto& s = state.get_string();
         if (trace_json_to_bin)
             printf("%*spublic_key\n", int(state.stack.size() * 4), "");
-        auto key = string_to_public_key(s);
+        public_key key;
+        if (!string_to_public_key(key, state.error, s))
+            return false;
         push_raw(state.bin, key);
         return true;
     } else
-        throw error("expected string containing public_key");
+        return set_error(state, "expected string containing public_key");
 }
 
-inline bool bin_to_json(public_key*, bin_to_json_state& state, bool, const abi_type*, bool start) {
-    auto v = read_bin<public_key>(state.bin);
-    auto result = public_key_to_string(v);
+ABIEOS_NODISCARD inline bool bin_to_json(public_key*, bin_to_json_state& state, bool, const abi_type*, bool start) {
+    public_key v;
+    if (!read_raw(state.bin, state.error, v))
+        return false;
+    std::string result;
+    if (!public_key_to_string(result, state.error, v))
+        return false;
     return state.writer.String(result.c_str(), result.size());
 }
 
 template <typename State>
-bool json_to_bin(private_key*, State& state, bool, const abi_type*, event_type event, bool start) {
+ABIEOS_NODISCARD bool json_to_bin(private_key*, State& state, bool, const abi_type*, event_type event, bool start) {
     if (event == event_type::received_string) {
         auto& s = state.get_string();
         if (trace_json_to_bin)
             printf("%*sprivate_key\n", int(state.stack.size() * 4), "");
-        auto key = string_to_private_key(s);
+        private_key key;
+        if (!string_to_private_key(key, state.error, s))
+            return false;
         push_raw(state.bin, key);
         return true;
     } else
-        throw error("expected string containing private_key");
+        return set_error(state, "expected string containing private_key");
 }
 
-inline bool bin_to_json(private_key*, bin_to_json_state& state, bool, const abi_type*, bool start) {
-    auto v = read_bin<private_key>(state.bin);
-    auto result = private_key_to_string(v);
+ABIEOS_NODISCARD inline bool bin_to_json(private_key*, bin_to_json_state& state, bool, const abi_type*, bool start) {
+    private_key v;
+    if (!read_raw(state.bin, state.error, v))
+        return false;
+    std::string result;
+    if (!private_key_to_string(result, state.error, v))
+        return false;
     return state.writer.String(result.c_str(), result.size());
 }
 
-inline void bin_to_native(signature& obj, bin_to_native_state& state, bool) { read_bin(state.bin, obj); }
+ABIEOS_NODISCARD inline bool bin_to_native(signature& obj, bin_to_native_state& state, bool) {
+    return read_raw(state.bin, state.error, obj);
+}
 
-inline bool json_to_native(signature& obj, json_to_native_state& state, event_type event, bool start) {
-    if (event == event_type::received_string) {
-        obj = string_to_signature(state.get_string());
-        return true;
-    } else
-        throw error("expected string containing signature");
+ABIEOS_NODISCARD inline bool json_to_native(signature& obj, json_to_native_state& state, event_type event, bool start) {
+    if (event == event_type::received_string)
+        return string_to_signature(obj, state.error, state.get_string());
+    else
+        return set_error(state, "expected string containing signature");
 }
 
 template <typename State>
-bool json_to_bin(signature*, State& state, bool, const abi_type*, event_type event, bool start) {
+ABIEOS_NODISCARD bool json_to_bin(signature*, State& state, bool, const abi_type*, event_type event, bool start) {
     if (event == event_type::received_string) {
         auto& s = state.get_string();
         if (trace_json_to_bin)
             printf("%*ssignature\n", int(state.stack.size() * 4), "");
-        auto key = string_to_signature(s);
+        signature key;
+        if (!string_to_signature(key, state.error, s))
+            return false;
         push_raw(state.bin, key);
         return true;
     } else
-        throw error("expected string containing signature");
+        return set_error(state, "expected string containing signature");
 }
 
-inline bool bin_to_json(signature*, bin_to_json_state& state, bool, const abi_type*, bool start) {
-    auto v = read_bin<signature>(state.bin);
-    auto result = signature_to_string(v);
+ABIEOS_NODISCARD inline bool bin_to_json(signature*, bin_to_json_state& state, bool, const abi_type*, bool start) {
+    signature v;
+    if (!read_raw(state.bin, state.error, v))
+        return false;
+    std::string result;
+    if (!signature_to_string(result, state.error, v))
+        return false;
     return state.writer.String(result.c_str(), result.size());
 }
 
@@ -839,15 +896,17 @@ struct name {
     explicit operator std::string() const { return name_to_string(value); }
 };
 
-inline bool operator==(name a, name b) { return a.value == b.value; }
-inline bool operator!=(name a, name b) { return a.value != b.value; }
-inline bool operator<(name a, name b) { return a.value < b.value; }
+ABIEOS_NODISCARD inline bool operator==(name a, name b) { return a.value == b.value; }
+ABIEOS_NODISCARD inline bool operator!=(name a, name b) { return a.value != b.value; }
+ABIEOS_NODISCARD inline bool operator<(name a, name b) { return a.value < b.value; }
 
-inline void bin_to_native(name& obj, bin_to_native_state& state, bool start) { bin_to_native(obj.value, state, start); }
+ABIEOS_NODISCARD inline bool bin_to_native(name& obj, bin_to_native_state& state, bool start) {
+    return bin_to_native(obj.value, state, start);
+}
 
 inline void native_to_bin(std::vector<char>& bin, const name& obj) { native_to_bin(bin, obj.value); }
 
-inline bool json_to_native(name& obj, json_to_native_state& state, event_type event, bool start) {
+ABIEOS_NODISCARD inline bool json_to_native(name& obj, json_to_native_state& state, event_type event, bool start) {
     if (event == event_type::received_string) {
         obj.value = string_to_name(state.get_string().c_str());
         if (trace_json_to_native)
@@ -855,11 +914,11 @@ inline bool json_to_native(name& obj, json_to_native_state& state, event_type ev
                    (unsigned long long)obj.value, std::string{obj}.c_str());
         return true;
     } else
-        throw error("expected string containing name");
+        return set_error(state, "expected string containing name");
 }
 
 template <typename State>
-bool json_to_bin(name*, State& state, bool, const abi_type*, event_type event, bool start) {
+ABIEOS_NODISCARD bool json_to_bin(name*, State& state, bool, const abi_type*, event_type event, bool start) {
     if (event == event_type::received_string) {
         name obj{string_to_name(state.get_string().c_str())};
         if (trace_json_to_bin)
@@ -868,11 +927,14 @@ bool json_to_bin(name*, State& state, bool, const abi_type*, event_type event, b
         push_raw(state.bin, obj.value);
         return true;
     } else
-        throw error("expected string containing name");
+        return set_error(state, "expected string containing name");
 }
 
-inline bool bin_to_json(name*, bin_to_json_state& state, bool, const abi_type*, bool start) {
-    auto s = std::string{name{read_bin<uint64_t>(state.bin)}};
+ABIEOS_NODISCARD inline bool bin_to_json(name*, bin_to_json_state& state, bool, const abi_type*, bool start) {
+    name v;
+    if (!read_raw(state.bin, state.error, v))
+        return false;
+    auto s = std::string{v};
     return state.writer.String(s.c_str(), s.size());
 }
 
@@ -892,39 +954,49 @@ inline void push_varuint32(std::vector<char>& bin, uint32_t v) {
     } while (val);
 }
 
-inline uint32_t read_varuint32(input_buffer& bin) {
-    uint32_t result = 0;
+ABIEOS_NODISCARD inline bool read_varuint32(input_buffer& bin, std::string& error, uint32_t& dest) {
+    dest = 0;
     int shift = 0;
     uint8_t b = 0;
     do {
         if (shift >= 35)
-            throw error("invalid varuint32 encoding");
-        b = read_bin<uint8_t>(bin);
-        result |= uint32_t(b & 0x7f) << shift;
+            return set_error(error, "invalid varuint32 encoding");
+        if (!read_raw(bin, error, b))
+            return false;
+        dest |= uint32_t(b & 0x7f) << shift;
         shift += 7;
     } while (b & 0x80);
-    return result;
+    return true;
 }
 
-inline void bin_to_native(varuint32& obj, bin_to_native_state& state, bool) {
-    obj = varuint32{read_varuint32(state.bin)};
+ABIEOS_NODISCARD inline bool bin_to_native(varuint32& obj, bin_to_native_state& state, bool) {
+    return read_varuint32(state.bin, state.error, obj.value);
 }
 
 inline void native_to_bin(std::vector<char>& bin, const varuint32& obj) { push_varuint32(bin, obj.value); }
 
-inline bool json_to_native(varuint32& obj, json_to_native_state& state, event_type event, bool) {
-    obj = varuint32{json_to_number<uint32_t>(state, event)};
+ABIEOS_NODISCARD inline bool json_to_native(varuint32& obj, json_to_native_state& state, event_type event, bool) {
+    uint32_t x;
+    if (!json_to_number(x, state, event))
+        return false;
+    obj = varuint32{x};
     return true;
 }
 
 template <typename State>
-bool json_to_bin(varuint32*, State& state, bool, const abi_type*, event_type event, bool start) {
-    push_varuint32(state.bin, json_to_number<uint32_t>(state, event));
+ABIEOS_NODISCARD bool json_to_bin(varuint32*, State& state, bool, const abi_type*, event_type event, bool start) {
+    uint32_t x;
+    if (!json_to_number(x, state, event))
+        return false;
+    push_varuint32(state.bin, x);
     return true;
 }
 
-inline bool bin_to_json(varuint32*, bin_to_json_state& state, bool, const abi_type*, bool start) {
-    return state.writer.Uint64(read_varuint32(state.bin));
+ABIEOS_NODISCARD inline bool bin_to_json(varuint32*, bin_to_json_state& state, bool, const abi_type*, bool start) {
+    uint32_t v;
+    if (!read_varuint32(state.bin, state.error, v))
+        return false;
+    return state.writer.Uint64(v);
 }
 
 struct varint32 {
@@ -937,25 +1009,34 @@ inline void push_varint32(std::vector<char>& bin, int32_t v) {
     push_varuint32(bin, (uint32_t(v) << 1) ^ uint32_t(v >> 31));
 }
 
-inline int32_t read_varint32(input_buffer& bin) {
-    uint32_t v = read_varuint32(bin);
+ABIEOS_NODISCARD inline bool read_varint32(input_buffer& bin, std::string& error, int32_t& result) {
+    uint32_t v;
+    if (!read_varuint32(bin, error, v))
+        return false;
     if (v & 1)
-        return ((~v) >> 1) | 0x8000'0000;
+        result = ((~v) >> 1) | 0x8000'0000;
     else
-        return v >> 1;
-}
-
-template <typename State>
-bool json_to_bin(varint32*, State& state, bool, const abi_type*, event_type event, bool start) {
-    push_varint32(state.bin, json_to_number<int32_t>(state, event));
+        result = v >> 1;
     return true;
 }
 
-inline bool bin_to_json(varint32*, bin_to_json_state& state, bool, const abi_type*, bool start) {
-    return state.writer.Int64(read_varint32(state.bin));
+template <typename State>
+ABIEOS_NODISCARD bool json_to_bin(varint32*, State& state, bool, const abi_type*, event_type event, bool start) {
+    int32_t x;
+    if (!json_to_number(x, state, event))
+        return false;
+    push_varint32(state.bin, x);
+    return true;
 }
 
-inline std::string us_to_str(uint64_t microseconds) {
+ABIEOS_NODISCARD inline bool bin_to_json(varint32*, bin_to_json_state& state, bool, const abi_type*, bool start) {
+    int32_t v;
+    if (!read_varint32(state.bin, state.error, v))
+        return false;
+    return state.writer.Int64(v);
+}
+
+inline std::string microseconds_to_str(uint64_t microseconds) {
     std::string result;
 
     auto append_uint = [&result](uint32_t value, int digits) {
@@ -993,102 +1074,116 @@ inline std::string us_to_str(uint64_t microseconds) {
 struct time_point_sec {
     uint32_t utc_seconds = 0;
 
-    time_point_sec() = default;
-
-    explicit time_point_sec(uint32_t seconds) : utc_seconds{seconds} {}
-
-    explicit time_point_sec(const std::string& s) {
-        const char* ch = s.c_str();
-        auto parse_uint = [&](int digits) {
-            uint32_t result = 0;
-            while (digits--) {
-                if (*ch >= '0' && *ch <= '9')
-                    result = result * 10 + *ch++ - '0';
-                else
-                    throw error("expected string containing time_point_sec");
-            }
-            return result;
-        };
-        auto expect = [&](char c) {
-            if (*ch++ != c)
-                throw error("expected string containing time_point_sec");
-        };
-        auto y = parse_uint(4);
-        expect('-');
-        auto m = parse_uint(2);
-        expect('-');
-        auto d = parse_uint(2);
-        expect('T');
-        auto h = parse_uint(2);
-        expect(':');
-        auto min = parse_uint(2);
-        expect(':');
-        auto sec = parse_uint(2);
-        utc_seconds =
-            date::sys_days(date::year(y) / m / d).time_since_epoch().count() * 86400 + h * 3600 + min * 60 + sec;
-    }
-
-    explicit operator std::string() { return us_to_str(uint64_t(utc_seconds) * 1'000'000); }
+    explicit operator std::string() { return microseconds_to_str(uint64_t(utc_seconds) * 1'000'000); }
 };
 
+ABIEOS_NODISCARD inline bool string_to_time_point_sec(time_point_sec& result, std::string& error, const char* s) {
+    auto parse_uint = [&](uint32_t& result, int digits) {
+        result = 0;
+        while (digits--) {
+            if (*s >= '0' && *s <= '9')
+                result = result * 10 + *s++ - '0';
+            else
+                return set_error(error, "expected string containing time_point_sec");
+        }
+        return true;
+    };
+    uint32_t y, m, d, h, min, sec;
+    if (!parse_uint(y, 4))
+        return false;
+    if (*s++ != '-')
+        return set_error(error, "expected string containing time_point_sec");
+    if (!parse_uint(m, 2))
+        return false;
+    if (*s++ != '-')
+        return set_error(error, "expected string containing time_point_sec");
+    if (!parse_uint(d, 2))
+        return false;
+    if (*s++ != 'T')
+        return set_error(error, "expected string containing time_point_sec");
+    if (!parse_uint(h, 2))
+        return false;
+    if (*s++ != ':')
+        return set_error(error, "expected string containing time_point_sec");
+    if (!parse_uint(min, 2))
+        return false;
+    if (*s++ != ':')
+        return set_error(error, "expected string containing time_point_sec");
+    if (!parse_uint(sec, 2))
+        return false;
+    result.utc_seconds =
+        date::sys_days(date::year(y) / m / d).time_since_epoch().count() * 86400 + h * 3600 + min * 60 + sec;
+    return true;
+}
+
 template <typename State>
-bool json_to_bin(time_point_sec*, State& state, bool, const abi_type*, event_type event, bool start) {
+ABIEOS_NODISCARD bool json_to_bin(time_point_sec*, State& state, bool, const abi_type*, event_type event, bool start) {
     if (event == event_type::received_string) {
-        time_point_sec obj{state.get_string()};
+        time_point_sec obj;
+        if (!string_to_time_point_sec(obj, state.error, state.get_string().c_str()))
+            return false;
         if (trace_json_to_bin)
             printf("%*stime_point_sec: %s (%u) %s\n", int(state.stack.size() * 4), "", state.get_string().c_str(),
                    (unsigned)obj.utc_seconds, std::string{obj}.c_str());
         push_raw(state.bin, obj.utc_seconds);
         return true;
     } else
-        throw error("expected string containing time_point_sec");
+        return set_error(state, "expected string containing time_point_sec");
 }
 
-inline bool bin_to_json(time_point_sec*, bin_to_json_state& state, bool, const abi_type*, bool start) {
-    auto s = std::string{time_point_sec{read_bin<uint32_t>(state.bin)}};
+ABIEOS_NODISCARD inline bool bin_to_json(time_point_sec*, bin_to_json_state& state, bool, const abi_type*, bool start) {
+    time_point_sec v;
+    if (!read_raw(state.bin, state.error, v))
+        return false;
+    auto s = std::string{v};
     return state.writer.String(s.c_str(), s.size());
 }
 
 struct time_point {
     uint64_t microseconds = 0;
 
-    time_point() = default;
-
-    explicit time_point(uint64_t microseconds) : microseconds{microseconds} {}
-
-    explicit time_point(const std::string& s) {
-        auto dot = s.find('.');
-        if (dot == std::string::npos)
-            microseconds = time_point_sec{s}.utc_seconds * 1000000ull;
-        else {
-            auto ms = s.substr(dot);
-            ms[0] = '1';
-            while (ms.size() < 4)
-                ms.push_back('0');
-            microseconds = time_point_sec{s}.utc_seconds * 1000000ull + (stoull(ms) - 1000) * 1000;
-        }
-    }
-
-    explicit operator std::string() const { return us_to_str(microseconds); }
+    explicit operator std::string() const { return microseconds_to_str(microseconds); }
 };
+
+ABIEOS_NODISCARD inline bool string_to_time_point(time_point& dest, std::string& error, const std::string& s) {
+    time_point_sec tps;
+    if (!string_to_time_point_sec(tps, error, s.c_str()))
+        return false;
+    auto dot = s.find('.');
+    if (dot == std::string::npos)
+        dest.microseconds = tps.utc_seconds * 1000000ull;
+    else {
+        auto ms = s.substr(dot);
+        ms[0] = '1';
+        while (ms.size() < 4)
+            ms.push_back('0');
+        dest.microseconds = tps.utc_seconds * 1000000ull + (stoull(ms) - 1000) * 1000;
+    }
+    return true;
+}
 
 inline void native_to_bin(std::vector<char>& bin, const time_point& obj) { native_to_bin(bin, obj.microseconds); }
 
 template <typename State>
-bool json_to_bin(time_point*, State& state, bool, const abi_type*, event_type event, bool start) {
+ABIEOS_NODISCARD bool json_to_bin(time_point*, State& state, bool, const abi_type*, event_type event, bool start) {
     if (event == event_type::received_string) {
-        time_point obj{state.get_string()};
+        time_point obj;
+        if (!string_to_time_point(obj, state.error, state.get_string()))
+            return false;
         if (trace_json_to_bin)
             printf("%*stime_point: %s (%llu) %s\n", int(state.stack.size() * 4), "", state.get_string().c_str(),
                    (unsigned long long)obj.microseconds, std::string{obj}.c_str());
         push_raw(state.bin, obj.microseconds);
         return true;
     } else
-        throw error("expected string containing time_point");
+        return set_error(state, "expected string containing time_point");
 }
 
-inline bool bin_to_json(time_point*, bin_to_json_state& state, bool, const abi_type*, bool start) {
-    auto s = std::string{time_point{read_bin<uint64_t>(state.bin)}};
+ABIEOS_NODISCARD inline bool bin_to_json(time_point*, bin_to_json_state& state, bool, const abi_type*, bool start) {
+    time_point v;
+    if (!read_raw(state.bin, state.error, v))
+        return false;
+    auto s = std::string{v};
     return state.writer.String(s.c_str(), s.size());
 }
 
@@ -1100,35 +1195,44 @@ struct block_timestamp {
     block_timestamp() = default;
     explicit block_timestamp(uint32_t slot) : slot(slot) {}
     explicit block_timestamp(time_point t) { slot = (t.microseconds / 1000 - epoch_ms) / interval_ms; }
-    explicit block_timestamp(const std::string& s) : block_timestamp{time_point{s}} {}
 
     explicit operator time_point() const { return time_point{(slot * (uint64_t)interval_ms + epoch_ms) * 1000}; }
-    explicit operator std::string() const { return std::string{time_point{*this}}; }
+    explicit operator std::string() const { return std::string{(time_point)(*this)}; }
 }; // block_timestamp
 
-inline void bin_to_native(block_timestamp& obj, bin_to_native_state& state, bool) { read_bin(state.bin, obj.slot); }
+ABIEOS_NODISCARD inline bool bin_to_native(block_timestamp& obj, bin_to_native_state& state, bool) {
+    return read_raw(state.bin, state.error, obj.slot);
+}
 
 inline void native_to_bin(std::vector<char>& bin, const block_timestamp& obj) { native_to_bin(bin, obj.slot); }
 
-inline bool json_to_native(block_timestamp& obj, json_to_native_state& state, event_type event, bool start) {
-    throw error("can't convert block_timestamp");
+ABIEOS_NODISCARD inline bool json_to_native(block_timestamp& obj, json_to_native_state& state, event_type event,
+                                            bool start) {
+    return set_error(state, "can't convert block_timestamp");
 }
 
 template <typename State>
-bool json_to_bin(block_timestamp*, State& state, bool, const abi_type*, event_type event, bool start) {
+ABIEOS_NODISCARD bool json_to_bin(block_timestamp*, State& state, bool, const abi_type*, event_type event, bool start) {
     if (event == event_type::received_string) {
-        block_timestamp obj{state.get_string()};
+        time_point tp;
+        if (!string_to_time_point(tp, state.error, state.get_string()))
+            return false;
+        block_timestamp obj{tp};
         if (trace_json_to_bin)
             printf("%*sblock_timestamp: %s (%u) %s\n", int(state.stack.size() * 4), "", state.get_string().c_str(),
                    (unsigned)obj.slot, std::string{obj}.c_str());
         push_raw(state.bin, obj.slot);
         return true;
     } else
-        throw error("expected string containing block_timestamp_type");
+        return set_error(state, "expected string containing block_timestamp_type");
 }
 
-inline bool bin_to_json(block_timestamp*, bin_to_json_state& state, bool, const abi_type*, bool start) {
-    auto s = std::string{block_timestamp{read_bin<uint32_t>(state.bin)}};
+ABIEOS_NODISCARD inline bool bin_to_json(block_timestamp*, bin_to_json_state& state, bool, const abi_type*,
+                                         bool start) {
+    uint32_t v;
+    if (!read_raw(state.bin, state.error, v))
+        return false;
+    auto s = std::string{block_timestamp{v}};
     return state.writer.String(s.c_str(), s.size());
 }
 
@@ -1136,17 +1240,17 @@ struct symbol_code {
     uint64_t value = 0;
 };
 
-inline constexpr uint64_t string_to_symbol_code(const char* str) {
+ABIEOS_NODISCARD inline bool string_to_symbol_code(uint64_t& result, std::string& error, const char* str) {
     while (*str == ' ')
         ++str;
-    uint64_t result = 0;
+    result = 0;
     uint32_t i = 0;
     while (*str >= 'A' && *str <= 'Z') {
         if (i >= 7)
-            throw error("expected string containing symbol_code");
+            return set_error(error, "expected string containing symbol_code");
         result |= uint64_t(*str++) << (8 * i++);
     }
-    return result;
+    return true;
 }
 
 inline std::string symbol_code_to_string(uint64_t v) {
@@ -1159,20 +1263,25 @@ inline std::string symbol_code_to_string(uint64_t v) {
 }
 
 template <typename State>
-bool json_to_bin(symbol_code*, State& state, bool, const abi_type*, event_type event, bool start) {
+ABIEOS_NODISCARD bool json_to_bin(symbol_code*, State& state, bool, const abi_type*, event_type event, bool start) {
     if (event == event_type::received_string) {
         auto& s = state.get_string();
         if (trace_json_to_bin)
             printf("%*ssymbol_code: %s\n", int(state.stack.size() * 4), "", s.c_str());
-        auto v = string_to_symbol_code(s.c_str());
+        uint64_t v;
+        if (!string_to_symbol_code(v, state.error, s.c_str()))
+            return false;
         push_raw(state.bin, v);
         return true;
     } else
-        throw error("expected string containing symbol_code");
+        return set_error(state, "expected string containing symbol_code");
 }
 
-inline bool bin_to_json(symbol_code*, bin_to_json_state& state, bool, const abi_type*, bool start) {
-    std::string result{symbol_code_to_string(read_bin<uint64_t>(state.bin))};
+ABIEOS_NODISCARD inline bool bin_to_json(symbol_code*, bin_to_json_state& state, bool, const abi_type*, bool start) {
+    symbol_code v;
+    if (!read_raw(state.bin, state.error, v))
+        return false;
+    auto result = symbol_code_to_string(v.value);
     return state.writer.String(result.c_str(), result.size());
 }
 
@@ -1180,17 +1289,21 @@ struct symbol {
     uint64_t value = 0;
 };
 
-inline constexpr uint64_t string_to_symbol(uint8_t precision, const char* str) {
-    return (string_to_symbol_code(str) << 8) | precision;
+ABIEOS_NODISCARD inline bool string_to_symbol(uint64_t& result, std::string& error, uint8_t precision,
+                                              const char* str) {
+    if (!string_to_symbol_code(result, error, str))
+        return false;
+    result = (result << 8) | precision;
+    return true;
 }
 
-inline constexpr uint64_t string_to_symbol(const char* str) {
+ABIEOS_NODISCARD inline bool string_to_symbol(uint64_t& result, std::string& error, const char* str) {
     uint8_t precision = 0;
     while (*str >= '0' && *str <= '9')
         precision = precision * 10 + (*str++ - '0');
     if (*str == ',')
         ++str;
-    return string_to_symbol(precision, str);
+    return string_to_symbol(result, error, precision, str);
 }
 
 inline std::string symbol_to_string(uint64_t v) {
@@ -1198,20 +1311,25 @@ inline std::string symbol_to_string(uint64_t v) {
 }
 
 template <typename State>
-bool json_to_bin(symbol*, State& state, bool, const abi_type*, event_type event, bool start) {
+ABIEOS_NODISCARD bool json_to_bin(symbol*, State& state, bool, const abi_type*, event_type event, bool start) {
     if (event == event_type::received_string) {
         auto& s = state.get_string();
         if (trace_json_to_bin)
             printf("%*ssymbol: %s\n", int(state.stack.size() * 4), "", s.c_str());
-        auto v = string_to_symbol(s.c_str());
+        uint64_t v;
+        if (!string_to_symbol(v, state.error, s.c_str()))
+            return false;
         push_raw(state.bin, v);
         return true;
     } else
-        throw error("expected string containing symbol");
+        return set_error(state, "expected string containing symbol");
 }
 
-inline bool bin_to_json(symbol*, bin_to_json_state& state, bool, const abi_type*, bool start) {
-    std::string result{symbol_to_string(read_bin<uint64_t>(state.bin))};
+ABIEOS_NODISCARD inline bool bin_to_json(symbol*, bin_to_json_state& state, bool, const abi_type*, bool start) {
+    uint64_t v;
+    if (!read_raw(state.bin, state.error, v))
+        return false;
+    std::string result{symbol_to_string(v)};
     return state.writer.String(result.c_str(), result.size());
 }
 
@@ -1220,7 +1338,7 @@ struct asset {
     symbol sym{};
 };
 
-inline asset string_to_asset(const char* s) {
+ABIEOS_NODISCARD inline bool string_to_asset(asset& result, std::string& error, const char* s) {
     // todo: check overflow
     while (*s == ' ')
         ++s;
@@ -1242,8 +1360,11 @@ inline asset string_to_asset(const char* s) {
     }
     if (negative)
         amount = -amount;
-    auto code = string_to_symbol_code(s);
-    return asset{(int64_t)amount, symbol{(code << 8) | precision}};
+    uint64_t code;
+    if (!string_to_symbol_code(code, error, s))
+        return false;
+    result = asset{(int64_t)amount, symbol{(code << 8) | precision}};
+    return true;
 }
 
 inline std::string asset_to_string(const asset& v) {
@@ -1272,23 +1393,27 @@ inline std::string asset_to_string(const asset& v) {
 }
 
 template <typename State>
-bool json_to_bin(asset*, State& state, bool, const abi_type*, event_type event, bool start) {
+ABIEOS_NODISCARD bool json_to_bin(asset*, State& state, bool, const abi_type*, event_type event, bool start) {
     if (event == event_type::received_string) {
         auto& s = state.get_string();
         if (trace_json_to_bin)
             printf("%*sasset: %s\n", int(state.stack.size() * 4), "", s.c_str());
-        auto v = string_to_asset(s.c_str());
+        asset v;
+        if (!string_to_asset(v, state.error, s.c_str()))
+            return false;
         push_raw(state.bin, v.amount);
         push_raw(state.bin, v.sym.value);
         return true;
     } else
-        throw error("expected string containing asset");
+        return set_error(state, "expected string containing asset");
 }
 
-inline bool bin_to_json(asset*, bin_to_json_state& state, bool, const abi_type*, bool start) {
+ABIEOS_NODISCARD inline bool bin_to_json(asset*, bin_to_json_state& state, bool, const abi_type*, bool start) {
     asset v{};
-    read_bin(state.bin, v.amount);
-    read_bin(state.bin, v.sym.value);
+    if (!read_raw(state.bin, state.error, v.amount))
+        return false;
+    if (!read_raw(state.bin, state.error, v.sym.value))
+        return false;
     auto s = asset_to_string(v);
     return state.writer.String(s.c_str(), s.size());
 }
@@ -1422,25 +1547,31 @@ constexpr void for_each_field(abi_def*, F f) {
     f("variants", member_ptr<&abi_def::variants>{});
 }
 
-inline void check_abi_version(const std::string& s) {
+ABIEOS_NODISCARD inline bool check_abi_version(const std::string& s, std::string& error) {
     if (s.substr(0, 13) != "eosio::abi/1.")
-        throw error("unsupported abi version");
+        return set_error(error, "unsupported abi version");
+    return true;
 }
 
-inline void check_abi_version(input_buffer bin) { check_abi_version(read_string(bin)); }
+ABIEOS_NODISCARD inline bool check_abi_version(input_buffer bin, std::string& error) {
+    std::string version;
+    if (!read_string(bin, error, version))
+        return false;
+    return check_abi_version(version, error);
+}
 
 ///////////////////////////////////////////////////////////////////////////////
 // json_to_jvalue
 ///////////////////////////////////////////////////////////////////////////////
 
-bool json_to_jobject(jvalue& value, json_to_jvalue_state& state, event_type event, bool start);
-bool json_to_jarray(jvalue& value, json_to_jvalue_state& state, event_type event, bool start);
+ABIEOS_NODISCARD bool json_to_jobject(jvalue& value, json_to_jvalue_state& state, event_type event, bool start);
+ABIEOS_NODISCARD bool json_to_jarray(jvalue& value, json_to_jvalue_state& state, event_type event, bool start);
 
-inline bool receive_event(struct json_to_jvalue_state& state, event_type event, bool start) {
+ABIEOS_NODISCARD inline bool receive_event(struct json_to_jvalue_state& state, event_type event, bool start) {
     if (state.stack.empty())
-        throw error("extra data");
+        return set_error(state, "extra data");
     if (state.stack.size() > max_stack_size)
-        throw error("recursion limit reached");
+        return set_error(state, "recursion limit reached");
     if (trace_json_to_jvalue_event)
         printf("(event %d)\n", (int)event);
     auto& v = *state.stack.back().value;
@@ -1467,15 +1598,15 @@ inline bool receive_event(struct json_to_jvalue_state& state, event_type event, 
         else if (std::holds_alternative<jarray>(v.value))
             return json_to_jarray(v, state, event, start);
         else
-            throw error("extra data");
+            return set_error(state, "extra data");
     }
     return true;
 }
 
-inline bool json_to_jvalue(jvalue& value, std::string_view json) {
+ABIEOS_NODISCARD inline bool json_to_jvalue(jvalue& value, std::string& error, std::string_view json) {
     std::string mutable_json{json};
     mutable_json.push_back(0);
-    json_to_jvalue_state state;
+    json_to_jvalue_state state{.error = error};
     state.stack.push_back({&value});
     rapidjson::Reader reader;
     rapidjson::InsituStringStream ss(mutable_json.data());
@@ -1483,10 +1614,10 @@ inline bool json_to_jvalue(jvalue& value, std::string_view json) {
                         rapidjson::kParseNumbersAsStringsFlag>(ss, state);
 }
 
-inline bool json_to_jobject(jvalue& value, json_to_jvalue_state& state, event_type event, bool start) {
+ABIEOS_NODISCARD inline bool json_to_jobject(jvalue& value, json_to_jvalue_state& state, event_type event, bool start) {
     if (start) {
         if (event != event_type::received_start_object)
-            throw error("expected object");
+            return set_error(state, "expected object");
         if (trace_json_to_jvalue)
             printf("%*s{\n", int(state.stack.size() * 4), "");
         state.stack.push_back({&value});
@@ -1510,10 +1641,10 @@ inline bool json_to_jobject(jvalue& value, json_to_jvalue_state& state, event_ty
     }
 }
 
-inline bool json_to_jarray(jvalue& value, json_to_jvalue_state& state, event_type event, bool start) {
+ABIEOS_NODISCARD inline bool json_to_jarray(jvalue& value, json_to_jvalue_state& state, event_type event, bool start) {
     if (start) {
         if (event != event_type::received_start_array)
-            throw error("expected array");
+            return set_error(state, "expected array");
         if (trace_json_to_jvalue)
             printf("%*s[\n", int(state.stack.size() * 4), "");
         state.stack.push_back({&value});
@@ -1538,11 +1669,12 @@ inline bool json_to_jarray(jvalue& value, json_to_jvalue_state& state, event_typ
 
 template <typename T>
 struct native_serializer_impl : native_serializer {
-    void bin_to_native(void* v, bin_to_native_state& state, bool start) const override {
+    ABIEOS_NODISCARD bool bin_to_native(void* v, bin_to_native_state& state, bool start) const override {
         using ::abieos::bin_to_native;
-        bin_to_native(*reinterpret_cast<T*>(v), state, start);
+        return bin_to_native(*reinterpret_cast<T*>(v), state, start);
     }
-    bool json_to_native(void* v, json_to_native_state& state, event_type event, bool start) const override {
+    ABIEOS_NODISCARD bool json_to_native(void* v, json_to_native_state& state, event_type event,
+                                         bool start) const override {
         using ::abieos::json_to_native;
         return json_to_native(*reinterpret_cast<T*>(v), state, event, start);
     }
@@ -1554,11 +1686,12 @@ inline constexpr auto native_serializer_for = native_serializer_impl<T>{};
 template <typename member_ptr>
 constexpr auto create_native_field_serializer_methods_impl() {
     struct impl : native_field_serializer_methods {
-        void bin_to_native(void* v, bin_to_native_state& state, bool start) const override {
+        ABIEOS_NODISCARD bool bin_to_native(void* v, bin_to_native_state& state, bool start) const override {
             using ::abieos::bin_to_native;
-            bin_to_native(member_from_void(member_ptr{}, v), state, start);
+            return bin_to_native(member_from_void(member_ptr{}, v), state, start);
         }
-        bool json_to_native(void* v, json_to_native_state& state, event_type event, bool start) const override {
+        ABIEOS_NODISCARD bool json_to_native(void* v, json_to_native_state& state, event_type event,
+                                             bool start) const override {
             using ::abieos::json_to_native;
             return json_to_native(member_from_void(member_ptr{}, v), state, event, start);
         }
@@ -1592,36 +1725,34 @@ inline constexpr auto native_field_serializers_for = create_native_field_seriali
 ///////////////////////////////////////////////////////////////////////////////
 
 template <typename T>
-void bin_to_native(T& obj, input_buffer& bin) {
-    bin_to_native_state state{bin};
-    native_serializer_for<T>.bin_to_native(&obj, state, true);
+ABIEOS_NODISCARD bool bin_to_native(T& obj, std::string& error, input_buffer& bin) {
+    bin_to_native_state state{error, bin};
+    if (!native_serializer_for<T>.bin_to_native(&obj, state, true))
+        return false;
     while (!state.stack.empty()) {
-        state.stack.back().ser->bin_to_native(state.stack.back().obj, state, false);
+        if (!state.stack.back().ser->bin_to_native(state.stack.back().obj, state, false))
+            return false;
         if (state.stack.size() > max_stack_size)
-            throw error("recursion limit reached");
+            return set_error(state, "recursion limit reached");
     }
     bin = state.bin;
+    return true;
 }
 
 template <typename T>
-T bin_to_native(input_buffer& bin) {
-    T obj;
-    bin_to_native(obj, bin);
-    return obj;
+ABIEOS_NODISCARD auto bin_to_native(T& obj, bin_to_native_state& state, bool start)
+    -> std::enable_if_t<std::is_arithmetic_v<T>, bool> {
+    return read_raw(state.bin, state.error, obj);
 }
 
 template <typename T>
-auto bin_to_native(T& obj, bin_to_native_state& state, bool start) -> std::enable_if_t<std::is_arithmetic_v<T>, void> {
-    read_bin(state.bin, obj);
-}
-
-template <typename T>
-auto bin_to_native(T& obj, bin_to_native_state& state, bool start) -> std::enable_if_t<std::is_class_v<T>, void> {
+ABIEOS_NODISCARD auto bin_to_native(T& obj, bin_to_native_state& state, bool start)
+    -> std::enable_if_t<std::is_class_v<T>, bool> {
     if (start) {
         if (trace_bin_to_native)
             printf("%*s{ %d fields\n", int(state.stack.size() * 4), "", int(native_field_serializers_for<T>.size()));
         state.stack.push_back({&obj, &native_serializer_for<T>});
-        return;
+        return true;
     }
     auto& stack_entry = state.stack.back();
     if (stack_entry.position < (ptrdiff_t)native_field_serializers_for<T>.size()) {
@@ -1630,24 +1761,27 @@ auto bin_to_native(T& obj, bin_to_native_state& state, bool start) -> std::enabl
             printf("%*sfield %d/%d: %s %p\n", int(state.stack.size() * 4), "", int(stack_entry.position),
                    int(native_field_serializers_for<T>.size()), std::string{field_ser.name}.c_str(), field_ser.methods);
         ++stack_entry.position;
-        field_ser.methods->bin_to_native(&obj, state, true);
+        return field_ser.methods->bin_to_native(&obj, state, true);
     } else {
         if (trace_bin_to_native)
             printf("%*s}\n", int((state.stack.size() - 1) * 4), "");
         state.stack.pop_back();
+        return true;
     }
 }
 
 template <typename T>
-void bin_to_native(std::vector<T>& v, bin_to_native_state& state, bool start) {
+ABIEOS_NODISCARD bool bin_to_native(std::vector<T>& v, bin_to_native_state& state, bool start) {
     if (start) {
         v.clear();
-        auto size = read_varuint32(state.bin);
+        uint32_t size;
+        if (!read_varuint32(state.bin, state.error, size))
+            return false;
         if (trace_bin_to_native)
             printf("%*s[ %u items\n", int(state.stack.size() * 4), "", int(size));
         state.stack.push_back({&v, &native_serializer_for<std::vector<T>>});
         state.stack.back().array_size = size;
-        return;
+        return true;
     }
     auto& stack_entry = state.stack.back();
     if (stack_entry.position < stack_entry.array_size) {
@@ -1656,80 +1790,92 @@ void bin_to_native(std::vector<T>& v, bin_to_native_state& state, bool start) {
                    int(stack_entry.array_size));
         v.emplace_back();
         stack_entry.position = v.size();
-        native_serializer_for<T>.bin_to_native(&v.back(), state, true);
+        return native_serializer_for<T>.bin_to_native(&v.back(), state, true);
     } else {
         if (trace_bin_to_native)
             printf("%*s]\n", int((state.stack.size() - 1) * 4), "");
         state.stack.pop_back();
+        return true;
     }
 }
 
 template <typename First, typename Second>
-void bin_to_native(std::pair<First, Second>& obj, bin_to_native_state& state, bool start) {
+ABIEOS_NODISCARD bool bin_to_native(std::pair<First, Second>& obj, bin_to_native_state& state, bool start) {
     if (start) {
         if (trace_bin_to_native)
             printf("%*s[ pair\n", int(state.stack.size() * 4), "");
         state.stack.push_back({&obj, &native_serializer_for<std::pair<First, Second>>});
-        return;
+        return true;
     }
     auto& stack_entry = state.stack.back();
     if (stack_entry.position == 0) {
         if (trace_bin_to_native)
             printf("%*sitem 0/1\n", int(state.stack.size() * 4), "");
         ++stack_entry.position;
-        native_serializer_for<First>.bin_to_native(&obj.first, state, true);
+        return native_serializer_for<First>.bin_to_native(&obj.first, state, true);
     } else if (stack_entry.position == 1) {
         if (trace_bin_to_native)
             printf("%*sitem 1/1\n", int(state.stack.size() * 4), "");
         ++stack_entry.position;
-        native_serializer_for<Second>.bin_to_native(&obj.second, state, true);
+        return native_serializer_for<Second>.bin_to_native(&obj.second, state, true);
     } else {
         if (trace_bin_to_native)
             printf("%*s]\n", int((state.stack.size() - 1) * 4), "");
         state.stack.pop_back();
+        return true;
     }
 }
 
-inline void bin_to_native(std::string& obj, bin_to_native_state& state, bool) {
-    auto size = read_varuint32(state.bin);
+ABIEOS_NODISCARD inline bool bin_to_native(std::string& obj, bin_to_native_state& state, bool) {
+    uint32_t size;
+    if (!read_varuint32(state.bin, state.error, size))
+        return false;
     if (size > state.bin.end - state.bin.pos)
-        throw error("invalid string size");
+        return set_error(state, "invalid string size");
     obj.resize(size);
-    read_bin(state.bin, obj.data(), size);
+    return read_raw(state.bin, state.error, obj.data(), size);
 }
 
 template <typename T>
-void bin_to_native(std::optional<T>& obj, bin_to_native_state& state, bool) {
-    auto present = read_bin<bool>(state.bin);
-    if (!present)
-        return;
+ABIEOS_NODISCARD bool bin_to_native(std::optional<T>& obj, bin_to_native_state& state, bool) {
+    bool present;
+    if (!read_raw(state.bin, state.error, present))
+        return false;
+    if (!present) {
+        obj.reset();
+        return true;
+    }
     obj.emplace();
-    bin_to_native(*obj, state, true);
+    return bin_to_native(*obj, state, true);
 }
 
 template <uint32_t I, typename... Ts>
-bool bin_to_native_variant(std::variant<Ts...>& v, bin_to_native_state& state, uint32_t i) {
+ABIEOS_NODISCARD bool bin_to_native_variant(std::variant<Ts...>& v, bin_to_native_state& state, uint32_t i) {
     if constexpr (I < std::variant_size_v<std::variant<Ts...>>) {
         if (i == I) {
             auto& x = v.template emplace<std::variant_alternative_t<I, std::variant<Ts...>>>();
-            bin_to_native(x, state, true);
+            return bin_to_native(x, state, true);
         } else {
-            bin_to_native_variant<I + 1>(v, state, i);
+            return bin_to_native_variant<I + 1>(v, state, i);
         }
     } else {
-        throw error("bad variant index");
+        return set_error(state, "bad variant index");
     }
 }
 
 template <typename... Ts>
-void bin_to_native(std::variant<Ts...>& obj, bin_to_native_state& state, bool) {
-    return bin_to_native_variant<0>(obj, state, read_varuint32(state.bin));
+ABIEOS_NODISCARD bool bin_to_native(std::variant<Ts...>& obj, bin_to_native_state& state, bool) {
+    uint32_t u;
+    if (!read_varuint32(state.bin, state.error, u))
+        return false;
+    return bin_to_native_variant<0>(obj, state, u);
 }
 
 template <typename T>
-void bin_to_native(might_not_exist<T>& obj, bin_to_native_state& state, bool start) {
+ABIEOS_NODISCARD bool bin_to_native(might_not_exist<T>& obj, bin_to_native_state& state, bool start) {
     if (state.bin.pos != state.bin.end)
-        bin_to_native(obj.value, state, start);
+        return bin_to_native(obj.value, state, start);
+    return true;
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -1764,11 +1910,11 @@ void native_to_bin(std::vector<char>& bin, const std::vector<T>& obj) {
 // json_to_native
 ///////////////////////////////////////////////////////////////////////////////
 
-inline bool receive_event(struct json_to_native_state& state, event_type event, bool start) {
+ABIEOS_NODISCARD inline bool receive_event(struct json_to_native_state& state, event_type event, bool start) {
     if (state.stack.empty())
-        throw error("extra data");
+        return set_error(state, "extra data");
     if (state.stack.size() > max_stack_size)
-        throw error("recursion limit reached");
+        return set_error(state, "recursion limit reached");
     if (trace_json_to_native_event)
         printf("(event %d)\n", (int)event);
     auto x = state.stack.back();
@@ -1778,10 +1924,10 @@ inline bool receive_event(struct json_to_native_state& state, event_type event, 
 }
 
 template <typename T>
-bool json_to_native(T& obj, std::string_view json) {
+ABIEOS_NODISCARD bool json_to_native(T& obj, std::string& error, std::string_view json) {
     std::string mutable_json{json};
     mutable_json.push_back(0);
-    json_to_native_state state;
+    json_to_native_state state{.error = error};
     state.stack.push_back(native_stack_entry{&obj, &native_serializer_for<T>, 0});
     rapidjson::Reader reader;
     rapidjson::InsituStringStream ss(mutable_json.data());
@@ -1790,20 +1936,19 @@ bool json_to_native(T& obj, std::string_view json) {
 }
 
 template <typename T>
-auto json_to_native(T& obj, json_to_native_state& state, event_type event, bool start)
+ABIEOS_NODISCARD auto json_to_native(T& obj, json_to_native_state& state, event_type event, bool start)
     -> std::enable_if_t<std::is_arithmetic_v<T>, bool> {
 
-    obj = json_to_number<T>(state, event);
-    return true;
+    return json_to_number(obj, state, event);
 }
 
 template <typename T>
-auto json_to_native(T& obj, json_to_native_state& state, event_type event, bool start)
+ABIEOS_NODISCARD auto json_to_native(T& obj, json_to_native_state& state, event_type event, bool start)
     -> std::enable_if_t<std::is_class_v<T>, bool> {
 
     if (start) {
         if (event != event_type::received_start_object)
-            throw error("expected object");
+            return set_error(state, "expected object");
         if (trace_json_to_native)
             printf("%*s{ %d fields\n", int(state.stack.size() * 4), "", int(native_field_serializers_for<T>.size()));
         state.stack.push_back({&obj, &native_serializer_for<T>});
@@ -1821,7 +1966,7 @@ auto json_to_native(T& obj, json_to_native_state& state, event_type event, bool 
                native_field_serializers_for<T>[stack_entry.position].name != state.received_data.key)
             ++stack_entry.position;
         if (stack_entry.position >= (ptrdiff_t)native_field_serializers_for<T>.size())
-            throw error("unknown field " + state.received_data.key); // TODO: eat unknown subtree
+            return set_error(state, "unknown field " + state.received_data.key); // TODO: eat unknown subtree
         return true;
     } else if (stack_entry.position < (ptrdiff_t)native_field_serializers_for<T>.size()) {
         auto& field_ser = native_field_serializers_for<T>[stack_entry.position];
@@ -1836,10 +1981,10 @@ auto json_to_native(T& obj, json_to_native_state& state, event_type event, bool 
 }
 
 template <typename T>
-bool json_to_native(std::vector<T>& v, json_to_native_state& state, event_type event, bool start) {
+ABIEOS_NODISCARD bool json_to_native(std::vector<T>& v, json_to_native_state& state, event_type event, bool start) {
     if (start) {
         if (event != event_type::received_start_array)
-            throw error("expected array");
+            return set_error(state, "expected array");
         if (trace_json_to_native)
             printf("%*s[\n", int(state.stack.size() * 4), "");
         state.stack.push_back({&v, &native_serializer_for<std::vector<T>>});
@@ -1857,22 +2002,24 @@ bool json_to_native(std::vector<T>& v, json_to_native_state& state, event_type e
 }
 
 template <typename First, typename Second>
-bool json_to_native(std::pair<First, Second>& obj, json_to_native_state& state, event_type event, bool start) {
-    throw error("pair not implemented"); // TODO
+ABIEOS_NODISCARD bool json_to_native(std::pair<First, Second>& obj, json_to_native_state& state, event_type event,
+                                     bool start) {
+    return set_error(state, "pair not implemented"); // TODO
 }
 
-inline bool json_to_native(std::string& obj, json_to_native_state& state, event_type event, bool start) {
+ABIEOS_NODISCARD inline bool json_to_native(std::string& obj, json_to_native_state& state, event_type event,
+                                            bool start) {
     if (event == event_type::received_string) {
         obj = state.get_string();
         if (trace_json_to_native)
             printf("%*sstring: %s\n", int(state.stack.size() * 4), "", obj.c_str());
         return true;
     } else
-        throw error("expected string");
+        return set_error(state, "expected string");
 }
 
 template <typename T>
-bool json_to_native(std::optional<T>& obj, json_to_native_state& state, event_type event, bool) {
+ABIEOS_NODISCARD bool json_to_native(std::optional<T>& obj, json_to_native_state& state, event_type event, bool) {
     if (event == event_type::received_null)
         return true;
     obj.emplace();
@@ -1880,12 +2027,13 @@ bool json_to_native(std::optional<T>& obj, json_to_native_state& state, event_ty
 }
 
 template <typename... Ts>
-bool json_to_native(std::variant<Ts...>& obj, json_to_native_state& state, event_type event, bool) {
-    throw error("can not convert json to variant");
+ABIEOS_NODISCARD bool json_to_native(std::variant<Ts...>& obj, json_to_native_state& state, event_type event, bool) {
+    return set_error(state, "can not convert json to variant");
 }
 
 template <typename T>
-bool json_to_native(might_not_exist<T>& obj, json_to_native_state& state, event_type event, bool start) {
+ABIEOS_NODISCARD bool json_to_native(might_not_exist<T>& obj, json_to_native_state& state, event_type event,
+                                     bool start) {
     return json_to_native(obj.value, state, event, start);
 }
 
@@ -1933,15 +2081,16 @@ constexpr void for_each_abi_type(F f) {
 
 template <typename T>
 struct abi_serializer_impl : abi_serializer {
-    bool json_to_bin(jvalue_to_bin_state& state, bool allow_extensions, const abi_type* type, event_type event,
-                     bool start) const override {
+    ABIEOS_NODISCARD bool json_to_bin(jvalue_to_bin_state& state, bool allow_extensions, const abi_type* type,
+                                      event_type event, bool start) const override {
         return ::abieos::json_to_bin((T*)nullptr, state, allow_extensions, type, event, start);
     }
-    bool json_to_bin(json_to_bin_state& state, bool allow_extensions, const abi_type* type, event_type event,
-                     bool start) const override {
+    ABIEOS_NODISCARD bool json_to_bin(json_to_bin_state& state, bool allow_extensions, const abi_type* type,
+                                      event_type event, bool start) const override {
         return ::abieos::json_to_bin((T*)nullptr, state, allow_extensions, type, event, start);
     }
-    bool bin_to_json(bin_to_json_state& state, bool allow_extensions, const abi_type* type, bool start) const override {
+    ABIEOS_NODISCARD bool bin_to_json(bin_to_json_state& state, bool allow_extensions, const abi_type* type,
+                                      bool start) const override {
         return ::abieos::bin_to_json((T*)nullptr, state, allow_extensions, type, start);
     }
 };
@@ -1984,78 +2133,105 @@ bool ends_with(const std::string& s, const char (&suffix)[i]) {
     return s.size() >= i - 1 && !strcmp(s.c_str() + s.size() - (i - 1), suffix);
 }
 
-inline abi_type& get_type(std::map<std::string, abi_type>& abi_types, const std::string& name, int depth) {
+ABIEOS_NODISCARD inline bool get_type(abi_type*& result, std::string& error, std::map<std::string, abi_type>& abi_types,
+                                      const std::string& name, int depth) {
     if (depth >= 32)
-        throw error("abi recursion limit reached");
+        return set_error(error, "abi recursion limit reached");
     auto it = abi_types.find(name);
     if (it == abi_types.end()) {
         if (ends_with(name, "?")) {
             abi_type type{name};
-            type.optional_of = &get_type(abi_types, name.substr(0, name.size() - 1), depth + 1);
+            if (!get_type(type.optional_of, error, abi_types, name.substr(0, name.size() - 1), depth + 1))
+                return false;
             if (type.optional_of->optional_of || type.optional_of->array_of)
-                throw error("optional (?) and array ([]) don't support nesting");
+                return set_error(error, "optional (?) and array ([]) don't support nesting");
             if (type.optional_of->extension_of)
-                throw error("optional (?) may not contain binary extensions ($)");
+                return set_error(error, "optional (?) may not contain binary extensions ($)");
             type.ser = &abi_serializer_for<pseudo_optional>;
-            return abi_types[name] = std::move(type);
+            result = &(abi_types[name] = std::move(type));
+            return true;
         } else if (ends_with(name, "[]")) {
             abi_type type{name};
-            type.array_of = &get_type(abi_types, name.substr(0, name.size() - 2), depth + 1);
+            if (!get_type(type.array_of, error, abi_types, name.substr(0, name.size() - 2), depth + 1))
+                return false;
             if (type.array_of->array_of || type.array_of->optional_of)
-                throw error("optional (?) and array ([]) don't support nesting");
+                return set_error(error, "optional (?) and array ([]) don't support nesting");
             if (type.array_of->extension_of)
-                throw error("array ([]) may not contain binary extensions ($)");
+                return set_error(error, "array ([]) may not contain binary extensions ($)");
             type.ser = &abi_serializer_for<pseudo_array>;
-            return abi_types[name] = std::move(type);
+            result = &(abi_types[name] = std::move(type));
+            return true;
         } else if (ends_with(name, "$")) {
             abi_type type{name};
-            type.extension_of = &get_type(abi_types, name.substr(0, name.size() - 1), depth + 1);
+            if (!get_type(type.extension_of, error, abi_types, name.substr(0, name.size() - 1), depth + 1))
+                return false;
             if (type.extension_of->extension_of)
-                throw error("binary extensions ($) may not contain binary extensions ($)");
+                return set_error(error, "binary extensions ($) may not contain binary extensions ($)");
             type.ser = &abi_serializer_for<pseudo_extension>;
-            return abi_types[name] = std::move(type);
+            result = &(abi_types[name] = std::move(type));
+            return true;
         } else
-            throw error("unknown type \"" + name + "\"");
+            return set_error(error, "unknown type \"" + name + "\"");
     }
-    if (it->second.alias_of)
-        return *it->second.alias_of;
-    if (it->second.alias_of_name.empty())
-        return it->second;
-    auto& other = get_type(abi_types, it->second.alias_of_name, depth + 1);
-    it->second.alias_of = &other;
-    return other;
+    if (it->second.alias_of) {
+        result = it->second.alias_of;
+        return true;
+    }
+    if (it->second.alias_of_name.empty()) {
+        result = &it->second;
+        return true;
+    }
+    if (!get_type(result, error, abi_types, it->second.alias_of_name, depth + 1))
+        return false;
+    it->second.alias_of = result;
+    return true;
 }
 
-inline abi_type& fill_struct(std::map<std::string, abi_type>& abi_types, abi_type& type, int depth) {
+ABIEOS_NODISCARD inline bool fill_struct(std::map<std::string, abi_type>& abi_types, std::string& error, abi_type& type,
+                                         int depth) {
     if (depth >= 32)
-        throw error("abi recursion limit reached");
+        return set_error(error, "abi recursion limit reached");
     if (type.filled_struct)
-        return type;
+        return true;
     if (!type.struct_def)
-        throw error("abi type \"" + type.name + "\" is not a struct");
-    if (!type.struct_def->base.empty())
-        type.fields = fill_struct(abi_types, get_type(abi_types, type.struct_def->base, depth + 1), depth + 1).fields;
-    for (auto& field : type.struct_def->fields)
-        type.fields.push_back(abi_field{field.name, &get_type(abi_types, field.type, depth + 1)});
+        return set_error(error, "abi type \"" + type.name + "\" is not a struct");
+    if (!type.struct_def->base.empty()) {
+        abi_type* t;
+        if (!get_type(t, error, abi_types, type.struct_def->base, depth + 1))
+            return false;
+        if (!fill_struct(abi_types, error, *t, depth + 1))
+            return false;
+        type.fields = t->fields;
+    }
+    for (auto& field : type.struct_def->fields) {
+        abi_type* t;
+        if (!get_type(t, error, abi_types, field.type, depth + 1))
+            return false;
+        type.fields.push_back(abi_field{field.name, t});
+    }
     type.filled_struct = true;
-    return type;
+    return true;
 }
 
-inline abi_type& fill_variant(std::map<std::string, abi_type>& abi_types, abi_type& type, int depth) {
+ABIEOS_NODISCARD inline bool fill_variant(std::map<std::string, abi_type>& abi_types, std::string& error,
+                                          abi_type& type, int depth) {
     if (depth >= 32)
-        throw error("abi recursion limit reached");
+        return set_error(error, "abi recursion limit reached");
     if (type.filled_variant)
-        return type;
+        return true;
     if (!type.variant_def)
-        throw error("abi type \"" + type.name + "\" is not a variant");
-    for (auto& t : type.variant_def->types)
-        type.fields.push_back(abi_field{t, &get_type(abi_types, t, depth + 1)});
+        return set_error(error, "abi type \"" + type.name + "\" is not a variant");
+    for (auto& types : type.variant_def->types) {
+        abi_type* t;
+        if (!get_type(t, error, abi_types, types, depth + 1))
+            return false;
+        type.fields.push_back(abi_field{types, t});
+    }
     type.filled_variant = true;
-    return type;
+    return true;
 }
 
-inline contract create_contract(const abi_def& abi) {
-    contract c;
+ABIEOS_NODISCARD inline bool fill_contract(contract& c, std::string& error, const abi_def& abi) {
     for (auto& a : abi.actions)
         c.action_types[a.name] = a.type;
     for_each_abi_type([&](const char* name, auto* p) {
@@ -2065,8 +2241,12 @@ inline contract create_contract(const abi_def& abi) {
     });
     {
         abi_type type{"extended_asset"};
-        type.fields.push_back(abi_field{"quantity", &get_type(c.abi_types, "asset", 0)});
-        type.fields.push_back(abi_field{"contract", &get_type(c.abi_types, "name", 0)});
+        abi_type *asset_type, *name_type;
+        if (!get_type(asset_type, error, c.abi_types, "asset", 0) ||
+            !get_type(name_type, error, c.abi_types, "name", 0))
+            return false;
+        type.fields.push_back(abi_field{"quantity", asset_type});
+        type.fields.push_back(abi_field{"contract", name_type});
         type.filled_struct = true;
         type.ser = &abi_serializer_for<pseudo_object>;
         c.abi_types.insert({"extended_asset", std::move(type)});
@@ -2074,56 +2254,61 @@ inline contract create_contract(const abi_def& abi) {
 
     for (auto& t : abi.types) {
         if (t.new_type_name.empty())
-            throw error("abi has a type with a missing name");
+            return set_error(error, "abi has a type with a missing name");
         auto [_, inserted] = c.abi_types.insert({t.new_type_name, abi_type{t.new_type_name, t.type}});
         if (!inserted)
-            throw error("abi redefines type \"" + t.new_type_name + "\"");
+            return set_error(error, "abi redefines type \"" + t.new_type_name + "\"");
     }
     for (auto& s : abi.structs) {
         if (s.name.empty())
-            throw error("abi has a struct with a missing name");
+            return set_error(error, "abi has a struct with a missing name");
         abi_type type{s.name};
         type.struct_def = &s;
         type.ser = &abi_serializer_for<pseudo_object>;
         auto [_, inserted] = c.abi_types.insert({s.name, std::move(type)});
         if (!inserted)
-            throw error("abi redefines type \"" + s.name + "\"");
+            return set_error(error, "abi redefines type \"" + s.name + "\"");
     }
     for (auto& v : abi.variants.value) {
         if (v.name.empty())
-            throw error("abi has a variant with a missing name");
+            return set_error(error, "abi has a variant with a missing name");
         abi_type type{v.name};
         type.variant_def = &v;
         type.ser = &abi_serializer_for<pseudo_variant>;
         auto [_, inserted] = c.abi_types.insert({v.name, std::move(type)});
         if (!inserted)
-            throw error("abi redefines type \"" + v.name + "\"");
+            return set_error(error, "abi redefines type \"" + v.name + "\"");
     }
     for (auto& [_, t] : c.abi_types)
         if (!t.alias_of_name.empty())
-            t.alias_of = &get_type(c.abi_types, t.alias_of_name, 0);
+            if (!get_type(t.alias_of, error, c.abi_types, t.alias_of_name, 0))
+                return false;
     for (auto& [_, t] : c.abi_types) {
-        if (t.struct_def)
-            fill_struct(c.abi_types, t, 0);
-        else if (t.variant_def)
-            fill_variant(c.abi_types, t, 0);
+        if (t.struct_def) {
+            if (!fill_struct(c.abi_types, error, t, 0))
+                return false;
+        } else if (t.variant_def) {
+            if (!fill_variant(c.abi_types, error, t, 0))
+                return false;
+        }
     }
     for (auto& [_, t] : c.abi_types) {
         t.struct_def = nullptr;
         t.variant_def = nullptr;
         if (t.alias_of && t.alias_of->extension_of)
-            throw error("can't use extensions ($) within typedefs");
+            return set_error(error, "can't use extensions ($) within typedefs");
     }
-    return c;
+    return true;
 }
 
 ///////////////////////////////////////////////////////////////////////////////
 // json_to_bin (jvalue)
 ///////////////////////////////////////////////////////////////////////////////
 
-inline bool json_to_bin(std::vector<char>& bin, const abi_type* type, const jvalue& value) {
-    jvalue_to_bin_state state{bin, &value};
-    try {
+ABIEOS_NODISCARD inline bool json_to_bin(std::vector<char>& bin, std::string& error, const abi_type* type,
+                                         const jvalue& value) {
+    jvalue_to_bin_state state{error, bin, &value};
+    bool result = [&] {
         if (!type->ser->json_to_bin(state, true, type, get_event_type(value), true))
             return false;
         while (!state.stack.empty()) {
@@ -2133,34 +2318,34 @@ inline bool json_to_bin(std::vector<char>& bin, const abi_type* type, const jval
                 return false;
         }
         return true;
-    } catch (error& e) {
-        std::string s;
-        if (!state.stack.empty() && state.stack[0].type->filled_struct)
-            s += state.stack[0].type->name;
-        for (auto& entry : state.stack) {
-            if (entry.type->array_of)
-                s += "[" + std::to_string(entry.position) + "]";
-            else if (entry.type->filled_struct) {
-                if (entry.position >= 0 && entry.position < (int)entry.type->fields.size())
-                    s += "." + entry.type->fields[entry.position].name;
-            } else if (entry.type->optional_of) {
-                s += "<optional>";
-            } else if (entry.type->filled_variant) {
-                s += "<variant>";
-            } else {
-                s += "<?>";
-            }
+    }();
+    if (result)
+        return true;
+    std::string s;
+    if (!state.stack.empty() && state.stack[0].type->filled_struct)
+        s += state.stack[0].type->name;
+    for (auto& entry : state.stack) {
+        if (entry.type->array_of)
+            s += "[" + std::to_string(entry.position) + "]";
+        else if (entry.type->filled_struct) {
+            if (entry.position >= 0 && entry.position < (int)entry.type->fields.size())
+                s += "." + entry.type->fields[entry.position].name;
+        } else if (entry.type->optional_of) {
+            s += "<optional>";
+        } else if (entry.type->filled_variant) {
+            s += "<variant>";
+        } else {
+            s += "<?>";
         }
-        if (!s.empty())
-            s += ": ";
-        s += e.what();
-        throw error{s};
     }
-    return true;
+    if (!s.empty())
+        s += ": ";
+    error = s + error;
+    return false;
 }
 
-inline bool json_to_bin(pseudo_optional*, jvalue_to_bin_state& state, bool allow_extensions, const abi_type* type,
-                        event_type event, bool) {
+ABIEOS_NODISCARD inline bool json_to_bin(pseudo_optional*, jvalue_to_bin_state& state, bool allow_extensions,
+                                         const abi_type* type, event_type event, bool) {
     if (event == event_type::received_null) {
         state.bin.push_back(0);
         return true;
@@ -2170,17 +2355,17 @@ inline bool json_to_bin(pseudo_optional*, jvalue_to_bin_state& state, bool allow
            type->optional_of->ser->json_to_bin(state, allow_extensions, type->optional_of, event, true);
 }
 
-inline bool json_to_bin(pseudo_extension*, jvalue_to_bin_state& state, bool allow_extensions, const abi_type* type,
-                        event_type event, bool) {
+ABIEOS_NODISCARD inline bool json_to_bin(pseudo_extension*, jvalue_to_bin_state& state, bool allow_extensions,
+                                         const abi_type* type, event_type event, bool) {
     return type->extension_of->ser &&
            type->extension_of->ser->json_to_bin(state, allow_extensions, type->extension_of, event, true);
 }
 
-inline bool json_to_bin(pseudo_object*, jvalue_to_bin_state& state, bool allow_extensions, const abi_type* type,
-                        event_type event, bool start) {
+ABIEOS_NODISCARD inline bool json_to_bin(pseudo_object*, jvalue_to_bin_state& state, bool allow_extensions,
+                                         const abi_type* type, event_type event, bool start) {
     if (start) {
         if (!state.received_value || !std::holds_alternative<jobject>(state.received_value->value))
-            throw error("expected object");
+            return set_error(state.error, "expected object");
         if (trace_jvalue_to_bin)
             printf("%*s{ %d fields, allow_ex=%d\n", int(state.stack.size() * 4), "", int(type->fields.size()),
                    allow_extensions);
@@ -2207,20 +2392,20 @@ inline bool json_to_bin(pseudo_object*, jvalue_to_bin_state& state, bool allow_e
             return true;
         }
         stack_entry.position = -1;
-        throw error("expected field \"" + field.name + "\"");
+        return set_error(state.error, "expected field \"" + field.name + "\"");
     }
     if (state.skipped_extension)
-        throw error("unexpected field \"" + field.name + "\"");
+        return set_error(state.error, "unexpected field \"" + field.name + "\"");
     state.received_value = &it->second;
     return field.type->ser && field.type->ser->json_to_bin(state, allow_extensions && &field == &type->fields.back(),
                                                            field.type, get_event_type(it->second), true);
 }
 
-inline bool json_to_bin(pseudo_array*, jvalue_to_bin_state& state, bool, const abi_type* type, event_type event,
-                        bool start) {
+ABIEOS_NODISCARD inline bool json_to_bin(pseudo_array*, jvalue_to_bin_state& state, bool, const abi_type* type,
+                                         event_type event, bool start) {
     if (start) {
         if (!state.received_value || !std::holds_alternative<jarray>(state.received_value->value))
-            throw error("expected array");
+            return set_error(state.error, "expected array");
         if (trace_jvalue_to_bin)
             printf("%*s[ %d elements\n", int(state.stack.size() * 4), "",
                    int(std::get<jarray>(state.received_value->value).size()));
@@ -2244,16 +2429,16 @@ inline bool json_to_bin(pseudo_array*, jvalue_to_bin_state& state, bool, const a
            type->array_of->ser->json_to_bin(state, false, type->array_of, get_event_type(*state.received_value), true);
 }
 
-inline bool json_to_bin(pseudo_variant*, jvalue_to_bin_state& state, bool allow_extensions, const abi_type* type,
-                        event_type event, bool start) {
+ABIEOS_NODISCARD inline bool json_to_bin(pseudo_variant*, jvalue_to_bin_state& state, bool allow_extensions,
+                                         const abi_type* type, event_type event, bool start) {
     if (start) {
         if (!state.received_value || !std::holds_alternative<jarray>(state.received_value->value))
-            throw error(R"(expected variant: ["type", value])");
+            return set_error(state.error, R"(expected variant: ["type", value])");
         auto& arr = std::get<jarray>(state.received_value->value);
         if (arr.size() != 2)
-            throw error(R"(expected variant: ["type", value])");
+            return set_error(state.error, R"(expected variant: ["type", value])");
         if (!std::holds_alternative<std::string>(arr[0].value))
-            throw error(R"(expected variant: ["type", value])");
+            return set_error(state.error, R"(expected variant: ["type", value])");
         auto& typeName = std::get<std::string>(arr[0].value);
         if (trace_jvalue_to_bin)
             printf("%*s[ variant %s\n", int(state.stack.size() * 4), "", typeName.c_str());
@@ -2267,7 +2452,7 @@ inline bool json_to_bin(pseudo_variant*, jvalue_to_bin_state& state, bool allow_
         auto it = std::find_if(stack_entry.type->fields.begin(), stack_entry.type->fields.end(),
                                [&](auto& field) { return field.name == typeName; });
         if (it == stack_entry.type->fields.end())
-            throw error("type is not valid for this variant");
+            return set_error(state.error, "type is not valid for this variant");
         push_varuint32(state.bin, it - stack_entry.type->fields.begin());
         state.received_value = &arr[++stack_entry.position];
         return it->type->ser && it->type->ser->json_to_bin(state, allow_extensions, it->type,
@@ -2281,13 +2466,18 @@ inline bool json_to_bin(pseudo_variant*, jvalue_to_bin_state& state, bool allow_
 }
 
 template <typename T>
-auto json_to_bin(T*, jvalue_to_bin_state& state, bool, const abi_type*, event_type event, bool start)
+ABIEOS_NODISCARD auto json_to_bin(T*, jvalue_to_bin_state& state, bool, const abi_type*, event_type event, bool start)
     -> std::enable_if_t<std::is_arithmetic_v<T>, bool> {
-    push_raw(state.bin, json_to_number<T>(state, event));
+
+    T x;
+    if (!json_to_number(x, state, event))
+        return false;
+    push_raw(state.bin, x);
     return true;
 }
 
-inline bool json_to_bin(std::string*, jvalue_to_bin_state& state, bool, const abi_type*, event_type event, bool start) {
+ABIEOS_NODISCARD inline bool json_to_bin(std::string*, jvalue_to_bin_state& state, bool, const abi_type*,
+                                         event_type event, bool start) {
     if (event == event_type::received_string) {
         auto& s = state.get_string();
         if (trace_jvalue_to_bin)
@@ -2296,14 +2486,14 @@ inline bool json_to_bin(std::string*, jvalue_to_bin_state& state, bool, const ab
         state.bin.insert(state.bin.end(), s.begin(), s.end());
         return true;
     } else
-        throw error("expected string");
+        return set_error(state.error, "expected string");
 }
 
 ///////////////////////////////////////////////////////////////////////////////
 // json_to_bin
 ///////////////////////////////////////////////////////////////////////////////
 
-inline bool receive_event(struct json_to_bin_state& state, event_type event, bool start) {
+ABIEOS_NODISCARD inline bool receive_event(struct json_to_bin_state& state, event_type event, bool start) {
     if (state.stack.empty())
         return false;
     if (trace_json_to_bin_event)
@@ -2313,22 +2503,23 @@ inline bool receive_event(struct json_to_bin_state& state, event_type event, boo
     if (start)
         state.stack.clear();
     if (state.stack.size() > max_stack_size)
-        throw error("recursion limit reached");
+        return set_error(state, "recursion limit reached");
     return type->ser && type->ser->json_to_bin(state, entry.allow_extensions, type, event, start);
 }
 
-inline bool json_to_bin(std::vector<char>& bin, const abi_type* type, std::string_view json) {
+ABIEOS_NODISCARD inline bool json_to_bin(std::vector<char>& bin, std::string& error, const abi_type* type,
+                                         std::string_view json) {
     std::string mutable_json{json};
     mutable_json.push_back(0);
-    json_to_bin_state state;
+    json_to_bin_state state{.error = error};
     state.stack.push_back({type, true});
     rapidjson::Reader reader;
     rapidjson::InsituStringStream ss(mutable_json.data());
-    try {
-        if (!reader.Parse<rapidjson::kParseValidateEncodingFlag | rapidjson::kParseIterativeFlag |
-                          rapidjson::kParseNumbersAsStringsFlag>(ss, state))
-            throw error{"failed to parse"};
-    } catch (error& e) {
+
+    if (!reader.Parse<rapidjson::kParseValidateEncodingFlag | rapidjson::kParseIterativeFlag |
+                      rapidjson::kParseNumbersAsStringsFlag>(ss, state)) {
+        if (error.empty())
+            error = "failed to parse";
         std::string s;
         if (!state.stack.empty() && state.stack[0].type->filled_struct)
             s += state.stack[0].type->name;
@@ -2348,9 +2539,10 @@ inline bool json_to_bin(std::vector<char>& bin, const abi_type* type, std::strin
         }
         if (!s.empty())
             s += ": ";
-        s += e.what();
-        throw error{s};
+        error = s + error;
+        return false;
     }
+
     size_t pos = 0;
     for (auto& insertion : state.size_insertions) {
         bin.insert(bin.end(), state.bin.begin() + pos, state.bin.begin() + insertion.position);
@@ -2361,8 +2553,8 @@ inline bool json_to_bin(std::vector<char>& bin, const abi_type* type, std::strin
     return true;
 }
 
-inline bool json_to_bin(pseudo_optional*, json_to_bin_state& state, bool allow_extensions, const abi_type* type,
-                        event_type event, bool) {
+ABIEOS_NODISCARD inline bool json_to_bin(pseudo_optional*, json_to_bin_state& state, bool allow_extensions,
+                                         const abi_type* type, event_type event, bool) {
     if (event == event_type::received_null) {
         state.bin.push_back(0);
         return true;
@@ -2372,17 +2564,17 @@ inline bool json_to_bin(pseudo_optional*, json_to_bin_state& state, bool allow_e
            type->optional_of->ser->json_to_bin(state, allow_extensions, type->optional_of, event, true);
 }
 
-inline bool json_to_bin(pseudo_extension*, json_to_bin_state& state, bool allow_extensions, const abi_type* type,
-                        event_type event, bool) {
+ABIEOS_NODISCARD inline bool json_to_bin(pseudo_extension*, json_to_bin_state& state, bool allow_extensions,
+                                         const abi_type* type, event_type event, bool) {
     return type->extension_of->ser &&
            type->extension_of->ser->json_to_bin(state, allow_extensions, type->extension_of, event, true);
 }
 
-inline bool json_to_bin(pseudo_object*, json_to_bin_state& state, bool allow_extensions, const abi_type* type,
-                        event_type event, bool start) {
+ABIEOS_NODISCARD inline bool json_to_bin(pseudo_object*, json_to_bin_state& state, bool allow_extensions,
+                                         const abi_type* type, event_type event, bool start) {
     if (start) {
         if (event != event_type::received_start_object)
-            throw error("expected object");
+            return set_error(state, "expected object");
         if (trace_json_to_bin)
             printf("%*s{ %d fields, allow_ex=%d\n", int(state.stack.size() * 4), "", int(type->fields.size()),
                    allow_extensions);
@@ -2395,7 +2587,7 @@ inline bool json_to_bin(pseudo_object*, json_to_bin_state& state, bool allow_ext
             auto& field = type->fields[stack_entry.position + 1];
             if (!field.type->extension_of || !allow_extensions) {
                 stack_entry.position = -1;
-                throw error("expected field \"" + field.name + "\"");
+                return set_error(state, "expected field \"" + field.name + "\"");
             }
             ++stack_entry.position;
             state.skipped_extension = true;
@@ -2408,11 +2600,11 @@ inline bool json_to_bin(pseudo_object*, json_to_bin_state& state, bool allow_ext
     }
     if (event == event_type::received_key) {
         if (++stack_entry.position >= (ptrdiff_t)type->fields.size() || state.skipped_extension)
-            throw error("unexpected field \"" + state.received_data.key + "\"");
+            return set_error(state, "unexpected field \"" + state.received_data.key + "\"");
         auto& field = type->fields[stack_entry.position];
         if (state.received_data.key != field.name) {
             stack_entry.position = -1;
-            throw error("expected field \"" + field.name + "\"");
+            return set_error(state, "expected field \"" + field.name + "\"");
         }
         return true;
     } else {
@@ -2426,11 +2618,11 @@ inline bool json_to_bin(pseudo_object*, json_to_bin_state& state, bool allow_ext
     }
 }
 
-inline bool json_to_bin(pseudo_array*, json_to_bin_state& state, bool, const abi_type* type, event_type event,
-                        bool start) {
+ABIEOS_NODISCARD inline bool json_to_bin(pseudo_array*, json_to_bin_state& state, bool, const abi_type* type,
+                                         event_type event, bool start) {
     if (start) {
         if (event != event_type::received_start_array)
-            throw error("expected array");
+            return set_error(state, "expected array");
         if (trace_json_to_bin)
             printf("%*s[\n", int(state.stack.size() * 4), "");
         state.stack.push_back({type, false});
@@ -2452,11 +2644,11 @@ inline bool json_to_bin(pseudo_array*, json_to_bin_state& state, bool, const abi
     return type->array_of->ser && type->array_of->ser->json_to_bin(state, false, type->array_of, event, true);
 }
 
-inline bool json_to_bin(pseudo_variant*, json_to_bin_state& state, bool allow_extensions, const abi_type* type,
-                        event_type event, bool start) {
+ABIEOS_NODISCARD inline bool json_to_bin(pseudo_variant*, json_to_bin_state& state, bool allow_extensions,
+                                         const abi_type* type, event_type event, bool start) {
     if (start) {
         if (event != event_type::received_start_array)
-            throw error(R"(expected variant: ["type", value])");
+            return set_error(state, R"(expected variant: ["type", value])");
         if (trace_json_to_bin)
             printf("%*s[ variant\n", int(state.stack.size() * 4), "");
         state.stack.push_back({type, allow_extensions});
@@ -2466,7 +2658,7 @@ inline bool json_to_bin(pseudo_variant*, json_to_bin_state& state, bool allow_ex
     ++stack_entry.position;
     if (event == event_type::received_end_array) {
         if (stack_entry.position != 2)
-            throw error(R"(expected variant: ["type", value])");
+            return set_error(state, R"(expected variant: ["type", value])");
         if (trace_json_to_bin)
             printf("%*s]\n", int((state.stack.size() - 1) * 4), "");
         state.stack.pop_back();
@@ -2480,28 +2672,33 @@ inline bool json_to_bin(pseudo_variant*, json_to_bin_state& state, bool allow_ex
             auto it = std::find_if(stack_entry.type->fields.begin(), stack_entry.type->fields.end(),
                                    [&](auto& field) { return field.name == typeName; });
             if (it == stack_entry.type->fields.end())
-                throw error("type is not valid for this variant");
+                return set_error(state, "type is not valid for this variant");
             stack_entry.variant_type_index = it - stack_entry.type->fields.begin();
             push_varuint32(state.bin, stack_entry.variant_type_index);
             return true;
         } else
-            throw error(R"(expected variant: ["type", value])");
+            return set_error(state, R"(expected variant: ["type", value])");
     } else if (stack_entry.position == 1) {
         auto& field = stack_entry.type->fields[stack_entry.variant_type_index];
         return field.type->ser && field.type->ser->json_to_bin(state, allow_extensions, field.type, event, true);
     } else {
-        throw error(R"(expected variant: ["type", value])");
+        return set_error(state, R"(expected variant: ["type", value])");
     }
 }
 
 template <typename T>
-auto json_to_bin(T*, json_to_bin_state& state, bool, const abi_type*, event_type event, bool start)
+ABIEOS_NODISCARD auto json_to_bin(T*, json_to_bin_state& state, bool, const abi_type*, event_type event, bool start)
     -> std::enable_if_t<std::is_arithmetic_v<T>, bool> {
-    push_raw(state.bin, json_to_number<T>(state, event));
+
+    T x;
+    if (!json_to_number(x, state, event))
+        return false;
+    push_raw(state.bin, x);
     return true;
 }
 
-inline bool json_to_bin(std::string*, json_to_bin_state& state, bool, const abi_type*, event_type event, bool start) {
+ABIEOS_NODISCARD inline bool json_to_bin(std::string*, json_to_bin_state& state, bool, const abi_type*,
+                                         event_type event, bool start) {
     if (event == event_type::received_string) {
         auto& s = state.get_string();
         if (trace_json_to_bin)
@@ -2510,19 +2707,20 @@ inline bool json_to_bin(std::string*, json_to_bin_state& state, bool, const abi_
         state.bin.insert(state.bin.end(), s.begin(), s.end());
         return true;
     } else
-        throw error("expected string");
+        return set_error(state, "expected string");
 }
 
 ///////////////////////////////////////////////////////////////////////////////
 // bin_to_json
 ///////////////////////////////////////////////////////////////////////////////
 
-inline bool bin_to_json(input_buffer& bin, const abi_type* type, std::string& dest) {
+ABIEOS_NODISCARD inline bool bin_to_json(input_buffer& bin, std::string& error, const abi_type* type,
+                                         std::string& dest) {
     if (!type->ser)
         return false;
     rapidjson::StringBuffer buffer{};
     rapidjson::Writer<rapidjson::StringBuffer> writer{buffer};
-    bin_to_json_state state{bin, writer};
+    bin_to_json_state state{bin, error, writer};
     if (!type->ser || !type->ser->bin_to_json(state, true, type, true))
         return false;
     while (!state.stack.empty()) {
@@ -2530,28 +2728,32 @@ inline bool bin_to_json(input_buffer& bin, const abi_type* type, std::string& de
         if (!entry.type->ser || !entry.type->ser->bin_to_json(state, entry.allow_extensions, entry.type, false))
             return false;
         if (state.stack.size() > max_stack_size)
-            throw error("recursion limit reached");
+            return set_error(state, "recursion limit reached");
     }
     dest = buffer.GetString();
     return true;
 }
 
-inline bool bin_to_json(pseudo_optional*, bin_to_json_state& state, bool allow_extensions, const abi_type* type, bool) {
-    if (read_bin<uint8_t>(state.bin))
+ABIEOS_NODISCARD inline bool bin_to_json(pseudo_optional*, bin_to_json_state& state, bool allow_extensions,
+                                         const abi_type* type, bool) {
+    bool present;
+    if (!read_raw(state.bin, state.error, present))
+        return false;
+    if (present)
         return type->optional_of->ser &&
                type->optional_of->ser->bin_to_json(state, allow_extensions, type->optional_of, true);
     state.writer.Null();
     return true;
 }
 
-inline bool bin_to_json(pseudo_extension*, bin_to_json_state& state, bool allow_extensions, const abi_type* type,
-                        bool) {
+ABIEOS_NODISCARD inline bool bin_to_json(pseudo_extension*, bin_to_json_state& state, bool allow_extensions,
+                                         const abi_type* type, bool) {
     return type->extension_of->ser &&
            type->extension_of->ser->bin_to_json(state, allow_extensions, type->extension_of, true);
 }
 
-inline bool bin_to_json(pseudo_object*, bin_to_json_state& state, bool allow_extensions, const abi_type* type,
-                        bool start) {
+ABIEOS_NODISCARD inline bool bin_to_json(pseudo_object*, bin_to_json_state& state, bool allow_extensions,
+                                         const abi_type* type, bool start) {
     if (start) {
         if (trace_bin_to_json)
             printf("%*s{ %d fields\n", int(state.stack.size() * 4), "", int(type->fields.size()));
@@ -2581,10 +2783,12 @@ inline bool bin_to_json(pseudo_object*, bin_to_json_state& state, bool allow_ext
     }
 }
 
-inline bool bin_to_json(pseudo_array*, bin_to_json_state& state, bool, const abi_type* type, bool start) {
+ABIEOS_NODISCARD inline bool bin_to_json(pseudo_array*, bin_to_json_state& state, bool, const abi_type* type,
+                                         bool start) {
     if (start) {
         state.stack.push_back({type, false});
-        state.stack.back().array_size = read_varuint32(state.bin);
+        if (!read_varuint32(state.bin, state.error, state.stack.back().array_size))
+            return false;
         if (trace_bin_to_json)
             printf("%*s[ %d items\n", int(state.stack.size() * 4), "", int(state.stack.back().array_size));
         state.writer.StartArray();
@@ -2605,8 +2809,8 @@ inline bool bin_to_json(pseudo_array*, bin_to_json_state& state, bool, const abi
     }
 }
 
-inline bool bin_to_json(pseudo_variant*, bin_to_json_state& state, bool allow_extensions, const abi_type* type,
-                        bool start) {
+ABIEOS_NODISCARD inline bool bin_to_json(pseudo_variant*, bin_to_json_state& state, bool allow_extensions,
+                                         const abi_type* type, bool start) {
     if (start) {
         state.stack.push_back({type, allow_extensions});
         if (trace_bin_to_json)
@@ -2616,9 +2820,11 @@ inline bool bin_to_json(pseudo_variant*, bin_to_json_state& state, bool allow_ex
     }
     auto& stack_entry = state.stack.back();
     if (++stack_entry.position == 0) {
-        auto index = read_varuint32(state.bin);
+        uint32_t index;
+        if (!read_varuint32(state.bin, state.error, index))
+            return false;
         if (index >= stack_entry.type->fields.size())
-            throw error("invalid variant type index");
+            return set_error(state, "invalid variant type index");
         auto& f = stack_entry.type->fields[index];
         state.writer.String(f.name.c_str());
         return f.type->ser &&
@@ -2633,25 +2839,30 @@ inline bool bin_to_json(pseudo_variant*, bin_to_json_state& state, bool allow_ex
 }
 
 template <typename T>
-auto bin_to_json(T*, bin_to_json_state& state, bool, const abi_type*, bool start)
+ABIEOS_NODISCARD auto bin_to_json(T*, bin_to_json_state& state, bool, const abi_type*, bool start)
     -> std::enable_if_t<std::is_arithmetic_v<T>, bool> {
 
+    T v;
+    if (!read_raw(state.bin, state.error, v))
+        return false;
     if constexpr (std::is_same_v<T, bool>) {
-        return state.writer.Bool(read_bin<T>(state.bin));
+        return state.writer.Bool(v);
     } else if constexpr (std::is_floating_point_v<T>) {
-        return state.writer.Double(read_bin<T>(state.bin));
+        return state.writer.Double(v);
     } else if constexpr (sizeof(T) == 8) {
-        auto s = std::to_string(read_bin<T>(state.bin));
+        auto s = std::to_string(v);
         return state.writer.String(s.c_str(), s.size());
     } else if constexpr (std::is_signed_v<T>) {
-        return state.writer.Int64(read_bin<T>(state.bin));
+        return state.writer.Int64(v);
     } else {
-        return state.writer.Uint64(read_bin<T>(state.bin));
+        return state.writer.Uint64(v);
     }
 }
 
-inline bool bin_to_json(std::string*, bin_to_json_state& state, bool, const abi_type*, bool start) {
-    auto s = read_string(state.bin);
+ABIEOS_NODISCARD inline bool bin_to_json(std::string*, bin_to_json_state& state, bool, const abi_type*, bool start) {
+    std::string s;
+    if (!read_string(state.bin, state.error, s))
+        return false;
     return state.writer.String(s.c_str(), s.size());
 }
 
