@@ -8,7 +8,7 @@
 #include <string>
 #include <string_view>
 
-#include "ripemd160.hpp"
+#include "abieos_ripemd160.hpp"
 
 #define ABIEOS_NODISCARD [[nodiscard]]
 
@@ -201,10 +201,10 @@ struct signature {
 
 ABIEOS_NODISCARD inline bool digest_message_ripemd160(std::array<unsigned char, 20>& digest, std::string& error,
                                                       const unsigned char* message, size_t message_len) {
-    ripemd160::ripemd160_state self;
-    ripemd160::ripemd160_init(&self);
-    ripemd160::ripemd160_update(&self, message, message_len);
-    if (!ripemd160::ripemd160_digest(&self, digest.data()))
+    abieos_ripemd160::ripemd160_state self;
+    abieos_ripemd160::ripemd160_init(&self);
+    abieos_ripemd160::ripemd160_update(&self, message, message_len);
+    if (!abieos_ripemd160::ripemd160_digest(&self, digest.data()))
         return set_error(error, "ripemd failed");
     return true;
 }
@@ -213,11 +213,11 @@ template <size_t size, int suffix_size>
 ABIEOS_NODISCARD inline bool digest_suffix_ripemd160(std::array<unsigned char, 20>& digest, std::string& error,
                                                      const std::array<uint8_t, size>& data,
                                                      const char (&suffix)[suffix_size]) {
-    ripemd160::ripemd160_state self;
-    ripemd160::ripemd160_init(&self);
-    ripemd160::ripemd160_update(&self, data.data(), data.size());
-    ripemd160::ripemd160_update(&self, (uint8_t*)suffix, suffix_size - 1);
-    if (!ripemd160::ripemd160_digest(&self, digest.data()))
+    abieos_ripemd160::ripemd160_state self;
+    abieos_ripemd160::ripemd160_init(&self);
+    abieos_ripemd160::ripemd160_update(&self, data.data(), data.size());
+    abieos_ripemd160::ripemd160_update(&self, (uint8_t*)suffix, suffix_size - 1);
+    if (!abieos_ripemd160::ripemd160_digest(&self, digest.data()))
         return set_error(error, "ripemd failed");
     return true;
 }
