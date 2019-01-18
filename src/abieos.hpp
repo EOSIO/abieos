@@ -493,30 +493,23 @@ ABIEOS_NODISCARD bool json_to_number(T& dest, State& state, event_type event) {
         return true;
     }
     if (event == event_type::received_string) {
-        auto check = [&](auto f, bool check_result = true) {
-            using T2 = decltype(f());
-            T2 result;
-            try {
-                result = f();
-            } catch (...) {
-                return set_error(state.error, "number is out of range or has bad format");
-            }
-            if (check_result && (T2)(T)result != result)
-                return set_error(state.error, "number is out of range");
-            dest = result;
-            return true;
-        };
         auto& s = state.get_string();
-        if (std::is_integral_v<T> && std::is_signed_v<T>) {
-            return check([&] { return stoll(s); });
-        } else if (std::is_integral_v<T> && !std::is_signed_v<T>) {
-            if (s.find('-') != s.npos)
-                return set_error(state.error, "expected non-negative number");
-            return check([&] { return stoull(s); });
-        } else if (std::is_same_v<T, float>) {
-            return check([&] { return stof(s); }, false);
-        } else if (std::is_same_v<T, double>) {
-            return check([&] { return stod(s); }, false);
+        if constexpr (std::is_integral_v<T>) {
+            return decimal_to_binary(dest, state.error, s);
+        } else if constexpr (std::is_same_v<T, float>) {
+            errno = 0;
+            char* end;
+            dest = strtof(s.c_str(), &end);
+            if (errno || end == s.c_str())
+                return set_error(state.error, "number is out of range or has bad format");
+            return true;
+        } else if constexpr (std::is_same_v<T, double>) {
+            errno = 0;
+            char* end;
+            dest = strtod(s.c_str(), &end);
+            if (errno || end == s.c_str())
+                return set_error(state.error, "number is out of range or has bad format");
+            return true;
         }
     }
     return set_error(state.error, "expected number or boolean");
@@ -1149,15 +1142,17 @@ ABIEOS_NODISCARD inline bool string_to_time_point(time_point& dest, std::string&
     time_point_sec tps;
     if (!string_to_time_point_sec(tps, error, s.c_str()))
         return false;
+    dest.microseconds = tps.utc_seconds * 1000000ull;
     auto dot = s.find('.');
-    if (dot == std::string::npos)
-        dest.microseconds = tps.utc_seconds * 1000000ull;
-    else {
+    if (dot != std::string::npos) {
         auto ms = s.substr(dot);
         ms[0] = '1';
         while (ms.size() < 4)
             ms.push_back('0');
-        dest.microseconds = tps.utc_seconds * 1000000ull + (stoull(ms) - 1000) * 1000;
+        uint32_t u;
+        if (!decimal_to_binary(u, error, ms))
+            return false;
+        dest.microseconds += (u - 1000) * 1000;
     }
     return true;
 }

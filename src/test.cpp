@@ -397,8 +397,7 @@ void check_types() {
     check_error(context, "failed to parse", [&] { return abieos_json_to_bin(context, 0, "bool", R"(trues)"); });
     check_error(context, "expected number or boolean",
                 [&] { return abieos_json_to_bin(context, 0, "bool", R"(null)"); });
-    check_error(context, "number is out of range or has bad format",
-                [&] { return abieos_json_to_bin(context, 0, "bool", R"("foo")"); });
+    check_error(context, "invalid number", [&] { return abieos_json_to_bin(context, 0, "bool", R"("foo")"); });
     check_type(context, 0, "int8", R"(0)");
     check_type(context, 0, "int8", R"(127)");
     check_type(context, 0, "int8", R"(-128)");
@@ -446,13 +445,13 @@ void check_types() {
     check_type(context, 0, "int64", R"("-9223372036854775808")");
     check_type(context, 0, "uint64", R"("0")");
     check_type(context, 0, "uint64", R"("18446744073709551615")");
-    check_error(context, "number is out of range or has bad format",
+    check_error(context, "number is out of range",
                 [&] { return abieos_json_to_bin(context, 0, "int64", "9223372036854775808"); });
-    check_error(context, "number is out of range or has bad format",
+    check_error(context, "number is out of range",
                 [&] { return abieos_json_to_bin(context, 0, "int64", "-9223372036854775809"); });
     check_error(context, "expected non-negative number",
                 [&] { return abieos_json_to_bin(context, 0, "uint64", "-1"); });
-    check_error(context, "number is out of range or has bad format",
+    check_error(context, "number is out of range",
                 [&] { return abieos_json_to_bin(context, 0, "uint64", "18446744073709551616"); });
     check_type(context, 0, "int128", R"("0")");
     check_type(context, 0, "int128", R"("1")");

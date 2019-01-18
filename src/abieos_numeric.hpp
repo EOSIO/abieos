@@ -72,6 +72,50 @@ ABIEOS_NODISCARD inline bool decimal_to_binary(std::array<uint8_t, size>& result
     return true;
 }
 
+template <typename T>
+ABIEOS_NODISCARD inline auto decimal_to_binary(T& result, std::string& error, std::string_view s)
+    -> std::enable_if_t<std::is_unsigned_v<T>, bool> {
+    result = 0;
+    if (s.empty())
+        return set_error(error, "expected number");
+    if (s[0] == '-')
+        return set_error(error, "expected non-negative number");
+    for (auto& src_digit : s) {
+        if (src_digit < '0' || src_digit > '9')
+            return set_error(error, "invalid number");
+        T x = result * 10 + src_digit - '0';
+        if (x < result)
+            return set_error(error, "number is out of range");
+        result = x;
+    }
+    return true;
+}
+
+template <typename T>
+ABIEOS_NODISCARD inline auto decimal_to_binary(T& result, std::string& error, std::string_view s)
+    -> std::enable_if_t<std::is_signed_v<T>, bool> {
+    bool neg = false;
+    if (!s.empty() && s[0] == '-') {
+        neg = true;
+        s.remove_prefix(1);
+        if (s.empty() || s[0] == '-')
+            return set_error(error, "invalid number");
+    }
+    std::make_unsigned_t<T> u;
+    if (!decimal_to_binary(u, error, s))
+        return false;
+    if (neg) {
+        result = -u;
+        if (result > 0)
+            return set_error(error, "number is out of range");
+    } else {
+        result = u;
+        if (result < 0)
+            return set_error(error, "number is out of range");
+    }
+    return true;
+}
+
 template <auto size>
 std::string binary_to_decimal(const std::array<uint8_t, size>& bin) {
     std::string result("0");
