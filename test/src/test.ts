@@ -12,6 +12,7 @@ const transactionAbi = require('../../external/eosjs/src/transaction.abi.json');
 import * as eosjs from '../../external/eosjs/src/eosjs-api';
 import * as eosjs_jsonrpc from '../../external/eosjs/src/eosjs-jsonrpc';
 import * as eosjs_jssig from '../../external/eosjs/src/eosjs-jssig';
+import * as eosjs_ser from '../../external/eosjs/src/eosjs-serialize';
 
 const useTokenHexApi = true;
 const tokenHexApi =
@@ -137,20 +138,20 @@ function name(s: string) {
     return l.abieos_string_to_name(context, cstr(s));
 }
 
-const rpc = new eosjs_jsonrpc.JsonRpc(rpcEndpoint, { fetch });
+const rpc = new eosjs_jsonrpc.default(rpcEndpoint, { fetch });
 const signatureProvider = new eosjs_jssig.default(['5JtUScZK2XEp3g9gh7F8bwtPTRAkASmNrrftmx4AxDKD5K4zDnr']);
 const textEncoder = new (require('util').TextEncoder);
 const textDecoder = new (require('util').TextDecoder)('utf-8', { fatal: true });
-const api = new eosjs.Api({ rpc, signatureProvider, chainId: null, textEncoder, textDecoder });
-const abiTypes = eosjs.serialize.getTypesFromAbi(eosjs.serialize.createInitialTypes(), abiAbi);
-const js2Types = eosjs.serialize.getTypesFromAbi(eosjs.serialize.createInitialTypes(), transactionAbi);
+const api = new eosjs.default({ rpc, signatureProvider, chainId: null, textEncoder, textDecoder });
+const abiTypes = eosjs_ser.getTypesFromAbi(eosjs_ser.createInitialTypes(), abiAbi);
+const js2Types = eosjs_ser.getTypesFromAbi(eosjs_ser.createInitialTypes(), transactionAbi);
 
 function eosjs_hex_abi_to_json(hex: string): any {
-    return api.rawAbiToJson(eosjs.serialize.hexToUint8Array(hex));
+    return api.rawAbiToJson(eosjs_ser.hexToUint8Array(hex));
 }
 
 function eosjs_json_abi_to_hex(abi: any) {
-    let buf = new eosjs.serialize.SerialBuffer({ textEncoder, textDecoder });
+    let buf = new eosjs_ser.SerialBuffer({ textEncoder, textDecoder });
     abiTypes.get("abi_def").serialize(buf, {
         "types": [],
         "actions": [],
@@ -161,7 +162,7 @@ function eosjs_json_abi_to_hex(abi: any) {
         "abi_extensions": [],
         ...abi
     });
-    return eosjs.serialize.arrayToHex(buf.asUint8Array());
+    return eosjs_ser.arrayToHex(buf.asUint8Array());
 }
 
 function abieos_json_to_hex(contract: number, type: string, data: string) {
@@ -176,15 +177,15 @@ function abieos_hex_to_json(contract: number, type: string, hex: string) {
 }
 
 function eosjs_json_to_hex(types: any, type: string, data: any) {
-    let js2Type = eosjs.serialize.getType(types, type);
-    let buf = new eosjs.serialize.SerialBuffer({ textEncoder, textDecoder });
+    let js2Type = eosjs_ser.getType(types, type);
+    let buf = new eosjs_ser.SerialBuffer({ textEncoder, textDecoder });
     js2Type.serialize(buf, data);
-    return eosjs.serialize.arrayToHex(buf.asUint8Array());
+    return eosjs_ser.arrayToHex(buf.asUint8Array());
 }
 
 function eosjs_hex_to_json(types: any, type: string, hex: string) {
-    let js2Type = eosjs.serialize.getType(types, type);
-    let buf = new eosjs.serialize.SerialBuffer({ textEncoder, textDecoder, array: eosjs.serialize.hexToUint8Array(hex) });
+    let js2Type = eosjs_ser.getType(types, type);
+    let buf = new eosjs_ser.SerialBuffer({ textEncoder, textDecoder, array: eosjs_ser.hexToUint8Array(hex) });
     return js2Type.deserialize(buf);
 }
 
@@ -208,10 +209,10 @@ function check_type(contract: number, types: any, type: string, data: string, ex
     json = JSON.stringify(JSON.parse(json));
 
     //console.log(type, data);
-    let js2Type = eosjs.serialize.getType(types, type);
-    let buf = new eosjs.serialize.SerialBuffer({ textEncoder, textDecoder });
+    let js2Type = eosjs_ser.getType(types, type);
+    let buf = new eosjs_ser.SerialBuffer({ textEncoder, textDecoder });
     js2Type.serialize(buf, JSON.parse(data));
-    let js2Hex = eosjs.serialize.arrayToHex(buf.asUint8Array()).toUpperCase();
+    let js2Hex = eosjs_ser.arrayToHex(buf.asUint8Array()).toUpperCase();
     //console.log(hex)
     //console.log(js2Hex)
     if (js2Hex != hex)
@@ -228,8 +229,8 @@ function check_types() {
     let test = name('test.abi');
     check(l.abieos_set_abi_hex(context, token, cstr(tokenHexApi)));
     check(l.abieos_set_abi(context, test, cstr(testAbi)));
-    const tokenTypes = eosjs.serialize.getTypesFromAbi(eosjs.serialize.createInitialTypes(), eosjs_hex_abi_to_json(tokenHexApi));
-    const testTypes = eosjs.serialize.getTypesFromAbi(eosjs.serialize.createInitialTypes(), eosjs_hex_abi_to_json(eosjs_json_abi_to_hex(JSON.parse(testAbi))));
+    const tokenTypes = eosjs_ser.getTypesFromAbi(eosjs_ser.createInitialTypes(), eosjs_hex_abi_to_json(tokenHexApi));
+    const testTypes = eosjs_ser.getTypesFromAbi(eosjs_ser.createInitialTypes(), eosjs_hex_abi_to_json(eosjs_json_abi_to_hex(JSON.parse(testAbi))));
 
     check_throw('Error: missing abi_def.version (type=string)', () => eosjs_hex_abi_to_json(eosjs_json_abi_to_hex({})));
     check_throw('Error: Unsupported abi version', () => eosjs_hex_abi_to_json(eosjs_json_abi_to_hex({ version: '' })));
@@ -370,7 +371,7 @@ function check_types() {
     check_type(0, js2Types, 'block_timestamp_type', '"2018-06-15T19:17:47.500"');
     check_type(0, js2Types, 'block_timestamp_type', '"2018-06-15T19:17:48.000"');
     check_throw('Error: Invalid time format', () => eosjs_json_to_hex(js2Types, 'block_timestamp_type', true));
-    check_type(0, js2Types, 'name', '""', '"............."');
+    check_type(0, js2Types, 'name', '""');
     check_type(0, js2Types, 'name', '"1"');
     check_type(0, js2Types, 'name', '"abcd"');
     check_type(0, js2Types, 'name', '"ab.cd.ef"');
@@ -502,7 +503,7 @@ async function push_transfer() {
     let info = await rpc.get_info();
     let refBlock = await rpc.get_block(info.head_block_num - 3);
     let transaction = {
-        expiration: eosjs.serialize.timePointSecToDate(eosjs.serialize.dateToTimePointSec(refBlock.timestamp) + 10),
+        expiration: eosjs_ser.timePointSecToDate(eosjs_ser.dateToTimePointSec(refBlock.timestamp) + 10),
         ref_block_num: refBlock.block_num,
         ref_block_prefix: refBlock.ref_block_prefix,
         max_net_usage_words: 0,
@@ -528,7 +529,7 @@ async function push_transfer() {
     let sig = await signatureProvider.sign({
         chainId: info.chain_id,
         requiredKeys: await signatureProvider.getAvailableKeys(),
-        serializedTransaction: eosjs.serialize.hexToUint8Array(transactionDataHex),
+        serializedTransaction: eosjs_ser.hexToUint8Array(transactionDataHex),
         abis: [],
     });
     console.log('sig:', sig)

@@ -539,7 +539,7 @@ void check_types() {
     check_type(context, 0, "block_timestamp_type", R"("2018-06-15T19:17:48.000")");
     check_error(context, "expected string containing block_timestamp_type",
                 [&] { return abieos_json_to_bin(context, 0, "block_timestamp_type", "true"); });
-    check_type(context, 0, "name", R"("")", R"(".............")");
+    check_type(context, 0, "name", R"("")");
     check_type(context, 0, "name", R"("1")");
     check_type(context, 0, "name", R"("abcd")");
     check_type(context, 0, "name", R"("ab.cd.ef")");

@@ -872,10 +872,7 @@ inline std::string name_to_string(uint64_t name) {
     }
 
     const auto last = str.find_last_not_of('.');
-    if (last != std::string::npos)
-        str = str.substr(0, last + 1);
-
-    return str;
+    return str.substr(0, last + 1);
 }
 
 struct name {
