@@ -842,7 +842,7 @@ ABIEOS_NODISCARD inline bool bin_to_json(signature*, bin_to_json_state& state, b
     return state.writer.String(result.c_str(), result.size());
 }
 
-inline constexpr uint64_t char_to_symbol(char c) {
+inline constexpr uint64_t char_to_name_digit(char c) {
     if (c >= 'a' && c <= 'z')
         return (c - 'a') + 6;
     if (c >= '1' && c <= '5')
@@ -854,10 +854,47 @@ inline constexpr uint64_t string_to_name(const char* str) {
     uint64_t name = 0;
     int i = 0;
     for (; str[i] && i < 12; ++i)
-        name |= (char_to_symbol(str[i]) & 0x1f) << (64 - 5 * (i + 1));
+        name |= (char_to_name_digit(str[i]) & 0x1f) << (64 - 5 * (i + 1));
     if (i == 12)
-        name |= char_to_symbol(str[12]) & 0x0F;
+        name |= char_to_name_digit(str[12]) & 0x0F;
     return name;
+}
+
+inline constexpr bool char_to_name_digit_strict(char c, uint64_t& result) {
+    if (c >= 'a' && c <= 'z') {
+        result = (c - 'a') + 6;
+        return true;
+    }
+    if (c >= '1' && c <= '5') {
+        result = (c - '1') + 1;
+        return true;
+    }
+    if (c == '.') {
+        result = 0;
+        return true;
+    }
+    return false;
+}
+
+inline constexpr bool string_to_name_strict(std::string_view str, uint64_t& name) {
+    name = 0;
+    unsigned i = 0;
+    for (; i < str.size() && i < 12; ++i) {
+        uint64_t x = 0;
+        if (!char_to_name_digit_strict(str[i], x))
+            return false;
+        name |= (x & 0x1f) << (64 - 5 * (i + 1));
+    }
+    if (i < str.size() && i == 12) {
+        uint64_t x = 0;
+        if (!char_to_name_digit_strict(str[i], x) || x != (x & 0xf))
+            return false;
+        name |= x;
+        ++i;
+    }
+    if (i < str.size())
+        return false;
+    return true;
 }
 
 inline std::string name_to_string(uint64_t name) {
@@ -1232,15 +1269,16 @@ struct symbol_code {
     uint64_t value = 0;
 };
 
-ABIEOS_NODISCARD inline bool string_to_symbol_code(uint64_t& result, std::string& error, const char* str) {
-    while (*str == ' ')
-        ++str;
+ABIEOS_NODISCARD inline bool string_to_symbol_code(uint64_t& result, std::string& error, std::string_view str) {
+    while (!str.empty() && str.front() == ' ')
+        str.remove_prefix(1);
     result = 0;
     uint32_t i = 0;
-    while (*str >= 'A' && *str <= 'Z') {
+    while (!str.empty() && str.front() >= 'A' && str.front() <= 'Z') {
         if (i >= 7)
             return set_error(error, "expected string containing symbol_code");
-        result |= uint64_t(*str++) << (8 * i++);
+        result |= uint64_t(str.front()) << (8 * i++);
+        str.remove_prefix(1);
     }
     return true;
 }
@@ -1282,19 +1320,21 @@ struct symbol {
 };
 
 ABIEOS_NODISCARD inline bool string_to_symbol(uint64_t& result, std::string& error, uint8_t precision,
-                                              const char* str) {
+                                              std::string_view str) {
     if (!string_to_symbol_code(result, error, str))
         return false;
     result = (result << 8) | precision;
     return true;
 }
 
-ABIEOS_NODISCARD inline bool string_to_symbol(uint64_t& result, std::string& error, const char* str) {
+ABIEOS_NODISCARD inline bool string_to_symbol(uint64_t& result, std::string& error, std::string_view str) {
     uint8_t precision = 0;
-    while (*str >= '0' && *str <= '9')
-        precision = precision * 10 + (*str++ - '0');
-    if (*str == ',')
-        ++str;
+    while (!str.empty() && str.front() >= '0' && str.front() <= '9') {
+        precision = precision * 10 + (str.front() - '0');
+        str.remove_prefix(1);
+    }
+    if (!str.empty() && str.front() == ',')
+        str.remove_prefix(1);
     return string_to_symbol(result, error, precision, str);
 }
 
