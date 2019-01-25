@@ -89,7 +89,7 @@ template <typename T>
 void json_to_native(T& obj, std::string_view json) {
     std::string error;
     if (!json_to_native(obj, error, json))
-        throw new abieos::error(error);
+        throw abieos::error(error);
 }
 
 } // namespace abieos
