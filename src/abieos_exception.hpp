@@ -71,6 +71,22 @@ T read_raw(input_buffer& bin) {
     return x;
 }
 
+inline uint32_t read_varuint32(input_buffer& bin) {
+    std::string error;
+    uint32_t x;
+    if (!read_varuint32(bin, error, x))
+        throw abieos::error(error);
+    return x;
+}
+
+inline std::string read_string(input_buffer& bin) {
+    std::string error;
+    std::string x;
+    if (!read_string(bin, error, x))
+        throw abieos::error(error);
+    return x;
+}
+
 template <typename T>
 void bin_to_native(T& obj, input_buffer& bin) {
     std::string error;
@@ -89,6 +105,26 @@ template <typename T>
 void json_to_native(T& obj, std::string_view json) {
     std::string error;
     if (!json_to_native(obj, error, json))
+        throw abieos::error(error);
+}
+
+inline void check_abi_version(const std::string& s) {
+    std::string error;
+    if (!check_abi_version(s, error))
+        throw abieos::error(error);
+}
+
+inline contract create_contract(const abi_def& abi) {
+    std::string error;
+    contract c;
+    if (!fill_contract(c, error, abi))
+        throw abieos::error(error);
+    return c;
+}
+
+inline void json_to_bin(std::vector<char>& bin, const abi_type* type, const jvalue& value) {
+    std::string error;
+    if (!json_to_bin(bin, error, type, value))
         throw abieos::error(error);
 }
 
