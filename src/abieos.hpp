@@ -604,6 +604,16 @@ struct fixed_binary {
     }
 };
 
+template <unsigned size>
+bool operator==(const fixed_binary<size>& a, const fixed_binary<size>& b) {
+    return a.value == b.value;
+}
+
+template <unsigned size>
+bool operator!=(const fixed_binary<size>& a, const fixed_binary<size>& b) {
+    return a.value != b.value;
+}
+
 using float128 = fixed_binary<16>;
 using checksum160 = fixed_binary<20>;
 using checksum256 = fixed_binary<32>;
@@ -750,6 +760,8 @@ ABIEOS_NODISCARD inline bool bin_to_json(int128*, bin_to_json_state& state, bool
 ABIEOS_NODISCARD inline bool bin_to_native(public_key& obj, bin_to_native_state& state, bool) {
     return read_raw(state.bin, state.error, obj);
 }
+
+inline void native_to_bin(std::vector<char>& bin, const public_key& obj) { return push_raw(bin, obj); }
 
 ABIEOS_NODISCARD inline bool json_to_native(public_key& obj, json_to_native_state& state, event_type event,
                                             bool start) {
@@ -1924,6 +1936,13 @@ void native_to_bin(std::vector<char>& bin, const T& obj) {
         static_assert(std::is_arithmetic_v<T>);
         push_raw(bin, obj);
     }
+}
+
+template <typename T>
+std::vector<char> native_to_bin(const T& obj) {
+    std::vector<char> bin;
+    native_to_bin(bin, obj);
+    return bin;
 }
 
 inline void native_to_bin(std::vector<char>& bin, const std::string& obj) {
