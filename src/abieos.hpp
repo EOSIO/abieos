@@ -1155,6 +1155,17 @@ ABIEOS_NODISCARD inline bool string_to_time_point_sec(time_point_sec& result, st
     return true;
 }
 
+ABIEOS_NODISCARD inline bool bin_to_native(time_point_sec& obj, bin_to_native_state& state, bool) {
+    return read_raw(state.bin, state.error, obj.utc_seconds);
+}
+
+inline void native_to_bin(std::vector<char>& bin, const time_point_sec& obj) { native_to_bin(bin, obj.utc_seconds); }
+
+ABIEOS_NODISCARD inline bool json_to_native(time_point_sec& obj, json_to_native_state& state, event_type event,
+                                            bool start) {
+    return set_error(state, "can't convert time_point_sec");
+}
+
 template <typename State>
 ABIEOS_NODISCARD bool json_to_bin(time_point_sec*, State& state, bool, const abi_type*, event_type event, bool start) {
     if (event == event_type::received_string) {
@@ -1203,7 +1214,16 @@ ABIEOS_NODISCARD inline bool string_to_time_point(time_point& dest, std::string&
     return true;
 }
 
+ABIEOS_NODISCARD inline bool bin_to_native(time_point& obj, bin_to_native_state& state, bool) {
+    return read_raw(state.bin, state.error, obj.microseconds);
+}
+
 inline void native_to_bin(std::vector<char>& bin, const time_point& obj) { native_to_bin(bin, obj.microseconds); }
+
+ABIEOS_NODISCARD inline bool json_to_native(time_point& obj, json_to_native_state& state, event_type event,
+                                            bool start) {
+    return set_error(state, "can't convert time_point");
+}
 
 template <typename State>
 ABIEOS_NODISCARD bool json_to_bin(time_point*, State& state, bool, const abi_type*, event_type event, bool start) {
