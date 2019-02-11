@@ -547,6 +547,11 @@ inline void native_to_bin(std::vector<char>& bin, const bytes& obj) {
     bin.insert(bin.end(), obj.data.begin(), obj.data.end());
 }
 
+inline void native_to_bin(std::vector<char>& bin, const input_buffer& obj) {
+    push_varuint32(bin, obj.end - obj.pos);
+    bin.insert(bin.end(), obj.pos, obj.end);
+}
+
 ABIEOS_NODISCARD inline bool json_to_native(bytes& obj, json_to_native_state& state, event_type event, bool start) {
     if (event == event_type::received_string) {
         auto& s = state.get_string();
@@ -2175,7 +2180,7 @@ inline constexpr auto abi_serializer_for = abi_serializer_impl<T>{};
 
 struct abi_field {
     std::string name{};
-    struct abi_type* type{};
+    const struct abi_type* type{};
 };
 
 struct abi_type {
