@@ -2201,6 +2201,7 @@ struct abi_type {
 
 struct contract {
     std::map<name, std::string> action_types;
+    std::map<name, std::string> table_types;
     std::map<std::string, abi_type> abi_types;
 };
 
@@ -2310,6 +2311,8 @@ ABIEOS_NODISCARD inline bool fill_variant(std::map<std::string, abi_type>& abi_t
 ABIEOS_NODISCARD inline bool fill_contract(contract& c, std::string& error, const abi_def& abi) {
     for (auto& a : abi.actions)
         c.action_types[a.name] = a.type;
+    for (auto& t : abi.tables)
+        c.table_types[t.name] = t.type;
     for_each_abi_type([&](const char* name, auto* p) {
         abi_type type{name};
         type.ser = &abi_serializer_for<std::decay_t<decltype(*p)>>;
