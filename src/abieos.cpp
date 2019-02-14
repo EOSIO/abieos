@@ -177,6 +177,21 @@ extern "C" const char* abieos_get_type_for_action(abieos_context* context, uint6
     });
 }
 
+extern "C" const char* abieos_get_type_for_table(abieos_context* context, uint64_t contract, uint64_t table) {
+    return handle_exceptions(context, nullptr, [&] {
+        auto contract_it = context->contracts.find(::abieos::name{contract});
+        if (contract_it == context->contracts.end())
+            throw error("contract \"" + name_to_string(contract) + "\" is not loaded");
+        auto& c = contract_it->second;
+
+        auto table_it = c.table_types.find(name{table});
+        if (table_it == c.table_types.end())
+            throw error("contract \"" + name_to_string(contract) + "\" does not have table \"" + name_to_string(table) +
+                        "\"");
+        return table_it->second.c_str();
+    });
+}
+
 extern "C" abieos_bool abieos_json_to_bin(abieos_context* context, uint64_t contract, const char* type,
                                           const char* json) {
     fix_null_str(type);
