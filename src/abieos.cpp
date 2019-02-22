@@ -181,13 +181,13 @@ extern "C" const char* abieos_get_type_for_table(abieos_context* context, uint64
     return handle_exceptions(context, nullptr, [&] {
         auto contract_it = context->contracts.find(::abieos::name{contract});
         if (contract_it == context->contracts.end())
-            throw error("contract \"" + name_to_string(contract) + "\" is not loaded");
+            throw std::runtime_error("contract \"" + name_to_string(contract) + "\" is not loaded");
         auto& c = contract_it->second;
 
         auto table_it = c.table_types.find(name{table});
         if (table_it == c.table_types.end())
-            throw error("contract \"" + name_to_string(contract) + "\" does not have table \"" + name_to_string(table) +
-                        "\"");
+            throw std::runtime_error("contract \"" + name_to_string(contract) + "\" does not have table \"" +
+                                     name_to_string(table) + "\"");
         return table_it->second.c_str();
     });
 }
