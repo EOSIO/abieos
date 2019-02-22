@@ -138,11 +138,11 @@ function name(s: string) {
     return l.abieos_string_to_name(context, cstr(s));
 }
 
-const rpc = new eosjs_jsonrpc.default(rpcEndpoint, { fetch });
-const signatureProvider = new eosjs_jssig.default(['5JtUScZK2XEp3g9gh7F8bwtPTRAkASmNrrftmx4AxDKD5K4zDnr']);
+const rpc = new eosjs_jsonrpc.JsonRpc(rpcEndpoint, { fetch });
+const signatureProvider = new eosjs_jssig.JsSignatureProvider(['5JtUScZK2XEp3g9gh7F8bwtPTRAkASmNrrftmx4AxDKD5K4zDnr']);
 const textEncoder = new (require('util').TextEncoder);
 const textDecoder = new (require('util').TextDecoder)('utf-8', { fatal: true });
-const api = new eosjs.default({ rpc, signatureProvider, chainId: null, textEncoder, textDecoder });
+const api = new eosjs.Api({ rpc, signatureProvider, chainId: null, textEncoder, textDecoder });
 const abiTypes = eosjs_ser.getTypesFromAbi(eosjs_ser.createInitialTypes(), abiAbi);
 const js2Types = eosjs_ser.getTypesFromAbi(eosjs_ser.createInitialTypes(), transactionAbi);
 
