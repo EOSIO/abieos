@@ -1,34 +1,41 @@
 # copyright defined in abieos/LICENSE.txt
 
+set(CMAKE_OSX_DEPLOYMENT_TARGET 10.14)
+
 cmake_minimum_required (VERSION 3.11)
 project(abieos VERSION 0.1 LANGUAGES CXX)
 
-FIND_PACKAGE(Boost 1.58 REQUIRED COMPONENTS date_time)
+set(default_build_type "Release")
+
+if(NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
+  message(STATUS "Setting build type to '${default_build_type}' as none was specified.")
+  set(CMAKE_BUILD_TYPE "${default_build_type}" CACHE
+      STRING "Choose the type of build." FORCE)
+  set_property(CACHE CMAKE_BUILD_TYPE PROPERTY STRINGS
+    "Debug" "Release" "MinSizeRel" "RelWithDebInfo")
+endif()
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
 add_library(abieos MODULE src/abieos.cpp)
-target_include_directories(abieos PUBLIC external/rapidjson/include PRIVATE ${Boost_INCLUDE_DIR})
-target_link_libraries(abieos Boost::date_time)
+target_include_directories(abieos PRIVATE external/rapidjson/include external/date/include)
 
 add_executable(test src/test.cpp src/abieos.cpp)
-target_include_directories(test PUBLIC external/rapidjson/include PRIVATE ${Boost_INCLUDE_DIR})
-target_link_libraries(test Boost::date_time)
+target_include_directories(test PRIVATE external/rapidjson/include external/date/include)
 
 add_executable(test-sanitize src/test.cpp src/abieos.cpp)
-target_include_directories(test-sanitize PUBLIC external/rapidjson/include PRIVATE ${Boost_INCLUDE_DIR})
-target_link_libraries(test-sanitize Boost::date_time -fno-omit-frame-pointer -fsanitize=address,undefined)
+target_include_directories(test-sanitize PRIVATE external/rapidjson/include external/date/include)
+target_link_libraries(test-sanitize -fno-omit-frame-pointer -fsanitize=address,undefined)
 target_compile_options(test-sanitize PUBLIC -fno-omit-frame-pointer -fsanitize=address,undefined)
 
 # add_executable(fuzzer src/fuzzer.cpp src/abieos.cpp)
-# target_include_directories(fuzzer PUBLIC external/rapidjson/include PRIVATE ${Boost_INCLUDE_DIR})
-# target_link_libraries(fuzzer Boost::date_time)
+# target_include_directories(fuzzer PRIVATE external/rapidjson/include external/date/include)
 # target_link_libraries(fuzzer -fsanitize=fuzzer,address,undefined,signed-integer-overflow -fstandalone-debug)
 # target_compile_options(fuzzer PRIVATE -fsanitize=fuzzer,address,undefined,signed-integer-overflow -fstandalone-debug)
 
-if (CMAKE_CXX_COMPILER_ID MATCHES "Clang")
-    target_compile_options(abieos PRIVATE -Wall -Wextra -Wno-unused-parameter)
-    target_compile_options(test PRIVATE -Wall -Wextra -Wno-unused-parameter)
+if (CMAKE_CXX_COMPILER_ID MATCHES Clang|AppleClang)
+    target_compile_options(abieos PRIVATE -Wall -Wextra -Wno-unused-parameter -fcolor-diagnostics)
+    target_compile_options(test PRIVATE -Wall -Wextra -Wno-unused-parameter -fcolor-diagnostics)
 endif()

@@ -43,10 +43,12 @@
  *   "RIPEMD-160 is big-bit-endian, little-byte-endian, and left-justified."
  */
 
+#pragma once
+
 #include <assert.h>
 #include <string.h>
 
-namespace ripemd160 {
+namespace abieos_ripemd160 {
 
 inline constexpr auto ripemd160_digest_size = 20;
 inline constexpr auto ripemd160_magic = 0x9f19dd68u;
