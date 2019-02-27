@@ -3,7 +3,7 @@
 	url = https://github.com/Tencent/rapidjson.git
 [submodule "external/date"]
 	path = external/date
-	url = git@github.com:HowardHinnant/date.git
+	url = https://github.com/HowardHinnant/date.git
 [submodule "external/eosjs_"]
 	path = external/eosjs
-	url = git@github.com:EOSIO/eosjs.git
+	url = https://github.com/EOSIO/eosjs.git
