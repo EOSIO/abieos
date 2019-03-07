@@ -317,11 +317,15 @@ struct bin_to_json_stack_entry {
 struct json_to_jvalue_state : json_reader_handler<json_to_jvalue_state> {
     std::string& error;
     std::vector<json_to_jvalue_stack_entry> stack;
+
+    json_to_jvalue_state(std::string& error) : error{error} {}
 };
 
 struct json_to_native_state : json_reader_handler<json_to_native_state> {
     std::string& error;
     std::vector<native_stack_entry> stack;
+
+    json_to_native_state(std::string& error) : error{error} {}
 };
 
 struct bin_to_native_state {
@@ -348,6 +352,8 @@ struct json_to_bin_state : json_reader_handler<json_to_bin_state> {
     std::vector<size_insertion> size_insertions{};
     std::vector<json_to_bin_stack_entry> stack{};
     bool skipped_extension = false;
+
+    json_to_bin_state(std::string& error) : error{error} {}
 };
 
 struct bin_to_json_state : json_reader_handler<bin_to_json_state> {
@@ -1675,7 +1681,7 @@ ABIEOS_NODISCARD inline bool receive_event(struct json_to_jvalue_state& state, e
 ABIEOS_NODISCARD inline bool json_to_jvalue(jvalue& value, std::string& error, std::string_view json) {
     std::string mutable_json{json};
     mutable_json.push_back(0);
-    json_to_jvalue_state state{.error = error};
+    json_to_jvalue_state state{error};
     state.stack.push_back({&value});
     rapidjson::Reader reader;
     rapidjson::InsituStringStream ss(mutable_json.data());
@@ -2003,7 +2009,7 @@ template <typename T>
 ABIEOS_NODISCARD bool json_to_native(T& obj, std::string& error, std::string_view json) {
     std::string mutable_json{json};
     mutable_json.push_back(0);
-    json_to_native_state state{.error = error};
+    json_to_native_state state{error};
     state.stack.push_back(native_stack_entry{&obj, &native_serializer_for<T>, 0});
     rapidjson::Reader reader;
     rapidjson::InsituStringStream ss(mutable_json.data());
@@ -2590,7 +2596,7 @@ ABIEOS_NODISCARD inline bool json_to_bin(std::vector<char>& bin, std::string& er
                                          std::string_view json) {
     std::string mutable_json{json};
     mutable_json.push_back(0);
-    json_to_bin_state state{.error = error};
+    json_to_bin_state state{error};
     state.stack.push_back({type, true});
     rapidjson::Reader reader;
     rapidjson::InsituStringStream ss(mutable_json.data());
