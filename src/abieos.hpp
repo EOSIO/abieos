@@ -2203,6 +2203,13 @@ struct abi_type {
     bool filled_struct{};
     bool filled_variant{};
     const abi_serializer* ser{};
+
+    abi_type(std::string name = "", std::string alias_of_name = "")
+        : name{std::move(name)}, alias_of_name{std::move(alias_of_name)} {}
+    abi_type(const abi_type&) = delete;
+    abi_type(abi_type&&) = delete;
+    abi_type& operator=(const abi_type&) = delete;
+    abi_type& operator=(abi_type&&) = delete;
 };
 
 struct contract {
@@ -2223,7 +2230,8 @@ ABIEOS_NODISCARD inline bool get_type(abi_type*& result, std::string& error, std
     auto it = abi_types.find(name);
     if (it == abi_types.end()) {
         if (ends_with(name, "?")) {
-            abi_type type{name};
+            abi_type& type = abi_types[name];
+            type.name = name;
             if (!get_type(type.optional_of, error, abi_types, name.substr(0, name.size() - 1), depth + 1))
                 return false;
             if (type.optional_of->optional_of || type.optional_of->array_of)
@@ -2231,10 +2239,11 @@ ABIEOS_NODISCARD inline bool get_type(abi_type*& result, std::string& error, std
             if (type.optional_of->extension_of)
                 return set_error(error, "optional (?) may not contain binary extensions ($)");
             type.ser = &abi_serializer_for<pseudo_optional>;
-            result = &(abi_types[name] = std::move(type));
+            result = &type;
             return true;
         } else if (ends_with(name, "[]")) {
-            abi_type type{name};
+            abi_type& type = abi_types[name];
+            type.name = name;
             if (!get_type(type.array_of, error, abi_types, name.substr(0, name.size() - 2), depth + 1))
                 return false;
             if (type.array_of->array_of || type.array_of->optional_of)
@@ -2242,16 +2251,17 @@ ABIEOS_NODISCARD inline bool get_type(abi_type*& result, std::string& error, std
             if (type.array_of->extension_of)
                 return set_error(error, "array ([]) may not contain binary extensions ($)");
             type.ser = &abi_serializer_for<pseudo_array>;
-            result = &(abi_types[name] = std::move(type));
+            result = &type;
             return true;
         } else if (ends_with(name, "$")) {
-            abi_type type{name};
+            abi_type& type = abi_types[name];
+            type.name = name;
             if (!get_type(type.extension_of, error, abi_types, name.substr(0, name.size() - 1), depth + 1))
                 return false;
             if (type.extension_of->extension_of)
                 return set_error(error, "binary extensions ($) may not contain binary extensions ($)");
             type.ser = &abi_serializer_for<pseudo_extension>;
-            result = &(abi_types[name] = std::move(type));
+            result = &type;
             return true;
         } else
             return set_error(error, "unknown type \"" + name + "\"");
@@ -2320,12 +2330,13 @@ ABIEOS_NODISCARD inline bool fill_contract(contract& c, std::string& error, cons
     for (auto& t : abi.tables)
         c.table_types[t.name] = t.type;
     for_each_abi_type([&](const char* name, auto* p) {
-        abi_type type{name};
+        auto& type = c.abi_types[name];
+        type.name = name;
         type.ser = &abi_serializer_for<std::decay_t<decltype(*p)>>;
-        c.abi_types.insert({name, std::move(type)});
     });
     {
-        abi_type type{"extended_asset"};
+        auto& type = c.abi_types["extended_asset"];
+        type.name = "extended_asset";
         abi_type *asset_type, *name_type;
         if (!get_type(asset_type, error, c.abi_types, "asset", 0) ||
             !get_type(name_type, error, c.abi_types, "name", 0))
@@ -2334,35 +2345,32 @@ ABIEOS_NODISCARD inline bool fill_contract(contract& c, std::string& error, cons
         type.fields.push_back(abi_field{"contract", name_type});
         type.filled_struct = true;
         type.ser = &abi_serializer_for<pseudo_object>;
-        c.abi_types.insert({"extended_asset", std::move(type)});
     }
 
     for (auto& t : abi.types) {
         if (t.new_type_name.empty())
             return set_error(error, "abi has a type with a missing name");
-        auto [_, inserted] = c.abi_types.insert({t.new_type_name, abi_type{t.new_type_name, t.type}});
+        auto [_, inserted] = c.abi_types.try_emplace(t.new_type_name, t.new_type_name, t.type);
         if (!inserted)
             return set_error(error, "abi redefines type \"" + t.new_type_name + "\"");
     }
     for (auto& s : abi.structs) {
         if (s.name.empty())
             return set_error(error, "abi has a struct with a missing name");
-        abi_type type{s.name};
-        type.struct_def = &s;
-        type.ser = &abi_serializer_for<pseudo_object>;
-        auto [_, inserted] = c.abi_types.insert({s.name, std::move(type)});
+        auto [it, inserted] = c.abi_types.try_emplace(s.name, s.name);
         if (!inserted)
             return set_error(error, "abi redefines type \"" + s.name + "\"");
+        it->second.struct_def = &s;
+        it->second.ser = &abi_serializer_for<pseudo_object>;
     }
     for (auto& v : abi.variants.value) {
         if (v.name.empty())
             return set_error(error, "abi has a variant with a missing name");
-        abi_type type{v.name};
-        type.variant_def = &v;
-        type.ser = &abi_serializer_for<pseudo_variant>;
-        auto [_, inserted] = c.abi_types.insert({v.name, std::move(type)});
+        auto [it, inserted] = c.abi_types.try_emplace(v.name, v.name);
         if (!inserted)
             return set_error(error, "abi redefines type \"" + v.name + "\"");
+        it->second.variant_def = &v;
+        it->second.ser = &abi_serializer_for<pseudo_variant>;
     }
     for (auto& [_, t] : c.abi_types)
         if (!t.alias_of_name.empty())
