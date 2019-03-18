@@ -3,7 +3,6 @@
 #include "abieos.h"
 #include "abieos.hpp"
 #include "fuzzer.hpp"
-#include <boost/algorithm/hex.hpp>
 #include <stdexcept>
 #include <stdio.h>
 #include <string>
@@ -250,8 +249,8 @@ const char transactionAbi[] = R"({
 std::string string_to_hex(const std::string& s) {
     std::string result;
     uint8_t size = s.size();
-    boost::algorithm::hex(&size, &size + 1, std::back_inserter(result));
-    boost::algorithm::hex(s.begin(), s.end(), std::back_inserter(result));
+    abieos::hex(&size, &size + 1, std::back_inserter(result));
+    abieos::hex(s.begin(), s.end(), std::back_inserter(result));
     return result;
 }
 
@@ -355,13 +354,17 @@ void check_types() {
             abi = {transactionAbi, transactionAbi + strlen(transactionAbi)};
         } else if (contract == token) {
             abi_is_bin = true;
-            boost::algorithm::unhex(tokenHexAbi, tokenHexAbi + strlen(tokenHexAbi), std::back_inserter(abi));
+            std::string error;
+            if (!abieos::unhex(error, tokenHexAbi, tokenHexAbi + strlen(tokenHexAbi), std::back_inserter(abi)))
+                throw std::runtime_error(error);
         } else if (contract == testAbiName) {
             abi_is_bin = false;
             abi = {testAbi, testAbi + strlen(testAbi)};
         } else if (contract == testHexAbiName) {
             abi_is_bin = true;
-            boost::algorithm::unhex(testHexAbi, testHexAbi + strlen(testHexAbi), std::back_inserter(abi));
+            std::string error;
+            if (!abieos::unhex(error, testHexAbi, testHexAbi + strlen(testHexAbi), std::back_inserter(abi)))
+                throw std::runtime_error(error);
         } else {
             throw std::runtime_error("missing case in check_type");
         }
