@@ -48,6 +48,12 @@ template <typename T>
 inline constexpr bool is_optional_v<std::optional<T>> = true;
 
 template <typename T>
+inline constexpr bool is_variant_v = false;
+
+template <typename... Ts>
+inline constexpr bool is_variant_v<std::variant<Ts...>> = true;
+
+template <typename T>
 inline constexpr bool is_string_v = false;
 
 template <>
