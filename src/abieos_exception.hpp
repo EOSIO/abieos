@@ -22,6 +22,13 @@ inline std::string public_key_to_string(const public_key& key) {
     return dest;
 }
 
+inline std::string signature_to_string(const signature& key) {
+    std::string dest, error;
+    if (!signature_to_string(dest, error, key))
+        throw abieos::error(error);
+    return dest;
+}
+
 inline time_point_sec string_to_time_point_sec(const char* s) {
     time_point_sec result;
     std::string error;
