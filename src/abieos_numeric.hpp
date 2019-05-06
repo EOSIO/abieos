@@ -135,10 +135,8 @@ std::string binary_to_decimal(const std::array<uint8_t, size>& bin) {
     return result;
 }
 
-template <auto size>
-ABIEOS_NODISCARD inline bool base58_to_binary(std::array<uint8_t, size>& result, std::string& error,
-                                              std::string_view s) {
-    memset(result.begin(), 0, result.size());
+ABIEOS_NODISCARD inline bool base58_to_binary(std::vector<uint8_t>& result, std::string& error, std::string_view s) {
+    result.clear();
     for (auto& src_digit : s) {
         int carry = base58_map[src_digit];
         if (carry < 0)
@@ -149,14 +147,18 @@ ABIEOS_NODISCARD inline bool base58_to_binary(std::array<uint8_t, size>& result,
             carry = x >> 8;
         }
         if (carry)
-            return set_error(error, "base-58 value is out of range");
+            result.push_back(carry);
     }
+    for (auto& src_digit : s)
+        if (src_digit == '1')
+            result.push_back(0);
+        else
+            break;
     std::reverse(result.begin(), result.end());
     return true;
 }
 
-template <auto size>
-std::string binary_to_base58(const std::array<uint8_t, size>& bin) {
+inline std::string binary_to_base58(const std::vector<uint8_t>& bin) {
     std::string result("");
     for (auto byte : bin) {
         int carry = byte;
@@ -182,21 +184,28 @@ std::string binary_to_base58(const std::array<uint8_t, size>& bin) {
 enum class key_type : uint8_t {
     k1 = 0,
     r1 = 1,
+    wa = 2,
 };
 
 struct public_key {
-    key_type type{};
-    std::array<uint8_t, 33> data{};
+    static constexpr int k1r1_size = 33;
+
+    key_type type = key_type::k1;
+    std::vector<uint8_t> data = std::vector<uint8_t>(k1r1_size);
 };
 
 struct private_key {
-    key_type type{};
-    std::array<uint8_t, 32> data{};
+    static constexpr int k1r1_size = 32;
+
+    key_type type = key_type::k1;
+    std::vector<uint8_t> data = std::vector<uint8_t>(k1r1_size);
 };
 
 struct signature {
-    key_type type{};
-    std::array<uint8_t, 65> data{};
+    static constexpr int k1r1_size = 65;
+
+    key_type type = key_type::k1;
+    std::vector<uint8_t> data = std::vector<uint8_t>(k1r1_size);
 };
 
 ABIEOS_NODISCARD inline bool digest_message_ripemd160(std::array<unsigned char, 20>& digest, std::string& error,
@@ -209,9 +218,9 @@ ABIEOS_NODISCARD inline bool digest_message_ripemd160(std::array<unsigned char, 
     return true;
 }
 
-template <size_t size, int suffix_size>
+template <int suffix_size>
 ABIEOS_NODISCARD inline bool digest_suffix_ripemd160(std::array<unsigned char, 20>& digest, std::string& error,
-                                                     const std::array<uint8_t, size>& data,
+                                                     const std::vector<uint8_t>& data,
                                                      const char (&suffix)[suffix_size]) {
     abieos_ripemd160::ripemd160_state self;
     abieos_ripemd160::ripemd160_init(&self);
@@ -225,11 +234,13 @@ ABIEOS_NODISCARD inline bool digest_suffix_ripemd160(std::array<unsigned char, 2
 template <typename Key, int suffix_size>
 ABIEOS_NODISCARD bool string_to_key(Key& result, std::string& error, std::string_view s, key_type type,
                                     const char (&suffix)[suffix_size]) {
-    static constexpr auto size = std::tuple_size_v<decltype(Key::data)>;
-    std::array<uint8_t, size + 4> whole;
+    std::vector<uint8_t> whole;
     if (!base58_to_binary(whole, error, s))
         return false;
+    if (whole.size() <= 4)
+        return set_error(error, "key has invalid size");
     result.type = type;
+    result.data.resize(whole.size() - 4);
     memcpy(result.data.data(), whole.data(), result.data.size());
     std::array<unsigned char, 20> ripe_digest;
     if (!digest_suffix_ripemd160(ripe_digest, error, result.data, suffix))
@@ -242,24 +253,25 @@ ABIEOS_NODISCARD bool string_to_key(Key& result, std::string& error, std::string
 template <typename Key, int suffix_size>
 ABIEOS_NODISCARD bool key_to_string(std::string& dest, std::string& error, const Key& key,
                                     const char (&suffix)[suffix_size], const char* prefix) {
-    static constexpr auto size = std::tuple_size_v<decltype(Key::data)>;
     std::array<unsigned char, 20> ripe_digest;
     if (!digest_suffix_ripemd160(ripe_digest, error, key.data, suffix))
         return false;
-    std::array<uint8_t, size + 4> whole;
-    memcpy(whole.data(), key.data.data(), size);
-    memcpy(whole.data() + size, ripe_digest.data(), 4);
+    std::vector<uint8_t> whole(key.data.size() + 4);
+    memcpy(whole.data(), key.data.data(), key.data.size());
+    memcpy(whole.data() + key.data.size(), ripe_digest.data(), 4);
     dest = prefix + binary_to_base58(whole);
     return true;
 }
 
 ABIEOS_NODISCARD inline bool string_to_public_key(public_key& dest, std::string& error, std::string_view s) {
     if (s.size() >= 3 && s.substr(0, 3) == "EOS") {
-        std::array<uint8_t, 37> whole;
+        std::vector<uint8_t> whole;
         if (!base58_to_binary(whole, error, s.substr(3)))
             return false;
         public_key key{key_type::k1};
-        static_assert(whole.size() == key.data.size() + 4);
+        if (whole.size() != 37)
+            return set_error(error, "Key has invalid size");
+        key.data.resize(whole.size() - 4);
         memcpy(key.data.data(), whole.data(), key.data.size());
         std::array<unsigned char, 20> ripe_digest;
         if (!digest_message_ripemd160(ripe_digest, error, key.data.data(), key.data.size()))
@@ -272,6 +284,8 @@ ABIEOS_NODISCARD inline bool string_to_public_key(public_key& dest, std::string&
         return string_to_key(dest, error, s.substr(7), key_type::k1, "K1");
     } else if (s.size() >= 7 && s.substr(0, 7) == "PUB_R1_") {
         return string_to_key(dest, error, s.substr(7), key_type::r1, "R1");
+    } else if (s.size() >= 7 && s.substr(0, 7) == "PUB_WA_") {
+        return string_to_key(dest, error, s.substr(7), key_type::wa, "WA");
     } else {
         return set_error(error, "unrecognized public key format");
     }
@@ -282,6 +296,8 @@ ABIEOS_NODISCARD inline bool public_key_to_string(std::string& dest, std::string
         return key_to_string(dest, error, key, "K1", "PUB_K1_");
     } else if (key.type == key_type::r1) {
         return key_to_string(dest, error, key, "R1", "PUB_R1_");
+    } else if (key.type == key_type::wa) {
+        return key_to_string(dest, error, key, "WA", "PUB_WA_");
     } else {
         return set_error(error, "unrecognized public key format");
     }
@@ -307,6 +323,8 @@ ABIEOS_NODISCARD inline bool string_to_signature(signature& dest, std::string& e
         return string_to_key(dest, error, s.substr(7), key_type::k1, "K1");
     else if (s.size() >= 7 && s.substr(0, 7) == "SIG_R1_")
         return string_to_key(dest, error, s.substr(7), key_type::r1, "R1");
+    else if (s.size() >= 7 && s.substr(0, 7) == "SIG_WA_")
+        return string_to_key(dest, error, s.substr(7), key_type::wa, "WA");
     else
         return set_error(error, "unrecognized signature format");
 }
@@ -316,6 +334,8 @@ ABIEOS_NODISCARD inline bool signature_to_string(std::string& dest, std::string&
         return key_to_string(dest, error, signature, "K1", "SIG_K1_");
     else if (signature.type == key_type::r1)
         return key_to_string(dest, error, signature, "R1", "SIG_R1_");
+    else if (signature.type == key_type::wa)
+        return key_to_string(dest, error, signature, "WA", "SIG_WA_");
     else
         return set_error(error, "unrecognized signature format");
 }
