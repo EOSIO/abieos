@@ -1130,7 +1130,7 @@ inline std::string microseconds_to_str(uint64_t microseconds) {
 struct time_point_sec {
     uint32_t utc_seconds = 0;
 
-    explicit operator std::string() { return microseconds_to_str(uint64_t(utc_seconds) * 1'000'000); }
+    explicit operator std::string() const { return microseconds_to_str(uint64_t(utc_seconds) * 1'000'000); }
 };
 
 ABIEOS_NODISCARD inline bool string_to_time_point_sec(time_point_sec& result, std::string& error, const char* s) {
