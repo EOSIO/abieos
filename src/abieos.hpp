@@ -171,6 +171,7 @@ ABIEOS_NODISCARD inline bool read_raw(input_buffer& bin, std::string& error, boo
 }
 
 ABIEOS_NODISCARD bool read_varuint32(input_buffer& bin, std::string& error, uint32_t& dest);
+ABIEOS_NODISCARD bool read_varuint64(input_buffer& bin, std::string& error, uint64_t& dest);
 
 ABIEOS_NODISCARD inline bool read_string(input_buffer& bin, std::string& error, std::string& dest) {
     uint32_t size;
@@ -534,20 +535,20 @@ struct bytes {
 void push_varuint32(std::vector<char>& bin, uint32_t v);
 
 ABIEOS_NODISCARD inline bool bin_to_native(bytes& obj, bin_to_native_state& state, bool) {
-    uint32_t size;
-    if (!read_varuint32(state.bin, state.error, size))
+    uint64_t size;
+    if (!read_varuint64(state.bin, state.error, size))
         return false;
-    if (size > state.bin.end - state.bin.pos)
+    if (size > uint64_t(state.bin.end - state.bin.pos))
         return set_error(state, "invalid bytes size");
     obj.data.resize(size);
     return read_raw(state.bin, state.error, obj.data.data(), size);
 }
 
 ABIEOS_NODISCARD inline bool bin_to_native(input_buffer& obj, bin_to_native_state& state, bool) {
-    uint32_t size;
-    if (!read_varuint32(state.bin, state.error, size))
+    uint64_t size;
+    if (!read_varuint64(state.bin, state.error, size))
         return false;
-    if (size > state.bin.end - state.bin.pos)
+    if (size > uint64_t(state.bin.end - state.bin.pos))
         return set_error(state, "invalid bytes size");
     obj = {state.bin.pos, state.bin.pos + size};
     state.bin.pos += size;
@@ -597,10 +598,10 @@ ABIEOS_NODISCARD bool json_to_bin(bytes*, State& state, bool, const abi_type*, e
 }
 
 ABIEOS_NODISCARD inline bool bin_to_json(bytes*, bin_to_json_state& state, bool, const abi_type*, bool start) {
-    uint32_t size;
-    if (!read_varuint32(state.bin, state.error, size))
+    uint64_t size;
+    if (!read_varuint64(state.bin, state.error, size))
         return false;
-    if (size > state.bin.end - state.bin.pos)
+    if (size > uint64_t(state.bin.end - state.bin.pos))
         return set_error(state, "invalid bytes size");
     std::vector<char> raw(size);
     if (!read_raw(state.bin, state.error, raw.data(), size))
@@ -1020,6 +1021,21 @@ ABIEOS_NODISCARD inline bool read_varuint32(input_buffer& bin, std::string& erro
         if (!read_raw(bin, error, b))
             return false;
         dest |= uint32_t(b & 0x7f) << shift;
+        shift += 7;
+    } while (b & 0x80);
+    return true;
+}
+
+ABIEOS_NODISCARD inline bool read_varuint64(input_buffer& bin, std::string& error, uint64_t& dest) {
+    dest = 0;
+    int shift = 0;
+    uint8_t b = 0;
+    do {
+        if (shift >= 70)
+            return set_error(error, "invalid varuint64 encoding");
+        if (!read_raw(bin, error, b))
+            return false;
+        dest |= uint64_t(b & 0x7f) << shift;
         shift += 7;
     } while (b & 0x80);
     return true;
