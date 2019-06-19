@@ -58,7 +58,7 @@ typedef struct {
     uint32_t h[5];   /* The current hash state */
     uint64_t length; /* Total number of _bits_ (not bytes) added to the
                         hash.  This includes bits that have been buffered
-                        but not not fed through the compression function yet. */
+                        but not fed through the compression function yet. */
     union {
         uint32_t w[16];
         uint8_t b[64];
@@ -327,7 +327,8 @@ inline void ripemd160_compress(ripemd160_state* self) {
     self->bufpos = 0;
 }
 
-inline void ripemd160_update(ripemd160_state* self, const unsigned char* p, int length) {
+template<typename T>
+inline void ripemd160_update(ripemd160_state* self, T* p, int length) {
     unsigned int bytes_needed;
 
     /* Some assertions */
