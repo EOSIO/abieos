@@ -327,7 +327,7 @@ inline void ripemd160_compress(ripemd160_state* self) {
     self->bufpos = 0;
 }
 
-template<typename T>
+template<typename T, typename std::enable_if<sizeof(T) == 1>::type* = nullptr>
 inline void ripemd160_update(ripemd160_state* self, T* p, int length) {
     unsigned int bytes_needed;
 
