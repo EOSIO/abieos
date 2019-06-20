@@ -155,11 +155,11 @@ ABIEOS_NODISCARD inline bool base58_to_binary(std::array<uint8_t, size>& result,
     return true;
 }
 
-template <auto size>
-std::string binary_to_base58(const std::array<uint8_t, size>& bin) {
+template <typename T, auto size, typename std::enable_if<sizeof(T) == 1>::type* = nullptr>
+std::string binary_to_base58(const std::array<T, size>& bin) {
     std::string result("");
     for (auto byte : bin) {
-        int carry = byte;
+        int carry = static_cast<uint8_t>(byte);
         for (auto& result_digit : result) {
             int x = (base58_map[result_digit] << 8) + carry;
             result_digit = base58_chars[x % 58];
@@ -209,9 +209,9 @@ ABIEOS_NODISCARD inline bool digest_message_ripemd160(std::array<unsigned char, 
     return true;
 }
 
-template <size_t size, int suffix_size>
+template <typename T, size_t size, int suffix_size>
 ABIEOS_NODISCARD inline bool digest_suffix_ripemd160(std::array<unsigned char, 20>& digest, std::string& error,
-                                                     const std::array<uint8_t, size>& data,
+                                                     const std::array<T, size>& data,
                                                      const char (&suffix)[suffix_size]) {
     abieos_ripemd160::ripemd160_state self;
     abieos_ripemd160::ripemd160_init(&self);
