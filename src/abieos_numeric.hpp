@@ -159,9 +159,9 @@ template <typename T, auto size, typename std::enable_if<sizeof(T) == 1>::type* 
 std::string binary_to_base58(const std::array<T, size>& bin) {
     std::string result("");
     for (auto byte : bin) {
-        unsigned int carry = byte;
+        int carry = static_cast<uint8_t>(byte);
         for (auto& result_digit : result) {
-            unsigned int x = (base58_map[result_digit] << 8) + carry;
+            int x = (base58_map[result_digit] << 8) + carry;
             result_digit = base58_chars[x % 58];
             carry = x / 58;
         }
