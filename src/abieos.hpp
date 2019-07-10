@@ -87,6 +87,14 @@ struct member_ptr {
     using member_type = std::decay_t<decltype(member_from_void(std::declval<member_ptr<P>>(), std::declval<void*>()))>;
 };
 
+#define ABIEOS_REFLECT(STRUCT)                                                                                         \
+    template <typename F>                                                                                              \
+    constexpr void for_each_field(STRUCT*, F f)
+
+#define ABIEOS_MEMBER(STRUCT, MEMBER) f(#MEMBER, abieos::member_ptr<&STRUCT::MEMBER>{});
+
+#define ABIEOS_BASE(BASE) for_each_field((BASE*)nullptr, f);
+
 // Pseudo objects never exist, except in serialized form
 struct pseudo_optional;
 struct pseudo_extension;
@@ -1526,10 +1534,9 @@ struct type_def {
     std::string type{};
 };
 
-template <typename F>
-constexpr void for_each_field(type_def*, F f) {
-    f("new_type_name", member_ptr<&type_def::new_type_name>{});
-    f("type", member_ptr<&type_def::type>{});
+ABIEOS_REFLECT(type_def) {
+    ABIEOS_MEMBER(type_def, new_type_name)
+    ABIEOS_MEMBER(type_def, type)
 }
 
 struct field_def {
@@ -1537,10 +1544,9 @@ struct field_def {
     std::string type{};
 };
 
-template <typename F>
-constexpr void for_each_field(field_def*, F f) {
-    f("name", member_ptr<&field_def::name>{});
-    f("type", member_ptr<&field_def::type>{});
+ABIEOS_REFLECT(field_def) {
+    ABIEOS_MEMBER(field_def, name)
+    ABIEOS_MEMBER(field_def, type)
 }
 
 struct struct_def {
@@ -1549,11 +1555,10 @@ struct struct_def {
     std::vector<field_def> fields{};
 };
 
-template <typename F>
-constexpr void for_each_field(struct_def*, F f) {
-    f("name", member_ptr<&struct_def::name>{});
-    f("base", member_ptr<&struct_def::base>{});
-    f("fields", member_ptr<&struct_def::fields>{});
+ABIEOS_REFLECT(struct_def) {
+    ABIEOS_MEMBER(struct_def, name)
+    ABIEOS_MEMBER(struct_def, base)
+    ABIEOS_MEMBER(struct_def, fields)
 }
 
 struct action_def {
@@ -1562,11 +1567,10 @@ struct action_def {
     std::string ricardian_contract{};
 };
 
-template <typename F>
-constexpr void for_each_field(action_def*, F f) {
-    f("name", member_ptr<&action_def::name>{});
-    f("type", member_ptr<&action_def::type>{});
-    f("ricardian_contract", member_ptr<&action_def::ricardian_contract>{});
+ABIEOS_REFLECT(action_def) {
+    ABIEOS_MEMBER(action_def, name)
+    ABIEOS_MEMBER(action_def, type)
+    ABIEOS_MEMBER(action_def, ricardian_contract)
 }
 
 struct table_def {
@@ -1577,13 +1581,12 @@ struct table_def {
     std::string type{};
 };
 
-template <typename F>
-constexpr void for_each_field(table_def*, F f) {
-    f("name", member_ptr<&table_def::name>{});
-    f("index_type", member_ptr<&table_def::index_type>{});
-    f("key_names", member_ptr<&table_def::key_names>{});
-    f("key_types", member_ptr<&table_def::key_types>{});
-    f("type", member_ptr<&table_def::type>{});
+ABIEOS_REFLECT(table_def) {
+    ABIEOS_MEMBER(table_def, name)
+    ABIEOS_MEMBER(table_def, index_type)
+    ABIEOS_MEMBER(table_def, key_names)
+    ABIEOS_MEMBER(table_def, key_types)
+    ABIEOS_MEMBER(table_def, type)
 }
 
 struct clause_pair {
@@ -1591,10 +1594,9 @@ struct clause_pair {
     std::string body{};
 };
 
-template <typename F>
-constexpr void for_each_field(clause_pair*, F f) {
-    f("id", member_ptr<&clause_pair::id>{});
-    f("body", member_ptr<&clause_pair::body>{});
+ABIEOS_REFLECT(clause_pair) {
+    ABIEOS_MEMBER(clause_pair, id)
+    ABIEOS_MEMBER(clause_pair, body)
 }
 
 struct error_message {
@@ -1602,10 +1604,9 @@ struct error_message {
     std::string error_msg{};
 };
 
-template <typename F>
-constexpr void for_each_field(error_message*, F f) {
-    f("error_code", member_ptr<&error_message::error_code>{});
-    f("error_msg", member_ptr<&error_message::error_msg>{});
+ABIEOS_REFLECT(error_message) {
+    ABIEOS_MEMBER(error_message, error_code)
+    ABIEOS_MEMBER(error_message, error_msg)
 }
 
 struct variant_def {
@@ -1613,10 +1614,9 @@ struct variant_def {
     std::vector<std::string> types{};
 };
 
-template <typename F>
-constexpr void for_each_field(variant_def*, F f) {
-    f("name", member_ptr<&variant_def::name>{});
-    f("types", member_ptr<&variant_def::types>{});
+ABIEOS_REFLECT(variant_def) {
+    ABIEOS_MEMBER(variant_def, name)
+    ABIEOS_MEMBER(variant_def, types)
 }
 
 struct abi_def {
@@ -1631,17 +1631,16 @@ struct abi_def {
     might_not_exist<std::vector<variant_def>> variants{};
 };
 
-template <typename F>
-constexpr void for_each_field(abi_def*, F f) {
-    f("version", member_ptr<&abi_def::version>{});
-    f("types", member_ptr<&abi_def::types>{});
-    f("structs", member_ptr<&abi_def::structs>{});
-    f("actions", member_ptr<&abi_def::actions>{});
-    f("tables", member_ptr<&abi_def::tables>{});
-    f("ricardian_clauses", member_ptr<&abi_def::ricardian_clauses>{});
-    f("error_messages", member_ptr<&abi_def::error_messages>{});
-    f("abi_extensions", member_ptr<&abi_def::abi_extensions>{});
-    f("variants", member_ptr<&abi_def::variants>{});
+ABIEOS_REFLECT(abi_def) {
+    ABIEOS_MEMBER(abi_def, version);
+    ABIEOS_MEMBER(abi_def, types);
+    ABIEOS_MEMBER(abi_def, structs);
+    ABIEOS_MEMBER(abi_def, actions);
+    ABIEOS_MEMBER(abi_def, tables);
+    ABIEOS_MEMBER(abi_def, ricardian_clauses);
+    ABIEOS_MEMBER(abi_def, error_messages);
+    ABIEOS_MEMBER(abi_def, abi_extensions);
+    ABIEOS_MEMBER(abi_def, variants);
 }
 
 ABIEOS_NODISCARD inline bool check_abi_version(const std::string& s, std::string& error) {
