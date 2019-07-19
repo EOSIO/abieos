@@ -433,6 +433,8 @@ void native_to_bin(std::vector<char>& bin, const T& obj);
 void native_to_bin(std::vector<char>& bin, const std::string& obj);
 template <typename T>
 void native_to_bin(std::vector<char>& bin, const std::vector<T>& obj);
+template <typename... Ts>
+void native_to_bin(std::vector<char>& bin, const std::variant<Ts...>& obj);
 
 template <typename T>
 ABIEOS_NODISCARD auto json_to_native(T& obj, json_to_native_state& state, event_type event, bool start)
@@ -2007,6 +2009,12 @@ void native_to_bin(std::vector<char>& bin, const std::vector<T>& obj) {
     push_varuint32(bin, obj.size());
     for (auto& v : obj)
         native_to_bin(bin, v);
+}
+
+template <typename... Ts>
+void native_to_bin(std::vector<char>& bin, const std::variant<Ts...>& obj) {
+    push_varuint32(bin, obj.index());
+    std::visit([&](auto& x) { native_to_bin(bin, x); }, obj);
 }
 
 ///////////////////////////////////////////////////////////////////////////////
