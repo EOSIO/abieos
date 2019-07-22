@@ -429,12 +429,12 @@ template <typename T>
 ABIEOS_NODISCARD bool bin_to_native(might_not_exist<T>& obj, bin_to_native_state& state, bool);
 
 template <typename T>
-void native_to_bin(std::vector<char>& bin, const T& obj);
-void native_to_bin(std::vector<char>& bin, const std::string& obj);
+void native_to_bin(const T& obj, std::vector<char>& bin);
+void native_to_bin(const std::string& obj, std::vector<char>& bin);
 template <typename T>
-void native_to_bin(std::vector<char>& bin, const std::vector<T>& obj);
+void native_to_bin(const std::vector<T>& obj, std::vector<char>& bin);
 template <typename... Ts>
-void native_to_bin(std::vector<char>& bin, const std::variant<Ts...>& obj);
+void native_to_bin(const std::variant<Ts...>& obj, std::vector<char>& bin);
 
 template <typename T>
 ABIEOS_NODISCARD auto json_to_native(T& obj, json_to_native_state& state, event_type event, bool start)
@@ -565,12 +565,12 @@ ABIEOS_NODISCARD inline bool bin_to_native(input_buffer& obj, bin_to_native_stat
     return true;
 }
 
-inline void native_to_bin(std::vector<char>& bin, const bytes& obj) {
+inline void native_to_bin(const bytes& obj, std::vector<char>& bin) {
     push_varuint32(bin, obj.data.size());
     bin.insert(bin.end(), obj.data.begin(), obj.data.end());
 }
 
-inline void native_to_bin(std::vector<char>& bin, const input_buffer& obj) {
+inline void native_to_bin(const input_buffer& obj, std::vector<char>& bin) {
     push_varuint32(bin, obj.end - obj.pos);
     bin.insert(bin.end(), obj.pos, obj.end);
 }
@@ -653,7 +653,7 @@ ABIEOS_NODISCARD bool bin_to_native(fixed_binary<size>& obj, bin_to_native_state
 }
 
 template <unsigned size>
-inline void native_to_bin(std::vector<char>& bin, const fixed_binary<size>& obj) {
+inline void native_to_bin(const fixed_binary<size>& obj, std::vector<char>& bin) {
     bin.insert(bin.end(), obj.value.begin(), obj.value.end());
 }
 
@@ -789,7 +789,7 @@ ABIEOS_NODISCARD inline bool bin_to_native(public_key& obj, bin_to_native_state&
     return read_raw(state.bin, state.error, obj);
 }
 
-inline void native_to_bin(std::vector<char>& bin, const public_key& obj) { return push_raw(bin, obj); }
+inline void native_to_bin(const public_key& obj, std::vector<char>& bin) { return push_raw(bin, obj); }
 
 ABIEOS_NODISCARD inline bool json_to_native(public_key& obj, json_to_native_state& state, event_type event,
                                             bool start) {
@@ -971,7 +971,7 @@ ABIEOS_NODISCARD inline bool bin_to_native(name& obj, bin_to_native_state& state
     return bin_to_native(obj.value, state, start);
 }
 
-inline void native_to_bin(std::vector<char>& bin, const name& obj) { native_to_bin(bin, obj.value); }
+inline void native_to_bin(const name& obj, std::vector<char>& bin) { native_to_bin(obj.value, bin); }
 
 ABIEOS_NODISCARD inline bool json_to_native(name& obj, json_to_native_state& state, event_type event, bool start) {
     if (event == event_type::received_string) {
@@ -1055,7 +1055,7 @@ ABIEOS_NODISCARD inline bool bin_to_native(varuint32& obj, bin_to_native_state& 
     return read_varuint32(state.bin, state.error, obj.value);
 }
 
-inline void native_to_bin(std::vector<char>& bin, const varuint32& obj) { push_varuint32(bin, obj.value); }
+inline void native_to_bin(const varuint32& obj, std::vector<char>& bin) { push_varuint32(bin, obj.value); }
 
 ABIEOS_NODISCARD inline bool json_to_native(varuint32& obj, json_to_native_state& state, event_type event, bool) {
     uint32_t x;
@@ -1202,7 +1202,7 @@ ABIEOS_NODISCARD inline bool bin_to_native(time_point_sec& obj, bin_to_native_st
     return read_raw(state.bin, state.error, obj.utc_seconds);
 }
 
-inline void native_to_bin(std::vector<char>& bin, const time_point_sec& obj) { native_to_bin(bin, obj.utc_seconds); }
+inline void native_to_bin(const time_point_sec& obj, std::vector<char>& bin) { native_to_bin(obj.utc_seconds, bin); }
 
 ABIEOS_NODISCARD inline bool json_to_native(time_point_sec& obj, json_to_native_state& state, event_type event,
                                             bool start) {
@@ -1261,7 +1261,7 @@ ABIEOS_NODISCARD inline bool bin_to_native(time_point& obj, bin_to_native_state&
     return read_raw(state.bin, state.error, obj.microseconds);
 }
 
-inline void native_to_bin(std::vector<char>& bin, const time_point& obj) { native_to_bin(bin, obj.microseconds); }
+inline void native_to_bin(const time_point& obj, std::vector<char>& bin) { native_to_bin(obj.microseconds, bin); }
 
 ABIEOS_NODISCARD inline bool json_to_native(time_point& obj, json_to_native_state& state, event_type event,
                                             bool start) {
@@ -1308,7 +1308,7 @@ ABIEOS_NODISCARD inline bool bin_to_native(block_timestamp& obj, bin_to_native_s
     return read_raw(state.bin, state.error, obj.slot);
 }
 
-inline void native_to_bin(std::vector<char>& bin, const block_timestamp& obj) { native_to_bin(bin, obj.slot); }
+inline void native_to_bin(const block_timestamp& obj, std::vector<char>& bin) { native_to_bin(obj.slot, bin); }
 
 ABIEOS_NODISCARD inline bool json_to_native(block_timestamp& obj, json_to_native_state& state, event_type event,
                                             bool start) {
@@ -1981,10 +1981,10 @@ ABIEOS_NODISCARD bool bin_to_native(might_not_exist<T>& obj, bin_to_native_state
 ///////////////////////////////////////////////////////////////////////////////
 
 template <typename T>
-void native_to_bin(std::vector<char>& bin, const T& obj) {
+void native_to_bin(const T& obj, std::vector<char>& bin) {
     if constexpr (std::is_class_v<T>) {
         for_each_field((T*)nullptr, [&](auto* name, auto member_ptr) { //
-            native_to_bin(bin, member_from_void(member_ptr, &obj));
+            native_to_bin(member_from_void(member_ptr, &obj), bin);
         });
     } else {
         static_assert(std::is_arithmetic_v<T>);
@@ -1995,26 +1995,26 @@ void native_to_bin(std::vector<char>& bin, const T& obj) {
 template <typename T>
 std::vector<char> native_to_bin(const T& obj) {
     std::vector<char> bin;
-    native_to_bin(bin, obj);
+    native_to_bin(obj, bin);
     return bin;
 }
 
-inline void native_to_bin(std::vector<char>& bin, const std::string& obj) {
+inline void native_to_bin(const std::string& obj, std::vector<char>& bin) {
     push_varuint32(bin, obj.size());
     bin.insert(bin.end(), obj.begin(), obj.end());
 }
 
 template <typename T>
-void native_to_bin(std::vector<char>& bin, const std::vector<T>& obj) {
+void native_to_bin(const std::vector<T>& obj, std::vector<char>& bin) {
     push_varuint32(bin, obj.size());
     for (auto& v : obj)
-        native_to_bin(bin, v);
+        native_to_bin(v, bin);
 }
 
 template <typename... Ts>
-void native_to_bin(std::vector<char>& bin, const std::variant<Ts...>& obj) {
+void native_to_bin(const std::variant<Ts...>& obj, std::vector<char>& bin) {
     push_varuint32(bin, obj.index());
-    std::visit([&](auto& x) { native_to_bin(bin, x); }, obj);
+    std::visit([&](auto& x) { native_to_bin(x, bin); }, obj);
 }
 
 ///////////////////////////////////////////////////////////////////////////////
