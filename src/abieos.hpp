@@ -433,6 +433,8 @@ void native_to_bin(const T& obj, std::vector<char>& bin);
 void native_to_bin(const std::string& obj, std::vector<char>& bin);
 template <typename T>
 void native_to_bin(const std::vector<T>& obj, std::vector<char>& bin);
+template <typename T>
+void native_to_bin(const std::optional<T>& obj, std::vector<char>& bin);
 template <typename... Ts>
 void native_to_bin(const std::variant<Ts...>& obj, std::vector<char>& bin);
 
@@ -2009,6 +2011,13 @@ void native_to_bin(const std::vector<T>& obj, std::vector<char>& bin) {
     push_varuint32(bin, obj.size());
     for (auto& v : obj)
         native_to_bin(v, bin);
+}
+
+template <typename T>
+void native_to_bin(const std::optional<T>& obj, std::vector<char>& bin) {
+    push_raw(bin, obj.has_value());
+    if (obj)
+        native_to_bin(*obj, bin);
 }
 
 template <typename... Ts>
