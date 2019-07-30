@@ -848,6 +848,8 @@ ABIEOS_NODISCARD inline bool bin_to_json(private_key*, bin_to_json_state& state,
     return state.writer.String(result.c_str(), result.size());
 }
 
+inline void native_to_bin(const signature& obj, std::vector<char>& bin) { push_raw(bin, obj); }
+
 ABIEOS_NODISCARD inline bool bin_to_native(signature& obj, bin_to_native_state& state, bool) {
     return read_raw(state.bin, state.error, obj);
 }
