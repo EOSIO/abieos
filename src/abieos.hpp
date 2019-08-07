@@ -87,6 +87,14 @@ struct member_ptr {
     using member_type = std::decay_t<decltype(member_from_void(std::declval<member_ptr<P>>(), std::declval<void*>()))>;
 };
 
+#define ABIEOS_REFLECT(STRUCT)                                                                                         \
+    template <typename F>                                                                                              \
+    constexpr void for_each_field(STRUCT*, F f)
+
+#define ABIEOS_MEMBER(STRUCT, MEMBER) f(#MEMBER, abieos::member_ptr<&STRUCT::MEMBER>{});
+
+#define ABIEOS_BASE(BASE) for_each_field((BASE*)nullptr, f);
+
 // Pseudo objects never exist, except in serialized form
 struct pseudo_optional;
 struct pseudo_extension;
@@ -178,6 +186,7 @@ ABIEOS_NODISCARD inline bool read_raw(input_buffer& bin, std::string& error, boo
 }
 
 ABIEOS_NODISCARD bool read_varuint32(input_buffer& bin, std::string& error, uint32_t& dest);
+ABIEOS_NODISCARD bool read_varuint64(input_buffer& bin, std::string& error, uint64_t& dest);
 
 ABIEOS_NODISCARD inline bool read_string(input_buffer& bin, std::string& error, std::string& dest) {
     uint32_t size;
@@ -427,10 +436,14 @@ template <typename T>
 ABIEOS_NODISCARD bool bin_to_native(might_not_exist<T>& obj, bin_to_native_state& state, bool);
 
 template <typename T>
-void native_to_bin(std::vector<char>& bin, const T& obj);
-void native_to_bin(std::vector<char>& bin, const std::string& obj);
+void native_to_bin(const T& obj, std::vector<char>& bin);
+void native_to_bin(const std::string& obj, std::vector<char>& bin);
 template <typename T>
-void native_to_bin(std::vector<char>& bin, const std::vector<T>& obj);
+void native_to_bin(const std::vector<T>& obj, std::vector<char>& bin);
+template <typename T>
+void native_to_bin(const std::optional<T>& obj, std::vector<char>& bin);
+template <typename... Ts>
+void native_to_bin(const std::variant<Ts...>& obj, std::vector<char>& bin);
 
 template <typename T>
 ABIEOS_NODISCARD auto json_to_native(T& obj, json_to_native_state& state, event_type event, bool start)
@@ -541,32 +554,32 @@ struct bytes {
 void push_varuint32(std::vector<char>& bin, uint32_t v);
 
 ABIEOS_NODISCARD inline bool bin_to_native(bytes& obj, bin_to_native_state& state, bool) {
-    uint32_t size;
-    if (!read_varuint32(state.bin, state.error, size))
+    uint64_t size;
+    if (!read_varuint64(state.bin, state.error, size))
         return false;
-    if (size > state.bin.end - state.bin.pos)
+    if (size > uint64_t(state.bin.end - state.bin.pos))
         return set_error(state, "invalid bytes size");
     obj.data.resize(size);
     return read_raw(state.bin, state.error, obj.data.data(), size);
 }
 
 ABIEOS_NODISCARD inline bool bin_to_native(input_buffer& obj, bin_to_native_state& state, bool) {
-    uint32_t size;
-    if (!read_varuint32(state.bin, state.error, size))
+    uint64_t size;
+    if (!read_varuint64(state.bin, state.error, size))
         return false;
-    if (size > state.bin.end - state.bin.pos)
+    if (size > uint64_t(state.bin.end - state.bin.pos))
         return set_error(state, "invalid bytes size");
     obj = {state.bin.pos, state.bin.pos + size};
     state.bin.pos += size;
     return true;
 }
 
-inline void native_to_bin(std::vector<char>& bin, const bytes& obj) {
+inline void native_to_bin(const bytes& obj, std::vector<char>& bin) {
     push_varuint32(bin, obj.data.size());
     bin.insert(bin.end(), obj.data.begin(), obj.data.end());
 }
 
-inline void native_to_bin(std::vector<char>& bin, const input_buffer& obj) {
+inline void native_to_bin(const input_buffer& obj, std::vector<char>& bin) {
     push_varuint32(bin, obj.end - obj.pos);
     bin.insert(bin.end(), obj.pos, obj.end);
 }
@@ -604,10 +617,10 @@ ABIEOS_NODISCARD bool json_to_bin(bytes*, State& state, bool, const abi_type*, e
 }
 
 ABIEOS_NODISCARD inline bool bin_to_json(bytes*, bin_to_json_state& state, bool, const abi_type*, bool start) {
-    uint32_t size;
-    if (!read_varuint32(state.bin, state.error, size))
+    uint64_t size;
+    if (!read_varuint64(state.bin, state.error, size))
         return false;
-    if (size > state.bin.end - state.bin.pos)
+    if (size > uint64_t(state.bin.end - state.bin.pos))
         return set_error(state, "invalid bytes size");
     std::vector<char> raw(size);
     if (!read_raw(state.bin, state.error, raw.data(), size))
@@ -649,7 +662,7 @@ ABIEOS_NODISCARD bool bin_to_native(fixed_binary<size>& obj, bin_to_native_state
 }
 
 template <unsigned size>
-inline void native_to_bin(std::vector<char>& bin, const fixed_binary<size>& obj) {
+inline void native_to_bin(const fixed_binary<size>& obj, std::vector<char>& bin) {
     bin.insert(bin.end(), obj.value.begin(), obj.value.end());
 }
 
@@ -827,7 +840,7 @@ ABIEOS_NODISCARD inline bool bin_to_native(public_key& obj, bin_to_native_state&
     return bin_to_key(obj, state.bin, state.error);
 }
 
-inline void native_to_bin(std::vector<char>& bin, const public_key& obj) { key_to_bin(bin, obj); }
+inline void native_to_bin(const public_key& obj, std::vector<char>& bin) { key_to_bin(bin, obj); }
 
 ABIEOS_NODISCARD inline bool json_to_native(public_key& obj, json_to_native_state& state, event_type event,
                                             bool start) {
@@ -883,6 +896,8 @@ ABIEOS_NODISCARD inline bool bin_to_json(private_key*, bin_to_json_state& state,
         return false;
     return state.writer.String(result.c_str(), result.size());
 }
+
+inline void native_to_bin(const signature& obj, std::vector<char>& bin) { key_to_bin(bin, obj); }
 
 ABIEOS_NODISCARD inline bool bin_to_native(signature& obj, bin_to_native_state& state, bool) {
     return bin_to_key(obj, state.bin, state.error);
@@ -1009,7 +1024,7 @@ ABIEOS_NODISCARD inline bool bin_to_native(name& obj, bin_to_native_state& state
     return bin_to_native(obj.value, state, start);
 }
 
-inline void native_to_bin(std::vector<char>& bin, const name& obj) { native_to_bin(bin, obj.value); }
+inline void native_to_bin(const name& obj, std::vector<char>& bin) { native_to_bin(obj.value, bin); }
 
 ABIEOS_NODISCARD inline bool json_to_native(name& obj, json_to_native_state& state, event_type event, bool start) {
     if (event == event_type::received_string) {
@@ -1074,11 +1089,26 @@ ABIEOS_NODISCARD inline bool read_varuint32(input_buffer& bin, std::string& erro
     return true;
 }
 
+ABIEOS_NODISCARD inline bool read_varuint64(input_buffer& bin, std::string& error, uint64_t& dest) {
+    dest = 0;
+    int shift = 0;
+    uint8_t b = 0;
+    do {
+        if (shift >= 70)
+            return set_error(error, "invalid varuint64 encoding");
+        if (!read_raw(bin, error, b))
+            return false;
+        dest |= uint64_t(b & 0x7f) << shift;
+        shift += 7;
+    } while (b & 0x80);
+    return true;
+}
+
 ABIEOS_NODISCARD inline bool bin_to_native(varuint32& obj, bin_to_native_state& state, bool) {
     return read_varuint32(state.bin, state.error, obj.value);
 }
 
-inline void native_to_bin(std::vector<char>& bin, const varuint32& obj) { push_varuint32(bin, obj.value); }
+inline void native_to_bin(const varuint32& obj, std::vector<char>& bin) { push_varuint32(bin, obj.value); }
 
 ABIEOS_NODISCARD inline bool json_to_native(varuint32& obj, json_to_native_state& state, event_type event, bool) {
     uint32_t x;
@@ -1179,7 +1209,7 @@ inline std::string microseconds_to_str(uint64_t microseconds) {
 struct time_point_sec {
     uint32_t utc_seconds = 0;
 
-    explicit operator std::string() { return microseconds_to_str(uint64_t(utc_seconds) * 1'000'000); }
+    explicit operator std::string() const { return microseconds_to_str(uint64_t(utc_seconds) * 1'000'000); }
 };
 
 ABIEOS_NODISCARD inline bool string_to_time_point_sec(time_point_sec& result, std::string& error, const char* s) {
@@ -1225,7 +1255,7 @@ ABIEOS_NODISCARD inline bool bin_to_native(time_point_sec& obj, bin_to_native_st
     return read_raw(state.bin, state.error, obj.utc_seconds);
 }
 
-inline void native_to_bin(std::vector<char>& bin, const time_point_sec& obj) { native_to_bin(bin, obj.utc_seconds); }
+inline void native_to_bin(const time_point_sec& obj, std::vector<char>& bin) { native_to_bin(obj.utc_seconds, bin); }
 
 ABIEOS_NODISCARD inline bool json_to_native(time_point_sec& obj, json_to_native_state& state, event_type event,
                                             bool start) {
@@ -1284,7 +1314,7 @@ ABIEOS_NODISCARD inline bool bin_to_native(time_point& obj, bin_to_native_state&
     return read_raw(state.bin, state.error, obj.microseconds);
 }
 
-inline void native_to_bin(std::vector<char>& bin, const time_point& obj) { native_to_bin(bin, obj.microseconds); }
+inline void native_to_bin(const time_point& obj, std::vector<char>& bin) { native_to_bin(obj.microseconds, bin); }
 
 ABIEOS_NODISCARD inline bool json_to_native(time_point& obj, json_to_native_state& state, event_type event,
                                             bool start) {
@@ -1331,7 +1361,7 @@ ABIEOS_NODISCARD inline bool bin_to_native(block_timestamp& obj, bin_to_native_s
     return read_raw(state.bin, state.error, obj.slot);
 }
 
-inline void native_to_bin(std::vector<char>& bin, const block_timestamp& obj) { native_to_bin(bin, obj.slot); }
+inline void native_to_bin(const block_timestamp& obj, std::vector<char>& bin) { native_to_bin(obj.slot, bin); }
 
 ABIEOS_NODISCARD inline bool json_to_native(block_timestamp& obj, json_to_native_state& state, event_type event,
                                             bool start) {
@@ -1559,10 +1589,9 @@ struct type_def {
     std::string type{};
 };
 
-template <typename F>
-constexpr void for_each_field(type_def*, F f) {
-    f("new_type_name", member_ptr<&type_def::new_type_name>{});
-    f("type", member_ptr<&type_def::type>{});
+ABIEOS_REFLECT(type_def) {
+    ABIEOS_MEMBER(type_def, new_type_name)
+    ABIEOS_MEMBER(type_def, type)
 }
 
 struct field_def {
@@ -1570,10 +1599,9 @@ struct field_def {
     std::string type{};
 };
 
-template <typename F>
-constexpr void for_each_field(field_def*, F f) {
-    f("name", member_ptr<&field_def::name>{});
-    f("type", member_ptr<&field_def::type>{});
+ABIEOS_REFLECT(field_def) {
+    ABIEOS_MEMBER(field_def, name)
+    ABIEOS_MEMBER(field_def, type)
 }
 
 struct struct_def {
@@ -1582,11 +1610,10 @@ struct struct_def {
     std::vector<field_def> fields{};
 };
 
-template <typename F>
-constexpr void for_each_field(struct_def*, F f) {
-    f("name", member_ptr<&struct_def::name>{});
-    f("base", member_ptr<&struct_def::base>{});
-    f("fields", member_ptr<&struct_def::fields>{});
+ABIEOS_REFLECT(struct_def) {
+    ABIEOS_MEMBER(struct_def, name)
+    ABIEOS_MEMBER(struct_def, base)
+    ABIEOS_MEMBER(struct_def, fields)
 }
 
 struct action_def {
@@ -1595,11 +1622,10 @@ struct action_def {
     std::string ricardian_contract{};
 };
 
-template <typename F>
-constexpr void for_each_field(action_def*, F f) {
-    f("name", member_ptr<&action_def::name>{});
-    f("type", member_ptr<&action_def::type>{});
-    f("ricardian_contract", member_ptr<&action_def::ricardian_contract>{});
+ABIEOS_REFLECT(action_def) {
+    ABIEOS_MEMBER(action_def, name)
+    ABIEOS_MEMBER(action_def, type)
+    ABIEOS_MEMBER(action_def, ricardian_contract)
 }
 
 struct table_def {
@@ -1610,13 +1636,12 @@ struct table_def {
     std::string type{};
 };
 
-template <typename F>
-constexpr void for_each_field(table_def*, F f) {
-    f("name", member_ptr<&table_def::name>{});
-    f("index_type", member_ptr<&table_def::index_type>{});
-    f("key_names", member_ptr<&table_def::key_names>{});
-    f("key_types", member_ptr<&table_def::key_types>{});
-    f("type", member_ptr<&table_def::type>{});
+ABIEOS_REFLECT(table_def) {
+    ABIEOS_MEMBER(table_def, name)
+    ABIEOS_MEMBER(table_def, index_type)
+    ABIEOS_MEMBER(table_def, key_names)
+    ABIEOS_MEMBER(table_def, key_types)
+    ABIEOS_MEMBER(table_def, type)
 }
 
 struct clause_pair {
@@ -1624,10 +1649,9 @@ struct clause_pair {
     std::string body{};
 };
 
-template <typename F>
-constexpr void for_each_field(clause_pair*, F f) {
-    f("id", member_ptr<&clause_pair::id>{});
-    f("body", member_ptr<&clause_pair::body>{});
+ABIEOS_REFLECT(clause_pair) {
+    ABIEOS_MEMBER(clause_pair, id)
+    ABIEOS_MEMBER(clause_pair, body)
 }
 
 struct error_message {
@@ -1635,10 +1659,9 @@ struct error_message {
     std::string error_msg{};
 };
 
-template <typename F>
-constexpr void for_each_field(error_message*, F f) {
-    f("error_code", member_ptr<&error_message::error_code>{});
-    f("error_msg", member_ptr<&error_message::error_msg>{});
+ABIEOS_REFLECT(error_message) {
+    ABIEOS_MEMBER(error_message, error_code)
+    ABIEOS_MEMBER(error_message, error_msg)
 }
 
 struct variant_def {
@@ -1646,10 +1669,9 @@ struct variant_def {
     std::vector<std::string> types{};
 };
 
-template <typename F>
-constexpr void for_each_field(variant_def*, F f) {
-    f("name", member_ptr<&variant_def::name>{});
-    f("types", member_ptr<&variant_def::types>{});
+ABIEOS_REFLECT(variant_def) {
+    ABIEOS_MEMBER(variant_def, name)
+    ABIEOS_MEMBER(variant_def, types)
 }
 
 struct abi_def {
@@ -1664,17 +1686,16 @@ struct abi_def {
     might_not_exist<std::vector<variant_def>> variants{};
 };
 
-template <typename F>
-constexpr void for_each_field(abi_def*, F f) {
-    f("version", member_ptr<&abi_def::version>{});
-    f("types", member_ptr<&abi_def::types>{});
-    f("structs", member_ptr<&abi_def::structs>{});
-    f("actions", member_ptr<&abi_def::actions>{});
-    f("tables", member_ptr<&abi_def::tables>{});
-    f("ricardian_clauses", member_ptr<&abi_def::ricardian_clauses>{});
-    f("error_messages", member_ptr<&abi_def::error_messages>{});
-    f("abi_extensions", member_ptr<&abi_def::abi_extensions>{});
-    f("variants", member_ptr<&abi_def::variants>{});
+ABIEOS_REFLECT(abi_def) {
+    ABIEOS_MEMBER(abi_def, version);
+    ABIEOS_MEMBER(abi_def, types);
+    ABIEOS_MEMBER(abi_def, structs);
+    ABIEOS_MEMBER(abi_def, actions);
+    ABIEOS_MEMBER(abi_def, tables);
+    ABIEOS_MEMBER(abi_def, ricardian_clauses);
+    ABIEOS_MEMBER(abi_def, error_messages);
+    ABIEOS_MEMBER(abi_def, abi_extensions);
+    ABIEOS_MEMBER(abi_def, variants);
 }
 
 ABIEOS_NODISCARD inline bool check_abi_version(const std::string& s, std::string& error) {
@@ -2013,10 +2034,10 @@ ABIEOS_NODISCARD bool bin_to_native(might_not_exist<T>& obj, bin_to_native_state
 ///////////////////////////////////////////////////////////////////////////////
 
 template <typename T>
-void native_to_bin(std::vector<char>& bin, const T& obj) {
+void native_to_bin(const T& obj, std::vector<char>& bin) {
     if constexpr (std::is_class_v<T>) {
         for_each_field((T*)nullptr, [&](auto* name, auto member_ptr) { //
-            native_to_bin(bin, member_from_void(member_ptr, &obj));
+            native_to_bin(member_from_void(member_ptr, &obj), bin);
         });
     } else {
         static_assert(std::is_arithmetic_v<T>);
@@ -2027,20 +2048,33 @@ void native_to_bin(std::vector<char>& bin, const T& obj) {
 template <typename T>
 std::vector<char> native_to_bin(const T& obj) {
     std::vector<char> bin;
-    native_to_bin(bin, obj);
+    native_to_bin(obj, bin);
     return bin;
 }
 
-inline void native_to_bin(std::vector<char>& bin, const std::string& obj) {
+inline void native_to_bin(const std::string& obj, std::vector<char>& bin) {
     push_varuint32(bin, obj.size());
     bin.insert(bin.end(), obj.begin(), obj.end());
 }
 
 template <typename T>
-void native_to_bin(std::vector<char>& bin, const std::vector<T>& obj) {
+void native_to_bin(const std::vector<T>& obj, std::vector<char>& bin) {
     push_varuint32(bin, obj.size());
     for (auto& v : obj)
-        native_to_bin(bin, v);
+        native_to_bin(v, bin);
+}
+
+template <typename T>
+void native_to_bin(const std::optional<T>& obj, std::vector<char>& bin) {
+    push_raw(bin, obj.has_value());
+    if (obj)
+        native_to_bin(*obj, bin);
+}
+
+template <typename... Ts>
+void native_to_bin(const std::variant<Ts...>& obj, std::vector<char>& bin) {
+    push_varuint32(bin, obj.index());
+    std::visit([&](auto& x) { native_to_bin(x, bin); }, obj);
 }
 
 ///////////////////////////////////////////////////////////////////////////////

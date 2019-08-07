@@ -19,6 +19,16 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
+execute_process(COMMAND git submodule status --recursive
+                COMMAND grep -c "^[+\-]"
+                WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+                OUTPUT_VARIABLE submodule_status
+                OUTPUT_STRIP_TRAILING_WHITESPACE)
+if(submodule_status GREATER 0)
+   message(FATAL_ERROR "git submodules are not up to date.
+Please run the command 'git submodule update --init --recursive'.")
+endif()
+
 add_library(abieos MODULE src/abieos.cpp)
 target_include_directories(abieos PRIVATE external/rapidjson/include external/date/include)
 
