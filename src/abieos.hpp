@@ -155,6 +155,13 @@ struct input_buffer {
     const char* end = nullptr;
 };
 
+ABIEOS_NODISCARD inline bool skip_raw(input_buffer& bin, std::string& error, ptrdiff_t size) {
+    if (bin.end - bin.pos < size)
+        return set_error(error, "read past end");
+    bin.pos += size;
+    return true;
+}
+
 ABIEOS_NODISCARD inline bool read_raw(input_buffer& bin, std::string& error, void* dest, ptrdiff_t size) {
     if (bin.end - bin.pos < size)
         return set_error(error, "read past end");
@@ -787,11 +794,53 @@ ABIEOS_NODISCARD inline bool bin_to_json(int128*, bin_to_json_state& state, bool
     return state.writer.String(result.c_str(), result.size());
 }
 
-ABIEOS_NODISCARD inline bool bin_to_native(public_key& obj, bin_to_native_state& state, bool) {
-    return read_raw(state.bin, state.error, obj);
+template <typename Key>
+ABIEOS_NODISCARD inline bool bin_to_key(Key& obj, input_buffer& bin, std::string& error) {
+    if (!read_raw(bin, error, obj.type))
+        return false;
+    if (obj.type == key_type::wa) {
+        if constexpr (std::is_same_v<std::decay_t<Key>, public_key>) {
+            auto begin = bin.pos;
+            if (!skip_raw(bin, error, 34))
+                return false;
+            uint32_t size;
+            if (!read_varuint32(bin, error, size) || !skip_raw(bin, error, size))
+                return false;
+            obj.data.resize(bin.pos - begin);
+            memcpy(obj.data.data(), begin, obj.data.size());
+            return true;
+        } else if constexpr (std::is_same_v<std::decay_t<Key>, signature>) {
+            auto begin = bin.pos;
+            if (!skip_raw(bin, error, 65))
+                return false;
+            uint32_t size;
+            if (!read_varuint32(bin, error, size) || !skip_raw(bin, error, size))
+                return false;
+            if (!read_varuint32(bin, error, size) || !skip_raw(bin, error, size))
+                return false;
+            obj.data.resize(bin.pos - begin);
+            memcpy(obj.data.data(), begin, obj.data.size());
+            return true;
+        } else {
+            return set_error(error, "Invalid private key type");
+        }
+    } else {
+        obj.data.resize(Key::k1r1_size);
+        return read_raw(bin, error, obj.data.data(), obj.data.size());
+    }
 }
 
-inline void native_to_bin(const public_key& obj, std::vector<char>& bin) { return push_raw(bin, obj); }
+template <typename Key>
+inline void key_to_bin(std::vector<char>& bin, const Key& obj) {
+    push_raw(bin, obj.type);
+    bin.insert(bin.end(), obj.data.begin(), obj.data.end());
+}
+
+ABIEOS_NODISCARD inline bool bin_to_native(public_key& obj, bin_to_native_state& state, bool) {
+    return bin_to_key(obj, state.bin, state.error);
+}
+
+inline void native_to_bin(const public_key& obj, std::vector<char>& bin) { key_to_bin(bin, obj); }
 
 ABIEOS_NODISCARD inline bool json_to_native(public_key& obj, json_to_native_state& state, event_type event,
                                             bool start) {
@@ -807,7 +856,7 @@ ABIEOS_NODISCARD bool json_to_bin(public_key*, State& state, bool, const abi_typ
         public_key key;
         if (!string_to_public_key(key, state.error, s))
             return false;
-        push_raw(state.bin, key);
+        key_to_bin(state.bin, key);
         return true;
     } else
         return set_error(state, "expected string containing public_key");
@@ -815,7 +864,7 @@ ABIEOS_NODISCARD bool json_to_bin(public_key*, State& state, bool, const abi_typ
 
 ABIEOS_NODISCARD inline bool bin_to_json(public_key*, bin_to_json_state& state, bool, const abi_type*, bool start) {
     public_key v;
-    if (!read_raw(state.bin, state.error, v))
+    if (!bin_to_key(v, state.bin, state.error))
         return false;
     std::string result;
     if (!public_key_to_string(result, state.error, v))
@@ -832,7 +881,7 @@ ABIEOS_NODISCARD bool json_to_bin(private_key*, State& state, bool, const abi_ty
         private_key key;
         if (!string_to_private_key(key, state.error, s))
             return false;
-        push_raw(state.bin, key);
+        key_to_bin(state.bin, key);
         return true;
     } else
         return set_error(state, "expected string containing private_key");
@@ -840,7 +889,7 @@ ABIEOS_NODISCARD bool json_to_bin(private_key*, State& state, bool, const abi_ty
 
 ABIEOS_NODISCARD inline bool bin_to_json(private_key*, bin_to_json_state& state, bool, const abi_type*, bool start) {
     private_key v;
-    if (!read_raw(state.bin, state.error, v))
+    if (!bin_to_key(v, state.bin, state.error))
         return false;
     std::string result;
     if (!private_key_to_string(result, state.error, v))
@@ -848,10 +897,10 @@ ABIEOS_NODISCARD inline bool bin_to_json(private_key*, bin_to_json_state& state,
     return state.writer.String(result.c_str(), result.size());
 }
 
-inline void native_to_bin(const signature& obj, std::vector<char>& bin) { push_raw(bin, obj); }
+inline void native_to_bin(const signature& obj, std::vector<char>& bin) { key_to_bin(bin, obj); }
 
 ABIEOS_NODISCARD inline bool bin_to_native(signature& obj, bin_to_native_state& state, bool) {
-    return read_raw(state.bin, state.error, obj);
+    return bin_to_key(obj, state.bin, state.error);
 }
 
 ABIEOS_NODISCARD inline bool json_to_native(signature& obj, json_to_native_state& state, event_type event, bool start) {
@@ -870,7 +919,7 @@ ABIEOS_NODISCARD bool json_to_bin(signature*, State& state, bool, const abi_type
         signature key;
         if (!string_to_signature(key, state.error, s))
             return false;
-        push_raw(state.bin, key);
+        key_to_bin(state.bin, key);
         return true;
     } else
         return set_error(state, "expected string containing signature");
@@ -878,7 +927,7 @@ ABIEOS_NODISCARD bool json_to_bin(signature*, State& state, bool, const abi_type
 
 ABIEOS_NODISCARD inline bool bin_to_json(signature*, bin_to_json_state& state, bool, const abi_type*, bool start) {
     signature v;
-    if (!read_raw(state.bin, state.error, v))
+    if (!bin_to_key(v, state.bin, state.error))
         return false;
     std::string result;
     if (!signature_to_string(result, state.error, v))

@@ -622,6 +622,10 @@ void check_types() {
     check_type(context, 0, "public_key", R"("PUB_R1_67vQGPDMCR4gbqYV3hkfNz3BfzRmmSj27kFDKrwDbaZKtaX36u")");
     check_type(context, 0, "public_key", R"("PUB_R1_6FPFZqw5ahYrR9jD96yDbbDNTdKtNqRbze6oTDLntrsANgQKZu")");
     check_type(context, 0, "public_key", R"("PUB_R1_7zetsBPJwGQqgmhVjviZUfoBMktHinmTqtLczbQqrBjhaBgi6x")");
+    check_type(context, 0, "public_key",
+               R"("PUB_WA_8PPYTWYNkRqrveNAoX7PJWDtSqDUp3c29QGBfr6MD9EaLocaPBmsk5QAHWq4vEQt2")");
+    check_type(context, 0, "public_key",
+               R"("PUB_WA_6VFnP5vnq1GjNyMR7S17e2yp6SRoChiborF2LumbnXvMTsPASXykJaBBGLhprXTpk")");
     check_error(context, "expected string containing public_key",
                 [&] { return abieos_json_to_bin(context, 0, "public_key", "true"); });
     check_error(context, "unrecognized public key format",
@@ -638,6 +642,12 @@ void check_types() {
     check_type(
         context, 0, "signature",
         R"("SIG_R1_Kfh19CfEcQ6pxkMBz6xe9mtqKuPooaoyatPYWtwXbtwHUHU8YLzxPGvZhkqgnp82J41e9R6r5mcpnxy1wAf1w9Vyo9wybZ")");
+    check_type(
+        context, 0, "signature",
+        R"("SIG_WA_FjWGWXz7AC54NrVWXS8y8DGu1aesCr7oFiFmVg4a1QfNS74JwaVkqkN8xbMD64uvcsmPvtNnA9du6G6nSsWuyT9tM8CQw9mV1BSbWEs8hjF1uFBP1QHAEadvhkZQPU1FTyPMz4jevaHYMQgfMiAf3QoPhPn9RGxzvNph8Zrd6F3pKpZkUe92tGQU8PQvEMa22ELPvdXzxXC6qUKnKVSH4gK7BXw168jb5d3nnWrpQ1yrLTWB4xizEMpN8sTfsgScKKx1QajX2uNUahQEb1cxipQZbVMApifHEUsK45PqsNxfXvb")");
+    check_type(
+        context, 0, "signature",
+        R"("SIG_WA_FejsRu4VrdwoZ27v2D3wmp4Kge46JJSqWsiMgbJapVuuYnPDyZZjJSTggdHUNPMp3zt2fGfAdpWY7ScsohZzWTJ1iTerbab2pNE6Tso7MJRjdMAG56K4fjrASEK6QsUs7rxG9Syp7kstBcq8eZidayrtK9YSH1MCNTAqrDPMbN366vR8q5XeN5BSDmyDsqmjsMMSKWMeEbUi7jNHKLziZY6dKHNqDYqjmDmuXoevxyDRWrNVHjAzvBtfTuVtj2r5tCScdCZ3a7yQ1D2zZvstphB4t5HN9YXw1HGS3yKCY6uRZ2V")");
     check_error(context, "expected string containing signature",
                 [&] { return abieos_json_to_bin(context, 0, "signature", "true"); });
     check_error(context, "unrecognized signature format",
