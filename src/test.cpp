@@ -396,6 +396,8 @@ void check_types() {
 
     check_type(context, 0, "bool", R"(true)");
     check_type(context, 0, "bool", R"(false)");
+    check_type(context, 0, "bool#", R"(false)");
+    check_type(context, 0, "bool#", R"(true)");
     check_error(context, "read past end", [&] { return abieos_hex_to_json(context, 0, "bool", ""); });
     check_error(context, "failed to parse", [&] { return abieos_json_to_bin(context, 0, "bool", R"(trues)"); });
     check_error(context, "expected number or boolean",
@@ -416,6 +418,14 @@ void check_types() {
     check_type(context, 0, "uint8[]", R"([10])");
     check_type(context, 0, "uint8[]", R"([10,9])");
     check_type(context, 0, "uint8[]", R"([10,9,8])");
+    check_type(context, 0, "uint8[]#", R"([])");
+    check_type(context, 0, "uint8[]#", R"([10])");
+    check_type(context, 0, "uint8[]#", R"([10,9])");
+    check_type(context, 0, "uint8[]#", R"([10,9,8])");
+    check_type(context, 0, "uint8#[]", R"([])");
+    check_type(context, 0, "uint8#[]", R"([10])");
+    check_type(context, 0, "uint8#[]", R"([10,9])");
+    check_type(context, 0, "uint8#[]", R"([10,9,8])");
     check_type(context, 0, "int16", R"(0)");
     check_type(context, 0, "int16", R"(32767)");
     check_type(context, 0, "int16", R"(-32768)");
@@ -495,6 +505,9 @@ void check_types() {
     check_type(context, 0, "varuint32", R"(268435457)");
     check_type(context, 0, "varuint32", R"(4294967294)");
     check_type(context, 0, "varuint32", R"(4294967295)");
+    check_type(context, 0, "varuint32#", R"(0)");
+    check_type(context, 0, "varuint32#", R"(127)");
+    check_type(context, 0, "varuint32#", R"(128)");
     check_type(context, 0, "varint32", R"(0)");
     check_type(context, 0, "varint32", R"(-1)");
     check_type(context, 0, "varint32", R"(1)");
@@ -570,6 +583,7 @@ void check_types() {
     check_type(context, 0, "checksum160", R"("123456789ABCDEF01234567890ABCDEF70123456")");
     check_type(context, 0, "checksum256", R"("0000000000000000000000000000000000000000000000000000000000000000")");
     check_type(context, 0, "checksum256", R"("0987654321ABCDEF0987654321FFFF1234567890ABCDEF001234567890ABCDEF")");
+    check_type(context, 0, "checksum256#", R"("0987654321ABCDEF0987654321FFFF1234567890ABCDEF001234567890ABCDEF")");
     check_type(
         context, 0, "checksum512",
         R"("00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000")");
@@ -668,6 +682,7 @@ void check_types() {
     check_type(context, 0, "asset", R"("0.000 FOO")");
     check_type(context, 0, "asset", R"("1.2345 SYS")");
     check_type(context, 0, "asset", R"("-1.2345 SYS")");
+    check_type(context, 0, "asset#", R"("1.2345 SYS")");
     check_error(context, "expected string containing asset",
                 [&] { return abieos_json_to_bin(context, 0, "asset", "null"); });
     check_type(context, 0, "asset[]", R"([])");
@@ -677,6 +692,7 @@ void check_types() {
     check_type(context, 0, "asset?", R"("0.123456 SIX")");
     check_type(context, 0, "extended_asset", R"({"quantity":"0 FOO","contract":"bar"})");
     check_type(context, 0, "extended_asset", R"({"quantity":"0.123456 SIX","contract":"seven"})");
+    check_type(context, 0, "extended_asset#", R"({"quantity":"0.123456 SIX","contract":"seven"})");
 
     check_type(context, token, "transfer",
                R"({"from":"useraaaaaaaa","to":"useraaaaaaab","quantity":"0.0001 SYS","memo":"test memo"})");
