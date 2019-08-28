@@ -240,6 +240,12 @@ function check_types() {
 
     check_type(0, js2Types, 'bool', 'true');
     check_type(0, js2Types, 'bool', 'false');
+    check_type(0, js2Types, 'bool#', 'false');
+    check_type(0, js2Types, 'bool#', 'true');
+    check_type(0, js2Types, 'bool#1', 'false');
+    check_type(0, js2Types, 'bool#1', 'true');
+    check_type(0, js2Types, 'bool#3', 'false');
+    check_type(0, js2Types, 'bool#3', 'true');
     check_throw('Error: Read past end of buffer', () => eosjs_hex_to_json(js2Types, 'bool', ''));
     check_throw('Error: Expected true or false', () => eosjs_json_to_hex(js2Types, 'bool', 'trues'));
     check_throw('Error: Expected true or false', () => eosjs_json_to_hex(js2Types, 'bool', null));
@@ -262,6 +268,21 @@ function check_types() {
     check_type(0, js2Types, 'uint8[]', '[10]');
     check_type(0, js2Types, 'uint8[]', '[10,9]');
     check_type(0, js2Types, 'uint8[]', '[10,9,8]');
+    check_type(0, js2Types, 'uint8[]#', '[]');
+    check_type(0, js2Types, 'uint8[]#', '[10]');
+    check_type(0, js2Types, 'uint8[]#', '[10,9]');
+    check_type(0, js2Types, 'uint8[]#', '[10,9,8]');
+    check_type(0, js2Types, 'uint8#[]', '[]');
+    check_type(0, js2Types, 'uint8#[]', '[10]');
+    check_type(0, js2Types, 'uint8#[]', '[10,9]');
+    check_type(0, js2Types, 'uint8#[]', '[10,9,8]');
+    check_type(0, js2Types, 'uint8[]#3', '[]');
+    check_type(0, js2Types, 'uint8[]#3', '[10]');
+    check_type(0, js2Types, 'uint8[]#3', '[10,9]');
+    check_throw('Error: data exceeds fixed-size limit (#3)', () => eosjs_json_to_hex(js2Types, 'uint8[]#3', [10, 9, 8]));
+    check_type(0, js2Types, 'uint8#2[]', '[]');
+    check_type(0, js2Types, 'uint8#2[]', '[10]');
+    check_type(0, js2Types, 'uint8#2[]', '[10,9]');
     check_type(0, js2Types, 'int16', '0');
     check_type(0, js2Types, 'int16', '32767');
     check_type(0, js2Types, 'int16', '-32768');
@@ -331,6 +352,12 @@ function check_types() {
     check_type(0, js2Types, 'varuint32', '268435457');
     check_type(0, js2Types, 'varuint32', '4294967294');
     check_type(0, js2Types, 'varuint32', '4294967295');
+    check_type(0, js2Types, 'varuint32#', '0');
+    check_type(0, js2Types, 'varuint32#', '127');
+    check_type(0, js2Types, 'varuint32#', '128');
+    check_type(0, js2Types, 'varuint32#3', '0');
+    check_type(0, js2Types, 'varuint32#3', '127');
+    check_type(0, js2Types, 'varuint32#3', '128');
     check_type(0, js2Types, 'varint32', '0');
     check_type(0, js2Types, 'varint32', '-1');
     check_type(0, js2Types, 'varint32', '1');
@@ -393,10 +420,18 @@ function check_types() {
     check_type(0, js2Types, 'string', '"' + '*'.repeat(128) + '"');
     check_type(0, js2Types, 'string', `"\\u0000  这是一个测试  Это тест  هذا اختبار 👍"`);
     check_throw('Error: Read past end of buffer', () => eosjs_hex_to_json(js2Types, 'string', '01'));
+    check_type(0, js2Types, 'string[]', '["a","b"]');
+    check_type(0, js2Types, 'string[]#5', '["a","b"]');
+    check_type(0, js2Types, 'string[]#6', '["a","b"]');
+    check_type(0, js2Types, 'string#2[]', '["a","b"]');
+    check_type(0, js2Types, 'string#3[]', '["a","b"]');
     check_type(0, js2Types, 'checksum160', '"0000000000000000000000000000000000000000"');
     check_type(0, js2Types, 'checksum160', '"123456789ABCDEF01234567890ABCDEF70123456"');
     check_type(0, js2Types, 'checksum256', '"0000000000000000000000000000000000000000000000000000000000000000"');
     check_type(0, js2Types, 'checksum256', '"0987654321ABCDEF0987654321FFFF1234567890ABCDEF001234567890ABCDEF"');
+    check_type(0, js2Types, 'checksum256#', '"0987654321ABCDEF0987654321FFFF1234567890ABCDEF001234567890ABCDEF"');
+    check_type(0, js2Types, 'checksum256#32', '"0987654321ABCDEF0987654321FFFF1234567890ABCDEF001234567890ABCDEF"');
+    check_type(0, js2Types, 'checksum256#33', '"0987654321ABCDEF0987654321FFFF1234567890ABCDEF001234567890ABCDEF"');
     check_type(0, js2Types, 'checksum512', '"00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000"');
     check_type(0, js2Types, 'checksum512', '"0987654321ABCDEF0987654321FFFF1234567890ABCDEF001234567890ABCDEF0987654321ABCDEF0987654321FFFF1234567890ABCDEF001234567890ABCDEF"');
     check_throw('Error: Expected hex string', () => eosjs_json_to_hex(js2Types, 'checksum256', 'yz'));
@@ -458,6 +493,9 @@ function check_types() {
     check_type(0, js2Types, 'asset', '"0.000 FOO"');
     check_type(0, js2Types, 'asset', '"1.2345 SYS"');
     check_type(0, js2Types, 'asset', '"-1.2345 SYS"');
+    check_type(0, js2Types, 'asset#', '"1.2345 SYS"');
+    check_type(0, js2Types, 'asset#16', '"1.2345 SYS"');
+    check_type(0, js2Types, 'asset#17', '"1.2345 SYS"');
     check_throw('Error: Expected string containing asset', () => eosjs_json_to_hex(js2Types, 'asset', null));
     check_type(0, js2Types, 'asset[]', '[]');
     check_type(0, js2Types, 'asset[]', '["0 FOO"]');
@@ -466,6 +504,9 @@ function check_types() {
     check_type(0, js2Types, 'asset?', '"0.123456 SIX"');
     check_type(0, js2Types, 'extended_asset', '{"quantity":"0 FOO","contract":"bar"}');
     check_type(0, js2Types, 'extended_asset', '{"quantity":"0.123456 SIX","contract":"seven"}');
+    check_type(0, js2Types, 'extended_asset#', '{"quantity":"0.123456 SIX","contract":"seven"}');
+    check_type(0, js2Types, 'extended_asset#24', '{"quantity":"0.123456 SIX","contract":"seven"}');
+    check_type(0, js2Types, 'extended_asset#25', '{"quantity":"0.123456 SIX","contract":"seven"}');
 
     check_type(token, tokenTypes, "transfer", '{"from":"useraaaaaaaa","to":"useraaaaaaab","quantity":"0.0001 SYS","memo":"test memo"}');
     check_type(0, js2Types, "transaction", '{"expiration":"2009-02-13T23:31:31.000","ref_block_num":1234,"ref_block_prefix":5678,"max_net_usage_words":0,"max_cpu_usage_ms":0,"delay_sec":0,"context_free_actions":[],"actions":[{"account":"eosio.token","name":"transfer","authorization":[{"actor":"useraaaaaaaa","permission":"active"}],"data":"608C31C6187315D6708C31C6187315D60100000000000000045359530000000000"}],"transaction_extensions":[]}');
