@@ -309,6 +309,18 @@ void check_error(abieos_context* context, const std::string& s, F f) {
     check_except(s, [&] { check_context(context, f()); });
 }
 
+void check_size_suffix(const std::string& type, std::optional<abieos::size_suffix> expected) {
+    auto result = abieos::get_size_suffix(type);
+    printf("get_size_suffix: '%s' ", type.c_str());
+    if (result)
+        printf("value=%u suffix_length=%u\n", unsigned(result->value), unsigned(result->suffix_length));
+    else
+        printf("{}\n");
+    if ((result && !expected) || (!result && expected) ||
+        (result && expected && (result->value != expected->value || result->suffix_length != expected->suffix_length)))
+        throw std::runtime_error("get_size_suffix doesn't match expected");
+}
+
 void check_types() {
     auto context = check(abieos_create());
     auto token = check_context(context, abieos_string_to_name(context, "eosio.token"));
@@ -398,6 +410,10 @@ void check_types() {
     check_type(context, 0, "bool", R"(false)");
     check_type(context, 0, "bool#", R"(false)");
     check_type(context, 0, "bool#", R"(true)");
+    check_type(context, 0, "bool#1", R"(false)");
+    check_type(context, 0, "bool#1", R"(true)");
+    check_type(context, 0, "bool#3", R"(false)");
+    check_type(context, 0, "bool#3", R"(true)");
     check_error(context, "read past end", [&] { return abieos_hex_to_json(context, 0, "bool", ""); });
     check_error(context, "failed to parse", [&] { return abieos_json_to_bin(context, 0, "bool", R"(trues)"); });
     check_error(context, "expected number or boolean",
@@ -426,6 +442,14 @@ void check_types() {
     check_type(context, 0, "uint8#[]", R"([10])");
     check_type(context, 0, "uint8#[]", R"([10,9])");
     check_type(context, 0, "uint8#[]", R"([10,9,8])");
+    check_type(context, 0, "uint8[]#3", R"([])");
+    check_type(context, 0, "uint8[]#3", R"([10])");
+    check_type(context, 0, "uint8[]#3", R"([10,9])");
+    check_error(context, "<?>: data exceeds fixed-size limit (#)",
+                [&] { return abieos_json_to_bin(context, 0, "uint8[]#3", "[10,9,8]"); });
+    check_type(context, 0, "uint8#2[]", R"([])");
+    check_type(context, 0, "uint8#2[]", R"([10])");
+    check_type(context, 0, "uint8#2[]", R"([10,9])");
     check_type(context, 0, "int16", R"(0)");
     check_type(context, 0, "int16", R"(32767)");
     check_type(context, 0, "int16", R"(-32768)");
@@ -508,6 +532,9 @@ void check_types() {
     check_type(context, 0, "varuint32#", R"(0)");
     check_type(context, 0, "varuint32#", R"(127)");
     check_type(context, 0, "varuint32#", R"(128)");
+    check_type(context, 0, "varuint32#3", R"(0)");
+    check_type(context, 0, "varuint32#3", R"(127)");
+    check_type(context, 0, "varuint32#3", R"(128)");
     check_type(context, 0, "varint32", R"(0)");
     check_type(context, 0, "varint32", R"(-1)");
     check_type(context, 0, "varint32", R"(1)");
@@ -579,11 +606,18 @@ void check_types() {
     check_type(context, 0, "string", R"("' + '*'.repeat(128) + '")");
     check_type(context, 0, "string", R"("\u0000  这是一个测试  Это тест  هذا اختبار 👍")");
     check_error(context, "invalid string size", [&] { return abieos_hex_to_json(context, 0, "string", "01"); });
+    check_type(context, 0, "string[]", R"(["a","b"])");
+    check_type(context, 0, "string[]#5", R"(["a","b"])");
+    check_type(context, 0, "string[]#6", R"(["a","b"])");
+    check_type(context, 0, "string#2[]", R"(["a","b"])");
+    check_type(context, 0, "string#3[]", R"(["a","b"])");
     check_type(context, 0, "checksum160", R"("0000000000000000000000000000000000000000")");
     check_type(context, 0, "checksum160", R"("123456789ABCDEF01234567890ABCDEF70123456")");
     check_type(context, 0, "checksum256", R"("0000000000000000000000000000000000000000000000000000000000000000")");
     check_type(context, 0, "checksum256", R"("0987654321ABCDEF0987654321FFFF1234567890ABCDEF001234567890ABCDEF")");
     check_type(context, 0, "checksum256#", R"("0987654321ABCDEF0987654321FFFF1234567890ABCDEF001234567890ABCDEF")");
+    check_type(context, 0, "checksum256#32", R"("0987654321ABCDEF0987654321FFFF1234567890ABCDEF001234567890ABCDEF")");
+    check_type(context, 0, "checksum256#33", R"("0987654321ABCDEF0987654321FFFF1234567890ABCDEF001234567890ABCDEF")");
     check_type(
         context, 0, "checksum512",
         R"("00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000")");
@@ -683,6 +717,8 @@ void check_types() {
     check_type(context, 0, "asset", R"("1.2345 SYS")");
     check_type(context, 0, "asset", R"("-1.2345 SYS")");
     check_type(context, 0, "asset#", R"("1.2345 SYS")");
+    check_type(context, 0, "asset#16", R"("1.2345 SYS")");
+    check_type(context, 0, "asset#17", R"("1.2345 SYS")");
     check_error(context, "expected string containing asset",
                 [&] { return abieos_json_to_bin(context, 0, "asset", "null"); });
     check_type(context, 0, "asset[]", R"([])");
@@ -693,6 +729,8 @@ void check_types() {
     check_type(context, 0, "extended_asset", R"({"quantity":"0 FOO","contract":"bar"})");
     check_type(context, 0, "extended_asset", R"({"quantity":"0.123456 SIX","contract":"seven"})");
     check_type(context, 0, "extended_asset#", R"({"quantity":"0.123456 SIX","contract":"seven"})");
+    check_type(context, 0, "extended_asset#24", R"({"quantity":"0.123456 SIX","contract":"seven"})");
+    check_type(context, 0, "extended_asset#25", R"({"quantity":"0.123456 SIX","contract":"seven"})");
 
     check_type(context, token, "transfer",
                R"({"from":"useraaaaaaaa","to":"useraaaaaaab","quantity":"0.0001 SYS","memo":"test memo"})");
@@ -729,17 +767,19 @@ void check_types() {
                 [&] { return abieos_json_to_bin(context, 0, "int8$[]", ""); });
     check_error(context, "binary extensions ($) may not contain binary extensions ($)",
                 [&] { return abieos_json_to_bin(context, 0, "int8$$", ""); });
+    check_error(context, "size suffix (#) is out of range 1-1024",
+                [&] { return abieos_json_to_bin(context, 0, "int8#0", ""); });
+    check_error(context, "size suffix (#) is out of range 1-1024",
+                [&] { return abieos_json_to_bin(context, 0, "int8#1025", ""); });
     check_error(context, "unknown type \"fee\"", [&] { return abieos_json_to_bin(context, 0, "fee", ""); });
 
     check_error(context, "abi has a type with a missing name", [&] {
         return abieos_set_abi( //
-            context, 0,
-            R"({"version":"eosio::abi/1.1","types":[{"new_type_name":"","type":"int8"}]})");
+            context, 0, R"({"version":"eosio::abi/1.1","types":[{"new_type_name":"","type":"int8"}]})");
     });
     check_error(context, "can't use extensions ($) within typedefs", [&] {
         return abieos_set_abi( //
-            context, 0,
-            R"({"version":"eosio::abi/1.1","types":[{"new_type_name":"a","type":"int8$"}]})");
+            context, 0, R"({"version":"eosio::abi/1.1","types":[{"new_type_name":"a","type":"int8$"}]})");
     });
     check_error(context, "abi redefines type \"a\"", [&] {
         return abieos_set_abi(
@@ -912,6 +952,14 @@ void check_types() {
             context, testAbiName, "s5",
             R"({"x1":9,"x2":10,"x3":{"c1":4,"c2":[{"x1":7,"x2":true,"x3":{"c1":0,"c2":[],"c3":7}},{"x1":null} ]}} )");
     });
+    check_size_suffix("", {});
+    check_size_suffix("#", {});
+    check_size_suffix("#0", abieos::size_suffix{0, 2});
+    check_size_suffix("#1", abieos::size_suffix{1, 2});
+    check_size_suffix("#1234", abieos::size_suffix{1234, 5});
+    check_size_suffix("#001234", abieos::size_suffix{1234, 7});
+    check_size_suffix("#4294967295", abieos::size_suffix{4294967295, 11});
+    check_size_suffix("#4294967296", {});
 
     auto testWith = [&](auto& abiName) {
         check_type(context, abiName, "v1", R"(["int8",7])");
