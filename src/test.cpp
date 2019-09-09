@@ -632,9 +632,11 @@ void check_types() {
                 [&] { return abieos_json_to_bin(context, 0, "public_key", R"("foo")"); });
     check_type(context, 0, "private_key", R"("PVT_R1_PtoxLPzJZURZmPS4e26pjBiAn41mkkLPrET5qHnwDvbvqFEL6")");
     check_type(context, 0, "private_key", R"("PVT_R1_vbRKUuE34hjMVQiePj2FEjM8FvuG7yemzQsmzx89kPS9J8Coz")");
+    check_type(context, 0, "private_key", R"("5KQwrPbwdL6PhXujxW37FSSQZ1JiwsST4cqQzDeyXtP79zkvFD3")",
+               R"("PVT_K1_2bfGi9rYsXQSXXTvJbDAPhHLQUojjaNLomdm3cEJ1XTzMqUt3V")");
     check_error(context, "expected string containing private_key",
                 [&] { return abieos_json_to_bin(context, 0, "private_key", "true"); });
-    check_error(context, "unrecognized private key format",
+    check_error(context, "key has invalid size",
                 [&] { return abieos_json_to_bin(context, 0, "private_key", R"("foo")"); });
     check_type(
         context, 0, "signature",

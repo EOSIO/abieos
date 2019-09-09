@@ -872,6 +872,12 @@ ABIEOS_NODISCARD inline bool bin_to_json(public_key*, bin_to_json_state& state, 
     return state.writer.String(result.c_str(), result.size());
 }
 
+ABIEOS_NODISCARD inline bool bin_to_native(private_key& obj, bin_to_native_state& state, bool) {
+    return bin_to_key(obj, state.bin, state.error);
+}
+
+inline void native_to_bin(const private_key& obj, std::vector<char>& bin) { key_to_bin(bin, obj); }
+
 template <typename State>
 ABIEOS_NODISCARD bool json_to_bin(private_key*, State& state, bool, const abi_type*, event_type event, bool start) {
     if (event == event_type::received_string) {

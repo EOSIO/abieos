@@ -307,13 +307,28 @@ ABIEOS_NODISCARD inline bool public_key_to_string(std::string& dest, std::string
 ABIEOS_NODISCARD inline bool string_to_private_key(private_key& dest, std::string& error, std::string_view s) {
     if (s.size() >= 7 && s.substr(0, 7) == "PVT_R1_")
         return string_to_key(dest, error, s.substr(7), key_type::r1, "R1");
-    else
+    else if (s.size() >= 4 && s.substr(0, 4) == "PVT_")
         return set_error(error, "unrecognized private key format");
+    else {
+        std::vector<uint8_t> whole;
+        if (!base58_to_binary(whole, error, s))
+            return false;
+        private_key key{key_type::k1};
+        if (whole.size() != 37)
+            return set_error(error, "key has invalid size");
+        key.data.resize(whole.size() - 5);
+        // todo: verify checksum
+        memcpy(key.data.data(), whole.data() + 1, key.data.size());
+        dest = key;
+        return true;
+    }
 }
 
 ABIEOS_NODISCARD inline bool private_key_to_string(std::string& dest, std::string& error,
                                                    const private_key& private_key) {
-    if (private_key.type == key_type::r1)
+    if (private_key.type == key_type::k1)
+        return key_to_string(dest, error, private_key, "K1", "PVT_K1_");
+    else if (private_key.type == key_type::r1)
         return key_to_string(dest, error, private_key, "R1", "PVT_R1_");
     else
         return set_error(error, "unrecognized private key format");
