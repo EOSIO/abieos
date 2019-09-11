@@ -2,12 +2,27 @@
 
 #pragma once
 
+#ifdef EOSIO_CDT_COMPILATION
+#include <wchar.h>
+
+namespace std {
+inline size_t wcslen(const wchar_t* str) { return ::wcslen(str); }
+} // namespace std
+
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-W#warnings"
+#endif
+
 #include <ctime>
 #include <date/date.h>
 #include <map>
 #include <optional>
 #include <variant>
 #include <vector>
+
+#ifdef EOSIO_CDT_COMPILATION
+#pragma clang diagnostic pop
+#endif
 
 #include "abieos_numeric.hpp"
 
