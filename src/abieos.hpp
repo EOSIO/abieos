@@ -113,7 +113,7 @@ void hex(SrcIt begin, SrcIt end, DestIt dest) {
         if (i <= 9)
             *dest++ = '0' + i;
         else
-            *dest++ = 'A' + i - 10;
+            *dest++ = 'a' + i - 10;
     };
     while (begin != end) {
         nibble(((uint8_t)*begin) >> 4);
