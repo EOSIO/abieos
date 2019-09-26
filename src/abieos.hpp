@@ -2,6 +2,8 @@
 
 #pragma once
 
+#include <abieos/reflection.hpp>
+
 #ifdef EOSIO_CDT_COMPILATION
 #include <wchar.h>
 
@@ -73,42 +75,6 @@ inline constexpr bool is_string_v = false;
 
 template <>
 inline constexpr bool is_string_v<std::string> = true;
-
-template <auto P>
-struct member_ptr;
-
-template <class C, typename M>
-const C* class_from_void(M C::*, const void* v) {
-    return reinterpret_cast<const C*>(v);
-}
-
-template <class C, typename M>
-C* class_from_void(M C::*, void* v) {
-    return reinterpret_cast<C*>(v);
-}
-
-template <auto P>
-auto& member_from_void(const member_ptr<P>&, const void* p) {
-    return class_from_void(P, p)->*P;
-}
-
-template <auto P>
-auto& member_from_void(const member_ptr<P>&, void* p) {
-    return class_from_void(P, p)->*P;
-}
-
-template <auto P>
-struct member_ptr {
-    using member_type = std::decay_t<decltype(member_from_void(std::declval<member_ptr<P>>(), std::declval<void*>()))>;
-};
-
-#define ABIEOS_REFLECT(STRUCT)                                                                                         \
-    template <typename F>                                                                                              \
-    constexpr void for_each_field(STRUCT*, F f)
-
-#define ABIEOS_MEMBER(STRUCT, MEMBER) f(#MEMBER, abieos::member_ptr<&STRUCT::MEMBER>{});
-
-#define ABIEOS_BASE(BASE) for_each_field((BASE*)nullptr, f);
 
 // Pseudo objects never exist, except in serialized form
 struct pseudo_optional;
