@@ -1468,6 +1468,10 @@ struct symbol {
     uint64_t value = 0;
 };
 
+ABIEOS_REFLECT(symbol) { //
+    ABIEOS_MEMBER(symbol, value);
+}
+
 ABIEOS_NODISCARD inline bool string_to_symbol(uint64_t& result, std::string& error, uint8_t precision,
                                               std::string_view str) {
     if (!string_to_symbol_code(result, error, str))
@@ -1518,6 +1522,11 @@ struct asset {
     int64_t amount = 0;
     symbol sym{};
 };
+
+ABIEOS_REFLECT(asset) {
+    ABIEOS_MEMBER(asset, amount);
+    ABIEOS_MEMBER(asset, sym);
+}
 
 ABIEOS_NODISCARD inline bool string_to_asset(asset& result, std::string& error, const char* s) {
     // todo: check overflow
