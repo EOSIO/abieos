@@ -137,6 +137,13 @@ void hex(SrcIt begin, SrcIt end, DestIt dest) {
     }
 }
 
+template <typename SrcIt>
+std::string hex(SrcIt begin, SrcIt end) {
+    std::string s;
+    hex(begin, end, std::back_inserter(s));
+    return s;
+}
+
 template <typename SrcIt, typename DestIt>
 ABIEOS_NODISCARD bool unhex(std::string& error, SrcIt begin, SrcIt end, DestIt dest) {
     auto get_digit = [&](uint8_t& nibble) {
@@ -459,6 +466,8 @@ template <typename T>
 void native_to_bin(const std::optional<T>& obj, std::vector<char>& bin);
 template <typename... Ts>
 void native_to_bin(const std::variant<Ts...>& obj, std::vector<char>& bin);
+template <typename T, typename... Ts>
+void native_to_bin(const std::tuple<T, Ts...>& obj, std::vector<char>& bin);
 
 template <typename T>
 ABIEOS_NODISCARD auto json_to_native(T& obj, json_to_native_state& state, event_type event, bool start)
@@ -2105,6 +2114,19 @@ template <typename... Ts>
 void native_to_bin(const std::variant<Ts...>& obj, std::vector<char>& bin) {
     push_varuint32(bin, obj.index());
     std::visit([&](auto& x) { native_to_bin(x, bin); }, obj);
+}
+
+template <int i, typename T>
+void native_to_bin_tuple(const T& obj, std::vector<char>& bin) {
+    if constexpr (i < std::tuple_size_v<T>) {
+        native_to_bin(std::get<i>(obj), bin);
+        native_to_bin_tuple<i + 1>(obj, bin);
+    }
+}
+
+template <typename T, typename... Ts>
+void native_to_bin(const std::tuple<T, Ts...>& obj, std::vector<char>& bin) {
+    native_to_bin_tuple<0>(obj, bin);
 }
 
 ///////////////////////////////////////////////////////////////////////////////
