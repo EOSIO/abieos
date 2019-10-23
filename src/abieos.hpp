@@ -2,7 +2,7 @@
 
 #pragma once
 
-#include <abieos/reflection.hpp>
+#include <eosio/reflection.hpp>
 
 #ifdef EOSIO_CDT_COMPILATION
 #include <wchar.h>
