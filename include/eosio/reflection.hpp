@@ -59,7 +59,7 @@ namespace eosio { namespace reflection {
 #define ABIEOS_REFLECT(STRUCT)                                                                                         \
    inline const char* get_type_name(STRUCT*) { return #STRUCT; }                                                       \
    template <typename F>                                                                                               \
-   void for_each_field(STRUCT*, F f)
+   constexpr void for_each_field(STRUCT*, F f)
 
 // todo: remove
 #define ABIEOS_MEMBER(STRUCT, FIELD) f(#FIELD, eosio::reflection::field_ptr<&STRUCT::FIELD>{});
@@ -67,13 +67,18 @@ namespace eosio { namespace reflection {
 // todo: remove
 #define ABIEOS_BASE(BASE) for_each_field((BASE*)nullptr, f);
 
-#define EOSIO_REFLECT_INTERNAL(CLS, FIELD) f(#FIELD, field_ptr<&STRUCT::FIELD>{});
+#define EOSIO_REFLECT_INTERNAL(STRUCT, FIELD) f(#FIELD, eosio::reflection::field_ptr<&STRUCT::FIELD>{});
 
-#define EOSIO_REFLECT(CLS, ...)                                                                                        \
-   inline const char* get_type_name(CLS*) { return #CLS; }                                                             \
+#define EOSIO_REFLECT(STRUCT, ...)                                                                                     \
+   inline const char* get_type_name(STRUCT*) { return #STRUCT; }                                                       \
    template <typename F>                                                                                               \
-   void for_each_field(CLS*, F f) {                                                                                    \
-      MAP_REUSE_ARG0(EOSIO_REFLECT_INTERNAL, CLS, __VA_ARGS__)                                                         \
+   constexpr void for_each_field(STRUCT*, F f) {                                                                       \
+      MAP_REUSE_ARG0(EOSIO_REFLECT_INTERNAL, STRUCT, __VA_ARGS__)                                                      \
    }
+
+#define EOSIO_REFLECT_EMPTY(STRUCT)                                                                                    \
+   inline const char* get_type_name(STRUCT*) { return #STRUCT; }                                                       \
+   template <typename F>                                                                                               \
+   constexpr void for_each_field(STRUCT*, F f) {}
 
 }} // namespace eosio::reflection
