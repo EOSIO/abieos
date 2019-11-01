@@ -939,15 +939,26 @@ inline constexpr uint64_t char_to_name_digit(char c) {
     return 0;
 }
 
-inline constexpr uint64_t string_to_name(const char* str) {
+inline constexpr uint64_t string_to_name(const char* str, int size) {
     uint64_t name = 0;
     int i = 0;
-    for (; str[i] && i < 12; ++i)
+    for (; i < size && i < 12; ++i)
         name |= (char_to_name_digit(str[i]) & 0x1f) << (64 - 5 * (i + 1));
-    if (i == 12)
-        name |= char_to_name_digit(str[12]) & 0x0F;
+    if (i < size)
+        name |= char_to_name_digit(str[i]) & 0x0F;
     return name;
 }
+
+inline constexpr uint64_t string_to_name(const char* str) {
+    int len = 0;
+    while (str[len])
+        ++len;
+    return string_to_name(str, len);
+}
+
+inline constexpr uint64_t string_to_name(std::string_view str) { return string_to_name(str.data(), str.size()); }
+
+inline constexpr uint64_t string_to_name(const std::string& str) { return string_to_name(str.data(), str.size()); }
 
 inline constexpr bool char_to_name_digit_strict(char c, uint64_t& result) {
     if (c >= 'a' && c <= 'z') {
@@ -1007,6 +1018,8 @@ struct name {
     constexpr name() = default;
     constexpr explicit name(uint64_t value) : value{value} {}
     constexpr explicit name(const char* str) : value{string_to_name(str)} {}
+    constexpr explicit name(std::string_view str) : value{string_to_name(str)} {}
+    constexpr explicit name(const std::string& str) : value{string_to_name(str)} {}
     constexpr name(const name&) = default;
 
     explicit operator std::string() const { return name_to_string(value); }
@@ -1024,7 +1037,7 @@ inline void native_to_bin(const name& obj, std::vector<char>& bin) { native_to_b
 
 ABIEOS_NODISCARD inline bool json_to_native(name& obj, json_to_native_state& state, event_type event, bool start) {
     if (event == event_type::received_string) {
-        obj.value = string_to_name(state.get_string().c_str());
+        obj.value = string_to_name(state.get_string());
         if (trace_json_to_native)
             printf("%*sname: %s (%08llx) %s\n", int(state.stack.size() * 4), "", state.get_string().c_str(),
                    (unsigned long long)obj.value, std::string{obj}.c_str());
@@ -1036,7 +1049,7 @@ ABIEOS_NODISCARD inline bool json_to_native(name& obj, json_to_native_state& sta
 template <typename State>
 ABIEOS_NODISCARD bool json_to_bin(name*, State& state, bool, const abi_type*, event_type event, bool start) {
     if (event == event_type::received_string) {
-        name obj{string_to_name(state.get_string().c_str())};
+        name obj{string_to_name(state.get_string())};
         if (trace_json_to_bin)
             printf("%*sname: %s (%08llx) %s\n", int(state.stack.size() * 4), "", state.get_string().c_str(),
                    (unsigned long long)obj.value, std::string{obj}.c_str());

@@ -19,24 +19,26 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
-execute_process(COMMAND git submodule status --recursive
-                COMMAND grep -c "^[+\-]"
-                WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
-                OUTPUT_VARIABLE submodule_status
-                OUTPUT_STRIP_TRAILING_WHITESPACE)
-if(submodule_status GREATER 0)
-   message(FATAL_ERROR "git submodules are not up to date.
+if(NOT DEFINED SKIP_SUBMODULE_CHECK)
+  execute_process(COMMAND git submodule status --recursive
+                  COMMAND grep -c "^[+\-]"
+                  WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+                  OUTPUT_VARIABLE submodule_status
+                  OUTPUT_STRIP_TRAILING_WHITESPACE)
+  if(submodule_status GREATER 0)
+     message(FATAL_ERROR "git submodules are not up to date.
 Please run the command 'git submodule update --init --recursive'.")
+  endif()
 endif()
 
 add_library(abieos MODULE src/abieos.cpp)
-target_include_directories(abieos PRIVATE external/rapidjson/include external/date/include)
+target_include_directories(abieos PRIVATE include external/rapidjson/include external/date/include)
 
 add_executable(test src/test.cpp src/abieos.cpp)
-target_include_directories(test PRIVATE external/rapidjson/include external/date/include)
+target_include_directories(test PRIVATE include external/rapidjson/include external/date/include)
 
 add_executable(test-sanitize src/test.cpp src/abieos.cpp)
-target_include_directories(test-sanitize PRIVATE external/rapidjson/include external/date/include)
+target_include_directories(test-sanitize PRIVATE include external/rapidjson/include external/date/include)
 target_link_libraries(test-sanitize -fno-omit-frame-pointer -fsanitize=address,undefined)
 target_compile_options(test-sanitize PUBLIC -fno-omit-frame-pointer -fsanitize=address,undefined)
 
