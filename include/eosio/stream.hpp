@@ -1,10 +1,14 @@
 #pragma once
 
 #include <eosio/eosio_outcome.hpp>
+#include <string>
+#include <string_view>
+#include <vector>
 
 namespace eosio {
 enum class stream_error {
    no_error,
+   varuint_too_big,
    overrun,
    underrun,
    float_error,
@@ -25,10 +29,11 @@ class stream_error_category_type : public std::error_category {
    std::string message(int c) const override final {
       switch (static_cast<stream_error>(c)) {
             // clang-format off
-         case stream_error::no_error:     return "No error";
-         case stream_error::overrun:      return "Stream overrun";
-         case stream_error::underrun:     return "Stream underrun";
-         case stream_error::float_error:  return "Float error";
+         case stream_error::no_error:        return "No error";
+         case stream_error::varuint_too_big: return "varuint too big";
+         case stream_error::overrun:         return "Stream overrun";
+         case stream_error::underrun:        return "Stream underrun";
+         case stream_error::float_error:     return "Float error";
             // clang-format on
 
          default: return "unknown";
@@ -50,6 +55,21 @@ struct small_buffer {
 
    void             reverse() { std::reverse(data, pos); }
    std::string_view sv() { return { data, pos - data }; }
+};
+
+struct vector_stream {
+   std::vector<char>& data;
+   vector_stream(std::vector<char>& data) : data(data) {}
+
+   result<void> write(char ch) {
+      data.push_back(ch);
+      return outcome::success();
+   }
+
+   result<void> write(const char* src, size_t size) {
+      data.insert(data.end(), src, src + size);
+      return outcome::success();
+   }
 };
 
 struct fixed_buf_stream {

@@ -32,18 +32,18 @@ Please run the command 'git submodule update --init --recursive'.")
 endif()
 
 add_library(abieos MODULE src/abieos.cpp)
-target_include_directories(abieos PRIVATE include external/rapidjson/include external/date/include)
+target_include_directories(abieos PRIVATE include external/outcome/single-header external/rapidjson/include external/date/include)
 
 add_executable(test src/test.cpp src/abieos.cpp)
-target_include_directories(test PRIVATE include external/rapidjson/include external/date/include)
+target_include_directories(test PRIVATE include external/outcome/single-header external/rapidjson/include external/date/include)
 
 add_executable(test-sanitize src/test.cpp src/abieos.cpp)
-target_include_directories(test-sanitize PRIVATE include external/rapidjson/include external/date/include)
+target_include_directories(test-sanitize PRIVATE include external/outcome/single-header external/rapidjson/include external/date/include)
 target_link_libraries(test-sanitize -fno-omit-frame-pointer -fsanitize=address,undefined)
 target_compile_options(test-sanitize PUBLIC -fno-omit-frame-pointer -fsanitize=address,undefined)
 
 # add_executable(fuzzer src/fuzzer.cpp src/abieos.cpp)
-# target_include_directories(fuzzer PRIVATE external/rapidjson/include external/date/include)
+# target_include_directories(fuzzer PRIVATE external/outcome/single-header external/rapidjson/include external/date/include)
 # target_link_libraries(fuzzer -fsanitize=fuzzer,address,undefined,signed-integer-overflow -fstandalone-debug)
 # target_compile_options(fuzzer PRIVATE -fsanitize=fuzzer,address,undefined,signed-integer-overflow -fstandalone-debug)
 

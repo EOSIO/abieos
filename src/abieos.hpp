@@ -2,7 +2,9 @@
 
 #pragma once
 
+#include <eosio/chain_conversions.hpp>
 #include <eosio/reflection.hpp>
+#include <eosio/to_bin.hpp>
 
 #ifdef EOSIO_CDT_COMPILATION
 #include <wchar.h>
@@ -541,8 +543,6 @@ struct bytes {
     std::vector<char> data;
 };
 
-void push_varuint32(std::vector<char>& bin, uint32_t v);
-
 ABIEOS_NODISCARD inline bool bin_to_native(bytes& obj, bin_to_native_state& state, bool) {
     uint64_t size;
     if (!read_varuint64(state.bin, state.error, size))
@@ -565,12 +565,12 @@ ABIEOS_NODISCARD inline bool bin_to_native(input_buffer& obj, bin_to_native_stat
 }
 
 inline void native_to_bin(const bytes& obj, std::vector<char>& bin) {
-    push_varuint32(bin, obj.data.size());
+    eosio::push_varuint32(bin, obj.data.size());
     bin.insert(bin.end(), obj.data.begin(), obj.data.end());
 }
 
 inline void native_to_bin(const input_buffer& obj, std::vector<char>& bin) {
-    push_varuint32(bin, obj.end - obj.pos);
+    eosio::push_varuint32(bin, obj.end - obj.pos);
     bin.insert(bin.end(), obj.pos, obj.end);
 }
 
@@ -600,7 +600,7 @@ ABIEOS_NODISCARD bool json_to_bin(bytes*, State& state, bool, const abi_type*, e
             printf("%*sbytes (%d hex digits)\n", int(state.stack.size() * 4), "", int(s.size()));
         if (s.size() & 1)
             return set_error(state, "odd number of hex digits");
-        push_varuint32(state.bin, s.size() / 2);
+        eosio::push_varuint32(state.bin, s.size() / 2);
         return unhex(state.error, s.begin(), s.end(), std::back_inserter(state.bin));
     } else
         return set_error(state, "expected string containing hex digits");
@@ -931,98 +931,17 @@ ABIEOS_NODISCARD inline bool bin_to_json(signature*, bin_to_json_state& state, b
     return state.writer.String(result.c_str(), result.size());
 }
 
-inline constexpr uint64_t char_to_name_digit(char c) {
-    if (c >= 'a' && c <= 'z')
-        return (c - 'a') + 6;
-    if (c >= '1' && c <= '5')
-        return (c - '1') + 1;
-    return 0;
-}
-
-inline constexpr uint64_t string_to_name(const char* str, int size) {
-    uint64_t name = 0;
-    int i = 0;
-    for (; i < size && i < 12; ++i)
-        name |= (char_to_name_digit(str[i]) & 0x1f) << (64 - 5 * (i + 1));
-    if (i < size)
-        name |= char_to_name_digit(str[i]) & 0x0F;
-    return name;
-}
-
-inline constexpr uint64_t string_to_name(const char* str) {
-    int len = 0;
-    while (str[len])
-        ++len;
-    return string_to_name(str, len);
-}
-
-inline constexpr uint64_t string_to_name(std::string_view str) { return string_to_name(str.data(), str.size()); }
-
-inline constexpr uint64_t string_to_name(const std::string& str) { return string_to_name(str.data(), str.size()); }
-
-inline constexpr bool char_to_name_digit_strict(char c, uint64_t& result) {
-    if (c >= 'a' && c <= 'z') {
-        result = (c - 'a') + 6;
-        return true;
-    }
-    if (c >= '1' && c <= '5') {
-        result = (c - '1') + 1;
-        return true;
-    }
-    if (c == '.') {
-        result = 0;
-        return true;
-    }
-    return false;
-}
-
-inline constexpr bool string_to_name_strict(std::string_view str, uint64_t& name) {
-    name = 0;
-    unsigned i = 0;
-    for (; i < str.size() && i < 12; ++i) {
-        uint64_t x = 0;
-        if (!char_to_name_digit_strict(str[i], x))
-            return false;
-        name |= (x & 0x1f) << (64 - 5 * (i + 1));
-    }
-    if (i < str.size() && i == 12) {
-        uint64_t x = 0;
-        if (!char_to_name_digit_strict(str[i], x) || x != (x & 0xf))
-            return false;
-        name |= x;
-        ++i;
-    }
-    if (i < str.size())
-        return false;
-    return true;
-}
-
-inline std::string name_to_string(uint64_t name) {
-    static const char* charmap = ".12345abcdefghijklmnopqrstuvwxyz";
-    std::string str(13, '.');
-
-    uint64_t tmp = name;
-    for (uint32_t i = 0; i <= 12; ++i) {
-        char c = charmap[tmp & (i == 0 ? 0x0f : 0x1f)];
-        str[12 - i] = c;
-        tmp >>= (i == 0 ? 4 : 5);
-    }
-
-    const auto last = str.find_last_not_of('.');
-    return str.substr(0, last + 1);
-}
-
 struct name {
     uint64_t value = 0;
 
     constexpr name() = default;
     constexpr explicit name(uint64_t value) : value{value} {}
-    constexpr explicit name(const char* str) : value{string_to_name(str)} {}
-    constexpr explicit name(std::string_view str) : value{string_to_name(str)} {}
-    constexpr explicit name(const std::string& str) : value{string_to_name(str)} {}
+    constexpr explicit name(const char* str) : value{eosio::string_to_name(str)} {}
+    constexpr explicit name(std::string_view str) : value{eosio::string_to_name(str)} {}
+    constexpr explicit name(const std::string& str) : value{eosio::string_to_name(str)} {}
     constexpr name(const name&) = default;
 
-    explicit operator std::string() const { return name_to_string(value); }
+    explicit operator std::string() const { return eosio::name_to_string(value); }
 };
 
 ABIEOS_NODISCARD inline bool operator==(name a, name b) { return a.value == b.value; }
@@ -1037,7 +956,7 @@ inline void native_to_bin(const name& obj, std::vector<char>& bin) { native_to_b
 
 ABIEOS_NODISCARD inline bool json_to_native(name& obj, json_to_native_state& state, event_type event, bool start) {
     if (event == event_type::received_string) {
-        obj.value = string_to_name(state.get_string());
+        obj.value = eosio::string_to_name(state.get_string());
         if (trace_json_to_native)
             printf("%*sname: %s (%08llx) %s\n", int(state.stack.size() * 4), "", state.get_string().c_str(),
                    (unsigned long long)obj.value, std::string{obj}.c_str());
@@ -1049,7 +968,7 @@ ABIEOS_NODISCARD inline bool json_to_native(name& obj, json_to_native_state& sta
 template <typename State>
 ABIEOS_NODISCARD bool json_to_bin(name*, State& state, bool, const abi_type*, event_type event, bool start) {
     if (event == event_type::received_string) {
-        name obj{string_to_name(state.get_string())};
+        name obj{eosio::string_to_name(state.get_string())};
         if (trace_json_to_bin)
             printf("%*sname: %s (%08llx) %s\n", int(state.stack.size() * 4), "", state.get_string().c_str(),
                    (unsigned long long)obj.value, std::string{obj}.c_str());
@@ -1073,16 +992,7 @@ struct varuint32 {
     explicit operator std::string() const { return std::to_string(value); }
 };
 
-inline void push_varuint32(std::vector<char>& bin, uint32_t v) {
-    uint64_t val = v;
-    do {
-        uint8_t b = val & 0x7f;
-        val >>= 7;
-        b |= ((val > 0) << 7);
-        bin.push_back(b);
-    } while (val);
-}
-
+// !!!
 ABIEOS_NODISCARD inline bool read_varuint32(input_buffer& bin, std::string& error, uint32_t& dest) {
     dest = 0;
     int shift = 0;
@@ -1098,6 +1008,7 @@ ABIEOS_NODISCARD inline bool read_varuint32(input_buffer& bin, std::string& erro
     return true;
 }
 
+// !!!
 ABIEOS_NODISCARD inline bool read_varuint64(input_buffer& bin, std::string& error, uint64_t& dest) {
     dest = 0;
     int shift = 0;
@@ -1117,7 +1028,7 @@ ABIEOS_NODISCARD inline bool bin_to_native(varuint32& obj, bin_to_native_state& 
     return read_varuint32(state.bin, state.error, obj.value);
 }
 
-inline void native_to_bin(const varuint32& obj, std::vector<char>& bin) { push_varuint32(bin, obj.value); }
+inline void native_to_bin(const varuint32& obj, std::vector<char>& bin) { eosio::push_varuint32(bin, obj.value); }
 
 ABIEOS_NODISCARD inline bool json_to_native(varuint32& obj, json_to_native_state& state, event_type event, bool) {
     uint32_t x;
@@ -1132,7 +1043,7 @@ ABIEOS_NODISCARD bool json_to_bin(varuint32*, State& state, bool, const abi_type
     uint32_t x;
     if (!json_to_number(x, state, event))
         return false;
-    push_varuint32(state.bin, x);
+    eosio::push_varuint32(state.bin, x);
     return true;
 }
 
@@ -1150,7 +1061,7 @@ struct varint32 {
 };
 
 inline void push_varint32(std::vector<char>& bin, int32_t v) {
-    push_varuint32(bin, (uint32_t(v) << 1) ^ uint32_t(v >> 31));
+    eosio::push_varuint32(bin, (uint32_t(v) << 1) ^ uint32_t(v >> 31));
 }
 
 ABIEOS_NODISCARD inline bool read_varint32(input_buffer& bin, std::string& error, int32_t& result) {
@@ -2071,13 +1982,13 @@ std::vector<char> native_to_bin(const T& obj) {
 }
 
 inline void native_to_bin(const std::string& obj, std::vector<char>& bin) {
-    push_varuint32(bin, obj.size());
+    eosio::push_varuint32(bin, obj.size());
     bin.insert(bin.end(), obj.begin(), obj.end());
 }
 
 template <typename T>
 void native_to_bin(const std::vector<T>& obj, std::vector<char>& bin) {
-    push_varuint32(bin, obj.size());
+    eosio::push_varuint32(bin, obj.size());
     for (auto& v : obj)
         native_to_bin(v, bin);
 }
@@ -2091,7 +2002,7 @@ void native_to_bin(const std::optional<T>& obj, std::vector<char>& bin) {
 
 template <typename... Ts>
 void native_to_bin(const std::variant<Ts...>& obj, std::vector<char>& bin) {
-    push_varuint32(bin, obj.index());
+    eosio::push_varuint32(bin, obj.index());
     std::visit([&](auto& x) { native_to_bin(x, bin); }, obj);
 }
 
@@ -2622,7 +2533,7 @@ ABIEOS_NODISCARD inline bool json_to_bin(pseudo_array*, jvalue_to_bin_state& sta
         if (trace_jvalue_to_bin)
             printf("%*s[ %d elements\n", int(state.stack.size() * 4), "",
                    int(std::get<jarray>(state.received_value->value).size()));
-        push_varuint32(state.bin, std::get<jarray>(state.received_value->value).size());
+        eosio::push_varuint32(state.bin, std::get<jarray>(state.received_value->value).size());
         state.stack.push_back({type, false, state.received_value, -1});
         return true;
     }
@@ -2666,7 +2577,7 @@ ABIEOS_NODISCARD inline bool json_to_bin(pseudo_variant*, jvalue_to_bin_state& s
                                [&](auto& field) { return field.name == typeName; });
         if (it == stack_entry.type->fields.end())
             return set_error(state.error, "type is not valid for this variant");
-        push_varuint32(state.bin, it - stack_entry.type->fields.begin());
+        eosio::push_varuint32(state.bin, it - stack_entry.type->fields.begin());
         state.received_value = &arr[++stack_entry.position];
         return it->type->ser && it->type->ser->json_to_bin(state, allow_extensions, it->type,
                                                            get_event_type(*state.received_value), true);
@@ -2695,7 +2606,7 @@ ABIEOS_NODISCARD inline bool json_to_bin(std::string*, jvalue_to_bin_state& stat
         auto& s = state.get_string();
         if (trace_jvalue_to_bin)
             printf("%*sstring: %s\n", int(state.stack.size() * 4), "", s.c_str());
-        push_varuint32(state.bin, s.size());
+        eosio::push_varuint32(state.bin, s.size());
         state.bin.insert(state.bin.end(), s.begin(), s.end());
         return true;
     } else
@@ -2759,7 +2670,7 @@ ABIEOS_NODISCARD inline bool json_to_bin(std::vector<char>& bin, std::string& er
     size_t pos = 0;
     for (auto& insertion : state.size_insertions) {
         bin.insert(bin.end(), state.bin.begin() + pos, state.bin.begin() + insertion.position);
-        push_varuint32(bin, insertion.size);
+        eosio::push_varuint32(bin, insertion.size);
         pos = insertion.position;
     }
     bin.insert(bin.end(), state.bin.begin() + pos, state.bin.end());
@@ -2887,7 +2798,7 @@ ABIEOS_NODISCARD inline bool json_to_bin(pseudo_variant*, json_to_bin_state& sta
             if (it == stack_entry.type->fields.end())
                 return set_error(state, "type is not valid for this variant");
             stack_entry.variant_type_index = it - stack_entry.type->fields.begin();
-            push_varuint32(state.bin, stack_entry.variant_type_index);
+            eosio::push_varuint32(state.bin, stack_entry.variant_type_index);
             return true;
         } else
             return set_error(state, R"(expected variant: ["type", value])");
@@ -2916,7 +2827,7 @@ ABIEOS_NODISCARD inline bool json_to_bin(std::string*, json_to_bin_state& state,
         auto& s = state.get_string();
         if (trace_json_to_bin)
             printf("%*sstring: %s\n", int(state.stack.size() * 4), "", s.c_str());
-        push_varuint32(state.bin, s.size());
+        eosio::push_varuint32(state.bin, s.size());
         state.bin.insert(state.bin.end(), s.begin(), s.end());
         return true;
     } else

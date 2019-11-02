@@ -2,7 +2,6 @@
 
 #include <eosio/fpconv.h>
 #include <eosio/stream.hpp>
-#include <vector>
 
 namespace eosio {
 
@@ -64,10 +63,12 @@ result<void> to_json(const char* s, S& stream) {
    return to_json(std::string_view{ s }, stream);
 }
 
+/*
 template <typename S>
 result<void> to_json(const shared_memory<std::string_view>& s, S& stream) {
    return to_json(*s, stream);
 }
+*/
 
 template <typename S>
 result<void> to_json(bool value, S& stream) {
