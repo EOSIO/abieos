@@ -18,7 +18,6 @@ inline size_t wcslen(const wchar_t* str) { return ::wcslen(str); }
 #endif
 
 #include <ctime>
-#include <date/date.h>
 #include <map>
 #include <optional>
 #include <variant>
@@ -1091,84 +1090,18 @@ ABIEOS_NODISCARD inline bool bin_to_json(varint32*, bin_to_json_state& state, bo
     return state.writer.Int64(v);
 }
 
-inline std::string microseconds_to_str(uint64_t microseconds) {
-    std::string result;
-
-    auto append_uint = [&result](uint32_t value, int digits) {
-        char s[20];
-        char* ch = s;
-        while (digits--) {
-            *ch++ = '0' + (value % 10);
-            value /= 10;
-        };
-        std::reverse(s, ch);
-        result.insert(result.end(), s, ch);
-    };
-
-    std::chrono::microseconds us{microseconds};
-    date::sys_days sd(std::chrono::floor<date::days>(us));
-    auto ymd = date::year_month_day{sd};
-    uint32_t ms = (std::chrono::round<std::chrono::milliseconds>(us) - sd.time_since_epoch()).count();
-    us -= sd.time_since_epoch();
-    append_uint((int)ymd.year(), 4);
-    result.push_back('-');
-    append_uint((unsigned)ymd.month(), 2);
-    result.push_back('-');
-    append_uint((unsigned)ymd.day(), 2);
-    result.push_back('T');
-    append_uint(ms / 3600000 % 60, 2);
-    result.push_back(':');
-    append_uint(ms / 60000 % 60, 2);
-    result.push_back(':');
-    append_uint(ms / 1000 % 60, 2);
-    result.push_back('.');
-    append_uint(ms % 1000, 3);
-    return result;
-}
-
 struct time_point_sec {
     uint32_t utc_seconds = 0;
 
-    explicit operator std::string() const { return microseconds_to_str(uint64_t(utc_seconds) * 1'000'000); }
+    explicit operator std::string() const { return eosio::microseconds_to_str(uint64_t(utc_seconds) * 1'000'000); }
 };
 
-ABIEOS_NODISCARD inline bool string_to_time_point_sec(time_point_sec& result, std::string& error, const char* s) {
-    auto parse_uint = [&](uint32_t& result, int digits) {
-        result = 0;
-        while (digits--) {
-            if (*s >= '0' && *s <= '9')
-                result = result * 10 + *s++ - '0';
-            else
-                return set_error(error, "expected string containing time_point_sec");
-        }
+ABIEOS_NODISCARD inline bool string_to_time_point_sec(time_point_sec& result, std::string& error, const char* s,
+                                                      const char* end) {
+    if (eosio::string_to_utc_seconds(result.utc_seconds, s, end, true, true))
         return true;
-    };
-    uint32_t y, m, d, h, min, sec;
-    if (!parse_uint(y, 4))
-        return false;
-    if (*s++ != '-')
+    else
         return set_error(error, "expected string containing time_point_sec");
-    if (!parse_uint(m, 2))
-        return false;
-    if (*s++ != '-')
-        return set_error(error, "expected string containing time_point_sec");
-    if (!parse_uint(d, 2))
-        return false;
-    if (*s++ != 'T')
-        return set_error(error, "expected string containing time_point_sec");
-    if (!parse_uint(h, 2))
-        return false;
-    if (*s++ != ':')
-        return set_error(error, "expected string containing time_point_sec");
-    if (!parse_uint(min, 2))
-        return false;
-    if (*s++ != ':')
-        return set_error(error, "expected string containing time_point_sec");
-    if (!parse_uint(sec, 2))
-        return false;
-    result.utc_seconds =
-        date::sys_days(date::year(y) / m / d).time_since_epoch().count() * 86400 + h * 3600 + min * 60 + sec;
-    return true;
 }
 
 ABIEOS_NODISCARD inline bool bin_to_native(time_point_sec& obj, bin_to_native_state& state, bool) {
@@ -1186,7 +1119,8 @@ template <typename State>
 ABIEOS_NODISCARD bool json_to_bin(time_point_sec*, State& state, bool, const abi_type*, event_type event, bool start) {
     if (event == event_type::received_string) {
         time_point_sec obj;
-        if (!string_to_time_point_sec(obj, state.error, state.get_string().c_str()))
+        if (!string_to_time_point_sec(obj, state.error, state.get_string().data(),
+                                      state.get_string().data() + state.get_string().size()))
             return false;
         if (trace_json_to_bin)
             printf("%*stime_point_sec: %s (%u) %s\n", int(state.stack.size() * 4), "", state.get_string().c_str(),
@@ -1208,26 +1142,14 @@ ABIEOS_NODISCARD inline bool bin_to_json(time_point_sec*, bin_to_json_state& sta
 struct time_point {
     uint64_t microseconds = 0;
 
-    explicit operator std::string() const { return microseconds_to_str(microseconds); }
+    explicit operator std::string() const { return eosio::microseconds_to_str(microseconds); }
 };
 
 ABIEOS_NODISCARD inline bool string_to_time_point(time_point& dest, std::string& error, const std::string& s) {
-    time_point_sec tps;
-    if (!string_to_time_point_sec(tps, error, s.c_str()))
-        return false;
-    dest.microseconds = tps.utc_seconds * 1000000ull;
-    auto dot = s.find('.');
-    if (dot != std::string::npos) {
-        auto ms = s.substr(dot);
-        ms[0] = '1';
-        while (ms.size() < 4)
-            ms.push_back('0');
-        uint32_t u;
-        if (!decimal_to_binary(u, error, ms))
-            return false;
-        dest.microseconds += (u - 1000) * 1000;
-    }
-    return true;
+    if (eosio::string_to_utc_microseconds(dest.microseconds, s.data(), s.data() + s.size()))
+        return true;
+    else
+        return set_error(error, "expected string containing time_point");
 }
 
 ABIEOS_NODISCARD inline bool bin_to_native(time_point& obj, bin_to_native_state& state, bool) {
