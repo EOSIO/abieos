@@ -1305,31 +1305,11 @@ ABIEOS_REFLECT(asset) {
 
 ABIEOS_NODISCARD inline bool string_to_asset(asset& result, std::string& error, const char*& s, const char* end,
                                              bool expect_end) {
-    // todo: check overflow
-    while (s != end && *s == ' ')
-        ++s;
-    uint64_t amount = 0;
-    uint8_t precision = 0;
-    bool negative = false;
-    if (s != end && *s == '-') {
-        ++s;
-        negative = true;
-    }
-    while (s != end && *s >= '0' && *s <= '9')
-        amount = amount * 10 + (*s++ - '0');
-    if (s != end && *s == '.') {
-        ++s;
-        while (*s >= '0' && *s <= '9') {
-            amount = amount * 10 + (*s++ - '0');
-            ++precision;
-        }
-    }
-    if (negative)
-        amount = -amount;
-    uint64_t code;
-    if (!eosio::string_to_symbol_code(code, s, end, expect_end))
+    int64_t amount;
+    uint64_t sym;
+    if (!eosio::string_to_asset(amount, sym, s, end, expect_end))
         return set_error(error, "expected string containing asset");
-    result = asset{(int64_t)amount, symbol{(code << 8) | precision}};
+    result = asset{amount, symbol{sym}};
     return true;
 }
 
@@ -1337,30 +1317,7 @@ ABIEOS_NODISCARD inline bool string_to_asset(asset& result, std::string& error, 
     return string_to_asset(result, error, s, end, true);
 }
 
-inline std::string asset_to_string(const asset& v) {
-    std::string result;
-    uint64_t amount;
-    if (v.amount < 0)
-        amount = -v.amount;
-    else
-        amount = v.amount;
-    uint8_t precision = v.sym.value;
-    if (precision) {
-        while (precision--) {
-            result += '0' + amount % 10;
-            amount /= 10;
-        }
-        result += '.';
-    }
-    do {
-        result += '0' + amount % 10;
-        amount /= 10;
-    } while (amount);
-    if (v.amount < 0)
-        result += '-';
-    std::reverse(result.begin(), result.end());
-    return result + ' ' + eosio::symbol_code_to_string(v.sym.value >> 8);
-}
+inline std::string asset_to_string(const asset& v) { return eosio::asset_to_string(v.amount, v.sym.value); }
 
 template <typename State>
 ABIEOS_NODISCARD bool json_to_bin(asset*, State& state, bool, const abi_type*, event_type event, bool start) {

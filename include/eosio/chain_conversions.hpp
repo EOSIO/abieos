@@ -247,4 +247,60 @@ inline std::string symbol_to_string(uint64_t v) {
    return std::to_string(v & 0xff) + "," + eosio::symbol_code_to_string(v >> 8);
 }
 
+[[nodiscard]] inline bool string_to_asset(int64_t& amount, uint64_t& symbol, const char*& s, const char* end,
+                                          bool expect_end) {
+   // todo: check overflow
+   while (s != end && *s == ' ') //
+      ++s;
+   uint64_t uamount   = 0;
+   uint8_t  precision = 0;
+   bool     negative  = false;
+   if (s != end && *s == '-') {
+      ++s;
+      negative = true;
+   }
+   while (s != end && *s >= '0' && *s <= '9') //
+      uamount = uamount * 10 + (*s++ - '0');
+   if (s != end && *s == '.') {
+      ++s;
+      while (s != end && *s >= '0' && *s <= '9') {
+         uamount = uamount * 10 + (*s++ - '0');
+         ++precision;
+      }
+   }
+   if (negative)
+      uamount = -uamount;
+   amount = uamount;
+   uint64_t code;
+   if (!eosio::string_to_symbol_code(code, s, end, expect_end))
+      return false;
+   symbol = (code << 8) | precision;
+   return true;
+}
+
+inline std::string asset_to_string(int64_t amount, uint64_t symbol) {
+   std::string result;
+   uint64_t    uamount;
+   if (amount < 0)
+      uamount = -amount;
+   else
+      uamount = amount;
+   uint8_t precision = symbol;
+   if (precision) {
+      while (precision--) {
+         result += '0' + uamount % 10;
+         uamount /= 10;
+      }
+      result += '.';
+   }
+   do {
+      result += '0' + uamount % 10;
+      uamount /= 10;
+   } while (uamount);
+   if (amount < 0)
+      result += '-';
+   std::reverse(result.begin(), result.end());
+   return result + ' ' + eosio::symbol_code_to_string(symbol >> 8);
+}
+
 } // namespace eosio
