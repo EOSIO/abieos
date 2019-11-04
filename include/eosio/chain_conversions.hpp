@@ -36,7 +36,7 @@ inline constexpr uint64_t string_to_name(std::string_view str) { return string_t
 
 inline constexpr uint64_t string_to_name(const std::string& str) { return string_to_name(str.data(), str.size()); }
 
-inline constexpr bool char_to_name_digit_strict(char c, uint64_t& result) {
+[[nodiscard]] inline constexpr bool char_to_name_digit_strict(char c, uint64_t& result) {
    if (c >= 'a' && c <= 'z') {
       result = (c - 'a') + 6;
       return true;
@@ -52,7 +52,7 @@ inline constexpr bool char_to_name_digit_strict(char c, uint64_t& result) {
    return false;
 }
 
-inline constexpr bool string_to_name_strict(std::string_view str, uint64_t& name) {
+[[nodiscard]] inline constexpr bool string_to_name_strict(std::string_view str, uint64_t& name) {
    name       = 0;
    unsigned i = 0;
    for (; i < str.size() && i < 12; ++i) {
@@ -123,8 +123,8 @@ inline std::string microseconds_to_str(uint64_t microseconds) {
    return result;
 }
 
-inline bool string_to_utc_seconds(uint32_t& result, const char*& s, const char* end, bool eat_fractional,
-                                  bool require_end) {
+[[nodiscard]] inline bool string_to_utc_seconds(uint32_t& result, const char*& s, const char* end, bool eat_fractional,
+                                                bool require_end) {
    auto parse_uint = [&](uint32_t& result, int digits) {
       result = 0;
       while (digits--) {
@@ -166,11 +166,12 @@ inline bool string_to_utc_seconds(uint32_t& result, const char*& s, const char* 
    return s == end || !require_end;
 }
 
-inline bool string_to_utc_seconds(uint32_t& result, const char* s, const char* end) {
+[[nodiscard]] inline bool string_to_utc_seconds(uint32_t& result, const char* s, const char* end) {
    return string_to_utc_seconds(result, s, end, true, true);
 }
 
-inline bool string_to_utc_microseconds(uint64_t& result, const char*& s, const char* end, bool require_end) {
+[[nodiscard]] inline bool string_to_utc_microseconds(uint64_t& result, const char*& s, const char* end,
+                                                     bool require_end) {
    uint32_t sec;
    if (!string_to_utc_seconds(sec, s, end, false, false))
       return false;
@@ -188,8 +189,62 @@ inline bool string_to_utc_microseconds(uint64_t& result, const char*& s, const c
    return s == end || !require_end;
 }
 
-inline bool string_to_utc_microseconds(uint64_t& result, const char* s, const char* end) {
+[[nodiscard]] inline bool string_to_utc_microseconds(uint64_t& result, const char* s, const char* end) {
    return string_to_utc_microseconds(result, s, end, true);
+}
+
+[[nodiscard]] inline bool string_to_symbol_code(uint64_t& result, const char*& pos, const char* end, bool require_end) {
+   while (pos != end && *pos == ' ') ++pos;
+   result     = 0;
+   uint32_t i = 0;
+   while (pos != end && *pos >= 'A' && *pos <= 'Z') {
+      if (i >= 7)
+         return false;
+      result |= uint64_t(*pos++) << (8 * i++);
+   }
+   return i && (pos == end || !require_end);
+}
+
+[[nodiscard]] inline bool string_to_symbol_code(uint64_t& result, const char* pos, const char* end) {
+   return string_to_symbol_code(result, pos, end, true);
+}
+
+inline std::string symbol_code_to_string(uint64_t v) {
+   std::string result;
+   while (v > 0) {
+      result += char(v & 0xFF);
+      v >>= 8;
+   }
+   return result;
+}
+
+[[nodiscard]] inline bool string_to_symbol(uint64_t& result, uint8_t precision, const char*& pos, const char* end,
+                                           bool require_end) {
+   if (!eosio::string_to_symbol_code(result, pos, end, require_end))
+      return false;
+   result = (result << 8) | precision;
+   return true;
+}
+
+[[nodiscard]] inline bool string_to_symbol(uint64_t& result, const char*& pos, const char* end, bool require_end) {
+   uint8_t precision = 0;
+   bool    found     = false;
+   while (pos != end && *pos >= '0' && *pos <= '9') {
+      precision = precision * 10 + (*pos - '0');
+      found     = true;
+      ++pos;
+   }
+   if (!found || pos == end || *pos++ != ',')
+      return false;
+   return string_to_symbol(result, precision, pos, end, require_end);
+}
+
+[[nodiscard]] inline bool string_to_symbol(uint64_t& result, const char* pos, const char* end) {
+   return string_to_symbol(result, pos, end, true);
+}
+
+inline std::string symbol_to_string(uint64_t v) {
+   return std::to_string(v & 0xff) + "," + eosio::symbol_code_to_string(v >> 8);
 }
 
 } // namespace eosio

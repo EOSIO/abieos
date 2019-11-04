@@ -1239,29 +1239,6 @@ struct symbol_code {
     uint64_t value = 0;
 };
 
-ABIEOS_NODISCARD inline bool string_to_symbol_code(uint64_t& result, std::string& error, std::string_view str) {
-    while (!str.empty() && str.front() == ' ')
-        str.remove_prefix(1);
-    result = 0;
-    uint32_t i = 0;
-    while (!str.empty() && str.front() >= 'A' && str.front() <= 'Z') {
-        if (i >= 7)
-            return set_error(error, "expected string containing symbol_code");
-        result |= uint64_t(str.front()) << (8 * i++);
-        str.remove_prefix(1);
-    }
-    return true;
-}
-
-inline std::string symbol_code_to_string(uint64_t v) {
-    std::string result;
-    while (v > 0) {
-        result += char(v & 0xFF);
-        v >>= 8;
-    }
-    return result;
-}
-
 template <typename State>
 ABIEOS_NODISCARD bool json_to_bin(symbol_code*, State& state, bool, const abi_type*, event_type event, bool start) {
     if (event == event_type::received_string) {
@@ -1269,8 +1246,8 @@ ABIEOS_NODISCARD bool json_to_bin(symbol_code*, State& state, bool, const abi_ty
         if (trace_json_to_bin)
             printf("%*ssymbol_code: %s\n", int(state.stack.size() * 4), "", s.c_str());
         uint64_t v;
-        if (!string_to_symbol_code(v, state.error, s.c_str()))
-            return false;
+        if (!eosio::string_to_symbol_code(v, s.data(), s.data() + s.size()))
+            return set_error(state.error, "expected string containing symbol_code");
         push_raw(state.bin, v);
         return true;
     } else
@@ -1281,7 +1258,7 @@ ABIEOS_NODISCARD inline bool bin_to_json(symbol_code*, bin_to_json_state& state,
     symbol_code v;
     if (!read_raw(state.bin, state.error, v))
         return false;
-    auto result = symbol_code_to_string(v.value);
+    auto result = eosio::symbol_code_to_string(v.value);
     return state.writer.String(result.c_str(), result.size());
 }
 
@@ -1293,29 +1270,6 @@ ABIEOS_REFLECT(symbol) { //
     ABIEOS_MEMBER(symbol, value);
 }
 
-ABIEOS_NODISCARD inline bool string_to_symbol(uint64_t& result, std::string& error, uint8_t precision,
-                                              std::string_view str) {
-    if (!string_to_symbol_code(result, error, str))
-        return false;
-    result = (result << 8) | precision;
-    return true;
-}
-
-ABIEOS_NODISCARD inline bool string_to_symbol(uint64_t& result, std::string& error, std::string_view str) {
-    uint8_t precision = 0;
-    while (!str.empty() && str.front() >= '0' && str.front() <= '9') {
-        precision = precision * 10 + (str.front() - '0');
-        str.remove_prefix(1);
-    }
-    if (!str.empty() && str.front() == ',')
-        str.remove_prefix(1);
-    return string_to_symbol(result, error, precision, str);
-}
-
-inline std::string symbol_to_string(uint64_t v) {
-    return std::to_string(v & 0xff) + "," + symbol_code_to_string(v >> 8);
-}
-
 template <typename State>
 ABIEOS_NODISCARD bool json_to_bin(symbol*, State& state, bool, const abi_type*, event_type event, bool start) {
     if (event == event_type::received_string) {
@@ -1323,8 +1277,8 @@ ABIEOS_NODISCARD bool json_to_bin(symbol*, State& state, bool, const abi_type*, 
         if (trace_json_to_bin)
             printf("%*ssymbol: %s\n", int(state.stack.size() * 4), "", s.c_str());
         uint64_t v;
-        if (!string_to_symbol(v, state.error, s.c_str()))
-            return false;
+        if (!eosio::string_to_symbol(v, s.data(), s.data() + s.size()))
+            return set_error(state, "expected string containing symbol");
         push_raw(state.bin, v);
         return true;
     } else
@@ -1335,7 +1289,7 @@ ABIEOS_NODISCARD inline bool bin_to_json(symbol*, bin_to_json_state& state, bool
     uint64_t v;
     if (!read_raw(state.bin, state.error, v))
         return false;
-    std::string result{symbol_to_string(v)};
+    std::string result{eosio::symbol_to_string(v)};
     return state.writer.String(result.c_str(), result.size());
 }
 
@@ -1349,20 +1303,21 @@ ABIEOS_REFLECT(asset) {
     ABIEOS_MEMBER(asset, sym);
 }
 
-ABIEOS_NODISCARD inline bool string_to_asset(asset& result, std::string& error, const char* s) {
+ABIEOS_NODISCARD inline bool string_to_asset(asset& result, std::string& error, const char*& s, const char* end,
+                                             bool expect_end) {
     // todo: check overflow
-    while (*s == ' ')
+    while (s != end && *s == ' ')
         ++s;
     uint64_t amount = 0;
     uint8_t precision = 0;
     bool negative = false;
-    if (*s == '-') {
+    if (s != end && *s == '-') {
         ++s;
         negative = true;
     }
-    while (*s >= '0' && *s <= '9')
+    while (s != end && *s >= '0' && *s <= '9')
         amount = amount * 10 + (*s++ - '0');
-    if (*s == '.') {
+    if (s != end && *s == '.') {
         ++s;
         while (*s >= '0' && *s <= '9') {
             amount = amount * 10 + (*s++ - '0');
@@ -1372,10 +1327,14 @@ ABIEOS_NODISCARD inline bool string_to_asset(asset& result, std::string& error, 
     if (negative)
         amount = -amount;
     uint64_t code;
-    if (!string_to_symbol_code(code, error, s))
-        return false;
+    if (!eosio::string_to_symbol_code(code, s, end, expect_end))
+        return set_error(error, "expected string containing asset");
     result = asset{(int64_t)amount, symbol{(code << 8) | precision}};
     return true;
+}
+
+ABIEOS_NODISCARD inline bool string_to_asset(asset& result, std::string& error, const char* s, const char* end) {
+    return string_to_asset(result, error, s, end, true);
 }
 
 inline std::string asset_to_string(const asset& v) {
@@ -1400,7 +1359,7 @@ inline std::string asset_to_string(const asset& v) {
     if (v.amount < 0)
         result += '-';
     std::reverse(result.begin(), result.end());
-    return result + ' ' + symbol_code_to_string(v.sym.value >> 8);
+    return result + ' ' + eosio::symbol_code_to_string(v.sym.value >> 8);
 }
 
 template <typename State>
@@ -1410,7 +1369,7 @@ ABIEOS_NODISCARD bool json_to_bin(asset*, State& state, bool, const abi_type*, e
         if (trace_json_to_bin)
             printf("%*sasset: %s\n", int(state.stack.size() * 4), "", s.c_str());
         asset v;
-        if (!string_to_asset(v, state.error, s.c_str()))
+        if (!string_to_asset(v, state.error, s.data(), s.data() + s.size()))
             return false;
         push_raw(state.bin, v.amount);
         push_raw(state.bin, v.sym.value);
