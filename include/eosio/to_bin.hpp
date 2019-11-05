@@ -1,8 +1,31 @@
 #pragma once
 
 #include <eosio/stream.hpp>
+#include <optional>
+#include <variant>
 
 namespace eosio {
+
+template <typename S>
+result<void> to_bin(std::string_view sv, S& stream);
+
+template <typename S>
+result<void> to_bin(const std::string& s, S& stream);
+
+template <typename T, typename S>
+result<void> to_bin(const std::vector<T>& obj, S& stream);
+
+template <typename T, typename S>
+result<void> to_bin(const std::optional<T>& obj, S& stream);
+
+template <typename... Ts, typename S>
+result<void> to_bin(const std::variant<Ts...>& obj, S& stream);
+
+template <typename... Ts, typename S>
+result<void> to_bin(const std::tuple<Ts...>& obj, S& stream);
+
+template <typename T, typename S>
+result<void> to_bin(const T& obj, S& stream);
 
 template <typename T, typename S>
 result<void> raw_to_bin(const T& val, S& stream) {
@@ -77,6 +100,51 @@ result<void> to_bin(const std::vector<T>& obj, S& stream) {
       }
    }
    return outcome::success();
+}
+
+template <typename T, typename S>
+result<void> to_bin(const std::optional<T>& obj, S& stream) {
+   auto r = to_bin(obj.has_value(), stream);
+   if (!r)
+      return r.error();
+   if (obj)
+      return to_bin(*obj, stream);
+   else
+      return outcome::success();
+}
+
+template <typename... Ts, typename S>
+result<void> to_bin(const std::variant<Ts...>& obj, S& stream) {
+   auto r = varuint32_to_bin(obj.index(), stream);
+   if (!r)
+      return r.error();
+   return std::visit([&](auto& x) { return to_bin(x, stream); }, obj);
+}
+
+template <int i, typename T, typename S>
+result<void> to_bin_tuple(const T& obj, S& stream) {
+   if constexpr (i < std::tuple_size_v<T>) {
+      auto r = to_bin(std::get<i>(obj), stream);
+      if (!r)
+         return r.error();
+      return to_bin_tuple<i + 1>(obj, stream);
+   }
+   return outcome::success();
+}
+
+template <typename... Ts, typename S>
+result<void> to_bin(const std::tuple<Ts...>& obj, S& stream) {
+   return to_bin_tuple<0>(obj, stream);
+}
+
+template <typename T, typename S>
+result<void> to_bin(const T& obj, S& stream) {
+   result<void> r = outcome::success();
+   for_each_field((T*)nullptr, [&](auto* name, auto member_ptr) {
+      if (r)
+         r = to_bin(member_from_void(member_ptr, &obj), stream);
+   });
+   return r;
 }
 
 template <typename T>
