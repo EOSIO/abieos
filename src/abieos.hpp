@@ -3,6 +3,7 @@
 #pragma once
 
 #include <eosio/chain_conversions.hpp>
+#include <eosio/from_bin.hpp>
 #include <eosio/reflection.hpp>
 #include <eosio/to_bin.hpp>
 
@@ -35,13 +36,13 @@ inline size_t wcslen(const wchar_t* str) { return ::wcslen(str); }
 
 namespace abieos {
 
+using eosio::from_bin;
 using eosio::to_bin;
 
 inline constexpr bool trace_json_to_jvalue_event = false;
 inline constexpr bool trace_json_to_jvalue = false;
 inline constexpr bool trace_json_to_native = false;
 inline constexpr bool trace_json_to_native_event = false;
-inline constexpr bool trace_bin_to_native = false;
 inline constexpr bool trace_jvalue_to_bin = false;
 inline constexpr bool trace_json_to_bin = false;
 inline constexpr bool trace_json_to_bin_event = false;
@@ -90,6 +91,13 @@ template <typename T>
 struct might_not_exist {
     T value{};
 };
+
+template <typename T, typename S>
+eosio::result<void> from_bin(might_not_exist<T>& obj, S& stream) {
+    if (stream.remaining())
+        return from_bin(obj.value, stream);
+    return eosio::outcome::success();
+}
 
 template <typename SrcIt, typename DestIt>
 void hex(SrcIt begin, SrcIt end, DestIt dest) {
@@ -341,12 +349,6 @@ struct json_to_native_state : json_reader_handler<json_to_native_state> {
     json_to_native_state(std::string& error) : error{error} {}
 };
 
-struct bin_to_native_state {
-    std::string& error;
-    input_buffer bin{};
-    std::vector<native_stack_entry> stack{};
-};
-
 struct jvalue_to_bin_state {
     std::string& error;
     std::vector<char>& bin;
@@ -381,12 +383,10 @@ struct bin_to_json_state : json_reader_handler<bin_to_json_state> {
 };
 
 struct native_serializer {
-    ABIEOS_NODISCARD virtual bool bin_to_native(void*, bin_to_native_state&, bool) const = 0;
     ABIEOS_NODISCARD virtual bool json_to_native(void*, json_to_native_state&, event_type, bool) const = 0;
 };
 
 struct native_field_serializer_methods {
-    ABIEOS_NODISCARD virtual bool bin_to_native(void*, bin_to_native_state&, bool) const = 0;
     ABIEOS_NODISCARD virtual bool json_to_native(void*, json_to_native_state&, event_type, bool) const = 0;
 };
 
@@ -407,24 +407,6 @@ struct abi_serializer {
 ///////////////////////////////////////////////////////////////////////////////
 // serializer function prototypes
 ///////////////////////////////////////////////////////////////////////////////
-
-template <typename T>
-ABIEOS_NODISCARD auto bin_to_native(T& obj, bin_to_native_state& state, bool start)
-    -> std::enable_if_t<std::is_arithmetic_v<T>, bool>;
-template <typename T>
-ABIEOS_NODISCARD auto bin_to_native(T& obj, bin_to_native_state& state, bool start)
-    -> std::enable_if_t<std::is_class_v<T>, bool>;
-template <typename T>
-ABIEOS_NODISCARD bool bin_to_native(std::vector<T>& v, bin_to_native_state& state, bool start);
-template <typename First, typename Second>
-ABIEOS_NODISCARD bool bin_to_native(std::pair<First, Second>& obj, bin_to_native_state& state, bool start);
-ABIEOS_NODISCARD bool bin_to_native(std::string& obj, bin_to_native_state& state, bool);
-template <typename T>
-ABIEOS_NODISCARD bool bin_to_native(std::optional<T>& v, bin_to_native_state& state, bool start);
-template <typename... Ts>
-ABIEOS_NODISCARD bool bin_to_native(std::variant<Ts...>& v, bin_to_native_state& state, bool start);
-template <typename T>
-ABIEOS_NODISCARD bool bin_to_native(might_not_exist<T>& obj, bin_to_native_state& state, bool);
 
 template <typename T>
 ABIEOS_NODISCARD auto json_to_native(T& obj, json_to_native_state& state, event_type event, bool start)
@@ -532,25 +514,23 @@ struct bytes {
     std::vector<char> data;
 };
 
-ABIEOS_NODISCARD inline bool bin_to_native(bytes& obj, bin_to_native_state& state, bool) {
-    uint64_t size;
-    if (!read_varuint64(state.bin, state.error, size))
-        return false;
-    if (size > uint64_t(state.bin.end - state.bin.pos))
-        return set_error(state, "invalid bytes size");
-    obj.data.resize(size);
-    return read_raw(state.bin, state.error, obj.data.data(), size);
+template <typename S>
+eosio::result<void> from_bin(bytes& obj, S& stream) {
+    return from_bin(obj.data, stream);
 }
 
-ABIEOS_NODISCARD inline bool bin_to_native(input_buffer& obj, bin_to_native_state& state, bool) {
+template <typename S>
+eosio::result<void> from_bin(input_buffer& obj, S& stream) {
     uint64_t size;
-    if (!read_varuint64(state.bin, state.error, size))
-        return false;
-    if (size > uint64_t(state.bin.end - state.bin.pos))
-        return set_error(state, "invalid bytes size");
-    obj = {state.bin.pos, state.bin.pos + size};
-    state.bin.pos += size;
-    return true;
+    auto r = varuint64_from_bin(size, stream);
+    if (!r)
+        return r;
+    char* buf;
+    r = stream.read_reuse_storage(buf, size);
+    if (!r)
+        return r;
+    obj = {buf, buf + size};
+    return eosio::outcome::success();
 }
 
 template <typename S>
@@ -635,9 +615,9 @@ using checksum160 = fixed_binary<20>;
 using checksum256 = fixed_binary<32>;
 using checksum512 = fixed_binary<64>;
 
-template <unsigned size>
-ABIEOS_NODISCARD bool bin_to_native(fixed_binary<size>& obj, bin_to_native_state& state, bool start) {
-    return read_raw(state.bin, state.error, obj);
+template <unsigned size, typename S>
+eosio::result<void> from_bin(fixed_binary<size>& obj, S& stream) {
+    return stream.read(obj.value.data(), size);
 }
 
 template <unsigned size, typename S>
@@ -823,8 +803,9 @@ eosio::result<void> key_to_bin(const Key& obj, S& stream) {
     return stream.write(obj.data.data(), obj.data.size());
 }
 
-ABIEOS_NODISCARD inline bool bin_to_native(public_key& obj, bin_to_native_state& state, bool) {
-    return bin_to_key(obj, state.bin, state.error);
+template <typename S>
+eosio::result<void> from_bin(public_key& obj, S& stream) {
+    return bin_to_key(obj, stream);
 }
 
 template <typename S>
@@ -862,8 +843,9 @@ ABIEOS_NODISCARD inline bool bin_to_json(public_key*, bin_to_json_state& state, 
     return state.writer.String(result.c_str(), result.size());
 }
 
-ABIEOS_NODISCARD inline bool bin_to_native(private_key& obj, bin_to_native_state& state, bool) {
-    return bin_to_key(obj, state.bin, state.error);
+template <typename S>
+eosio::result<void> from_bin(private_key& obj, S& stream) {
+    return bin_to_key(obj, stream);
 }
 
 template <typename S>
@@ -901,8 +883,9 @@ eosio::result<void> to_bin(const signature& obj, S& stream) {
     return key_to_bin(obj, stream);
 }
 
-ABIEOS_NODISCARD inline bool bin_to_native(signature& obj, bin_to_native_state& state, bool) {
-    return bin_to_key(obj, state.bin, state.error);
+template <typename S>
+eosio::result<void> from_bin(signature& obj, S& stream) {
+    return bin_to_key(obj, stream);
 }
 
 ABIEOS_NODISCARD inline bool json_to_native(signature& obj, json_to_native_state& state, event_type event, bool start) {
@@ -954,8 +937,9 @@ ABIEOS_NODISCARD inline bool operator==(name a, name b) { return a.value == b.va
 ABIEOS_NODISCARD inline bool operator!=(name a, name b) { return a.value != b.value; }
 ABIEOS_NODISCARD inline bool operator<(name a, name b) { return a.value < b.value; }
 
-ABIEOS_NODISCARD inline bool bin_to_native(name& obj, bin_to_native_state& state, bool start) {
-    return bin_to_native(obj.value, state, start);
+template <typename S>
+eosio::result<void> from_bin(name& obj, S& stream) {
+    return from_bin(obj.value, stream);
 }
 
 template <typename S>
@@ -1001,40 +985,9 @@ struct varuint32 {
     explicit operator std::string() const { return std::to_string(value); }
 };
 
-// !!!!!
-ABIEOS_NODISCARD inline bool read_varuint32(input_buffer& bin, std::string& error, uint32_t& dest) {
-    dest = 0;
-    int shift = 0;
-    uint8_t b = 0;
-    do {
-        if (shift >= 35)
-            return set_error(error, "invalid varuint32 encoding");
-        if (!read_raw(bin, error, b))
-            return false;
-        dest |= uint32_t(b & 0x7f) << shift;
-        shift += 7;
-    } while (b & 0x80);
-    return true;
-}
-
-// !!!!!
-ABIEOS_NODISCARD inline bool read_varuint64(input_buffer& bin, std::string& error, uint64_t& dest) {
-    dest = 0;
-    int shift = 0;
-    uint8_t b = 0;
-    do {
-        if (shift >= 70)
-            return set_error(error, "invalid varuint64 encoding");
-        if (!read_raw(bin, error, b))
-            return false;
-        dest |= uint64_t(b & 0x7f) << shift;
-        shift += 7;
-    } while (b & 0x80);
-    return true;
-}
-
-ABIEOS_NODISCARD inline bool bin_to_native(varuint32& obj, bin_to_native_state& state, bool) {
-    return read_varuint32(state.bin, state.error, obj.value);
+template <typename S>
+eosio::result<void> from_bin(varuint32& obj, S& stream) {
+    return varuint32_from_bin(obj.value, stream);
 }
 
 template <typename S>
@@ -1076,18 +1029,6 @@ inline void push_varint32(std::vector<char>& bin, int32_t v) {
     eosio::push_varuint32(bin, (uint32_t(v) << 1) ^ uint32_t(v >> 31));
 }
 
-// !!!
-ABIEOS_NODISCARD inline bool read_varint32(input_buffer& bin, std::string& error, int32_t& result) {
-    uint32_t v;
-    if (!read_varuint32(bin, error, v))
-        return false;
-    if (v & 1)
-        result = ((~v) >> 1) | 0x8000'0000;
-    else
-        result = v >> 1;
-    return true;
-}
-
 template <typename State>
 ABIEOS_NODISCARD bool json_to_bin(varint32*, State& state, bool, const abi_type*, event_type event, bool start) {
     int32_t x;
@@ -1118,8 +1059,9 @@ ABIEOS_NODISCARD inline bool string_to_time_point_sec(time_point_sec& result, st
         return set_error(error, "expected string containing time_point_sec");
 }
 
-ABIEOS_NODISCARD inline bool bin_to_native(time_point_sec& obj, bin_to_native_state& state, bool) {
-    return read_raw(state.bin, state.error, obj.utc_seconds);
+template <typename S>
+eosio::result<void> from_bin(time_point_sec& obj, S& stream) {
+    return from_bin(obj.utc_seconds, stream);
 }
 
 template <typename S>
@@ -1169,8 +1111,9 @@ ABIEOS_NODISCARD inline bool string_to_time_point(time_point& dest, std::string&
         return set_error(error, "expected string containing time_point");
 }
 
-ABIEOS_NODISCARD inline bool bin_to_native(time_point& obj, bin_to_native_state& state, bool) {
-    return read_raw(state.bin, state.error, obj.microseconds);
+template <typename S>
+eosio::result<void> from_bin(time_point& obj, S& stream) {
+    return from_bin(obj.microseconds, stream);
 }
 
 template <typename S>
@@ -1219,8 +1162,9 @@ struct block_timestamp {
     explicit operator std::string() const { return std::string{(time_point)(*this)}; }
 }; // block_timestamp
 
-ABIEOS_NODISCARD inline bool bin_to_native(block_timestamp& obj, bin_to_native_state& state, bool) {
-    return read_raw(state.bin, state.error, obj.slot);
+template <typename S>
+eosio::result<void> from_bin(block_timestamp& obj, S& stream) {
+    return from_bin(obj.slot, stream);
 }
 
 template <typename S>
@@ -1610,10 +1554,6 @@ ABIEOS_NODISCARD inline bool json_to_jarray(jvalue& value, json_to_jvalue_state&
 
 template <typename T>
 struct native_serializer_impl : native_serializer {
-    ABIEOS_NODISCARD bool bin_to_native(void* v, bin_to_native_state& state, bool start) const override {
-        using ::abieos::bin_to_native;
-        return bin_to_native(*reinterpret_cast<T*>(v), state, start);
-    }
     ABIEOS_NODISCARD bool json_to_native(void* v, json_to_native_state& state, event_type event,
                                          bool start) const override {
         using ::abieos::json_to_native;
@@ -1627,10 +1567,6 @@ inline constexpr auto native_serializer_for = native_serializer_impl<T>{};
 template <typename member_ptr>
 constexpr auto create_native_field_serializer_methods_impl() {
     struct impl : native_field_serializer_methods {
-        ABIEOS_NODISCARD bool bin_to_native(void* v, bin_to_native_state& state, bool start) const override {
-            using ::abieos::bin_to_native;
-            return bin_to_native(member_from_void(member_ptr{}, v), state, start);
-        }
         ABIEOS_NODISCARD bool json_to_native(void* v, json_to_native_state& state, event_type event,
                                              bool start) const override {
             using ::abieos::json_to_native;
@@ -1660,164 +1596,6 @@ constexpr auto create_native_field_serializers() {
 
 template <typename T>
 inline constexpr auto native_field_serializers_for = create_native_field_serializers<T>();
-
-///////////////////////////////////////////////////////////////////////////////
-// bin_to_native
-///////////////////////////////////////////////////////////////////////////////
-
-template <typename T>
-ABIEOS_NODISCARD bool bin_to_native(T& obj, std::string& error, input_buffer& bin) {
-    bin_to_native_state state{error, bin};
-    if (!native_serializer_for<T>.bin_to_native(&obj, state, true))
-        return false;
-    while (!state.stack.empty()) {
-        if (!state.stack.back().ser->bin_to_native(state.stack.back().obj, state, false))
-            return false;
-        if (state.stack.size() > max_stack_size)
-            return set_error(state, "recursion limit reached");
-    }
-    bin = state.bin;
-    return true;
-}
-
-template <typename T>
-ABIEOS_NODISCARD auto bin_to_native(T& obj, bin_to_native_state& state, bool start)
-    -> std::enable_if_t<std::is_arithmetic_v<T>, bool> {
-    return read_raw(state.bin, state.error, obj);
-}
-
-template <typename T>
-ABIEOS_NODISCARD auto bin_to_native(T& obj, bin_to_native_state& state, bool start)
-    -> std::enable_if_t<std::is_class_v<T>, bool> {
-    if (start) {
-        if (trace_bin_to_native)
-            printf("%*s{ %d fields\n", int(state.stack.size() * 4), "", int(native_field_serializers_for<T>.size()));
-        state.stack.push_back({&obj, &native_serializer_for<T>});
-        return true;
-    }
-    auto& stack_entry = state.stack.back();
-    if (stack_entry.position < (ptrdiff_t)native_field_serializers_for<T>.size()) {
-        auto& field_ser = native_field_serializers_for<T>[stack_entry.position];
-        if (trace_bin_to_native)
-            printf("%*sfield %d/%d: %s %p\n", int(state.stack.size() * 4), "", int(stack_entry.position),
-                   int(native_field_serializers_for<T>.size()), std::string{field_ser.name}.c_str(), field_ser.methods);
-        ++stack_entry.position;
-        return field_ser.methods->bin_to_native(&obj, state, true);
-    } else {
-        if (trace_bin_to_native)
-            printf("%*s}\n", int((state.stack.size() - 1) * 4), "");
-        state.stack.pop_back();
-        return true;
-    }
-}
-
-template <typename T>
-ABIEOS_NODISCARD bool bin_to_native(std::vector<T>& v, bin_to_native_state& state, bool start) {
-    if (start) {
-        v.clear();
-        uint32_t size;
-        if (!read_varuint32(state.bin, state.error, size))
-            return false;
-        if (trace_bin_to_native)
-            printf("%*s[ %u items\n", int(state.stack.size() * 4), "", int(size));
-        state.stack.push_back({&v, &native_serializer_for<std::vector<T>>});
-        state.stack.back().array_size = size;
-        return true;
-    }
-    auto& stack_entry = state.stack.back();
-    if (stack_entry.position < stack_entry.array_size) {
-        if (trace_bin_to_native)
-            printf("%*sitem %d/%d\n", int(state.stack.size() * 4), "", int(stack_entry.position),
-                   int(stack_entry.array_size));
-        v.emplace_back();
-        stack_entry.position = v.size();
-        return native_serializer_for<T>.bin_to_native(&v.back(), state, true);
-    } else {
-        if (trace_bin_to_native)
-            printf("%*s]\n", int((state.stack.size() - 1) * 4), "");
-        state.stack.pop_back();
-        return true;
-    }
-}
-
-template <typename First, typename Second>
-ABIEOS_NODISCARD bool bin_to_native(std::pair<First, Second>& obj, bin_to_native_state& state, bool start) {
-    if (start) {
-        if (trace_bin_to_native)
-            printf("%*s[ pair\n", int(state.stack.size() * 4), "");
-        state.stack.push_back({&obj, &native_serializer_for<std::pair<First, Second>>});
-        return true;
-    }
-    auto& stack_entry = state.stack.back();
-    if (stack_entry.position == 0) {
-        if (trace_bin_to_native)
-            printf("%*sitem 0/1\n", int(state.stack.size() * 4), "");
-        ++stack_entry.position;
-        return native_serializer_for<First>.bin_to_native(&obj.first, state, true);
-    } else if (stack_entry.position == 1) {
-        if (trace_bin_to_native)
-            printf("%*sitem 1/1\n", int(state.stack.size() * 4), "");
-        ++stack_entry.position;
-        return native_serializer_for<Second>.bin_to_native(&obj.second, state, true);
-    } else {
-        if (trace_bin_to_native)
-            printf("%*s]\n", int((state.stack.size() - 1) * 4), "");
-        state.stack.pop_back();
-        return true;
-    }
-}
-
-ABIEOS_NODISCARD inline bool bin_to_native(std::string& obj, bin_to_native_state& state, bool) {
-    uint32_t size;
-    if (!read_varuint32(state.bin, state.error, size))
-        return false;
-    if (size > state.bin.end - state.bin.pos)
-        return set_error(state, "invalid string size");
-    obj.resize(size);
-    return read_raw(state.bin, state.error, obj.data(), size);
-}
-
-template <typename T>
-ABIEOS_NODISCARD bool bin_to_native(std::optional<T>& obj, bin_to_native_state& state, bool) {
-    bool present;
-    if (!read_raw(state.bin, state.error, present))
-        return false;
-    if (!present) {
-        obj.reset();
-        return true;
-    }
-    obj.emplace();
-    return bin_to_native(*obj, state, true);
-}
-
-template <uint32_t I, typename... Ts>
-ABIEOS_NODISCARD bool bin_to_native_variant(std::variant<Ts...>& v, bin_to_native_state& state, uint32_t i) {
-    if constexpr (I < std::variant_size_v<std::variant<Ts...>>) {
-        if (i == I) {
-            auto& x = v.template emplace<std::variant_alternative_t<I, std::variant<Ts...>>>();
-            return bin_to_native(x, state, true);
-        } else {
-            return bin_to_native_variant<I + 1>(v, state, i);
-        }
-    } else {
-        return set_error(state, "bad variant index");
-    }
-}
-
-template <typename... Ts>
-ABIEOS_NODISCARD bool bin_to_native(std::variant<Ts...>& obj, bin_to_native_state& state, bool) {
-    uint32_t u;
-    if (!read_varuint32(state.bin, state.error, u))
-        return false;
-    return bin_to_native_variant<0>(obj, state, u);
-}
-
-template <typename T>
-ABIEOS_NODISCARD bool bin_to_native(might_not_exist<T>& obj, bin_to_native_state& state, bool start) {
-    if (state.bin.pos != state.bin.end)
-        return bin_to_native(obj.value, state, start);
-    return true;
-}
 
 ///////////////////////////////////////////////////////////////////////////////
 // json_to_native
