@@ -27,25 +27,6 @@ result<void> to_bin(const std::tuple<Ts...>& obj, S& stream);
 template <typename T, typename S>
 result<void> to_bin(const T& obj, S& stream);
 
-template <typename T, typename S>
-result<void> raw_to_bin(const T& val, S& stream) {
-   return stream.write((const char*)&val, sizeof(val));
-}
-
-// clang-format off
-template <typename S>  result<void> to_bin(bool          val, S& stream) {return raw_to_bin(val, stream);}
-template <typename S>  result<void> to_bin(uint8_t       val, S& stream) {return raw_to_bin(val, stream);}
-template <typename S>  result<void> to_bin(uint16_t      val, S& stream) {return raw_to_bin(val, stream);}
-template <typename S>  result<void> to_bin(uint32_t      val, S& stream) {return raw_to_bin(val, stream);}
-template <typename S>  result<void> to_bin(uint64_t      val, S& stream) {return raw_to_bin(val, stream);}
-template <typename S>  result<void> to_bin(int8_t        val, S& stream) {return raw_to_bin(val, stream);}
-template <typename S>  result<void> to_bin(int16_t       val, S& stream) {return raw_to_bin(val, stream);}
-template <typename S>  result<void> to_bin(int32_t       val, S& stream) {return raw_to_bin(val, stream);}
-template <typename S>  result<void> to_bin(int64_t       val, S& stream) {return raw_to_bin(val, stream);}
-template <typename S>  result<void> to_bin(float         val, S& stream) {return raw_to_bin(val, stream);}
-template <typename S>  result<void> to_bin(double        val, S& stream) {return raw_to_bin(val, stream);}
-// clang-format on
-
 template <typename S>
 result<void> varuint32_to_bin(uint64_t val, S& stream) {
    if (val >> 32)
@@ -139,12 +120,16 @@ result<void> to_bin(const std::tuple<Ts...>& obj, S& stream) {
 
 template <typename T, typename S>
 result<void> to_bin(const T& obj, S& stream) {
-   result<void> r = outcome::success();
-   for_each_field((T*)nullptr, [&](auto* name, auto member_ptr) {
-      if (r)
-         r = to_bin(member_from_void(member_ptr, &obj), stream);
-   });
-   return r;
+   if constexpr (std::is_arithmetic_v<T>) {
+      return stream.write((char*)(&obj), sizeof(obj));
+   } else {
+      result<void> r = outcome::success();
+      for_each_field((T*)nullptr, [&](auto* name, auto member_ptr) {
+         if (r)
+            r = to_bin(member_from_void(member_ptr, &obj), stream);
+      });
+      return r;
+   }
 }
 
 template <typename T>

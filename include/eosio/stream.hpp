@@ -8,10 +8,12 @@
 namespace eosio {
 enum class stream_error {
    no_error,
-   varuint_too_big,
    overrun,
    underrun,
    float_error,
+   varuint_too_big,
+   invalid_varuint_encoding,
+   bad_variant_index,
 }; // stream_error
 } // namespace eosio
 
@@ -29,11 +31,13 @@ class stream_error_category_type : public std::error_category {
    std::string message(int c) const override final {
       switch (static_cast<stream_error>(c)) {
             // clang-format off
-         case stream_error::no_error:        return "No error";
-         case stream_error::varuint_too_big: return "varuint too big";
-         case stream_error::overrun:         return "Stream overrun";
-         case stream_error::underrun:        return "Stream underrun";
-         case stream_error::float_error:     return "Float error";
+         case stream_error::no_error:                 return "No error";
+         case stream_error::overrun:                  return "Stream overrun";
+         case stream_error::underrun:                 return "Stream underrun";
+         case stream_error::float_error:              return "Float error";
+         case stream_error::varuint_too_big:          return "Varuint too big";
+         case stream_error::invalid_varuint_encoding: return "Invalid varuint encoding";
+         case stream_error::bad_variant_index:        return "Bad variant index";
             // clang-format on
 
          default: return "unknown";
@@ -104,6 +108,41 @@ struct size_stream {
 
    result<void> write(const std::string_view& sv) {
       size += sv.size();
+      return outcome::success();
+   }
+};
+
+struct input_stream {
+   char* pos;
+   char* end;
+
+   input_stream(char* pos, size_t size) : pos{ pos }, end{ pos + size } {}
+   input_stream(char* pos, char* end) : pos{ pos }, end{ end } {}
+   input_stream(const input_stream&) = default;
+
+   input_stream& operator=(const input_stream&) = default;
+
+   size_t remaining() { return end - pos; }
+
+   result<void> check_available(size_t size) {
+      if (size > size_t(end - pos))
+         return stream_error::overrun;
+      return outcome::success();
+   }
+
+   result<void> read(char* dest, size_t size) {
+      if (size > size_t(end - pos))
+         return stream_error::overrun;
+      memcpy(dest, pos, size);
+      pos += size;
+      return outcome::success();
+   }
+
+   result<void> read_reuse_storage(char*& result, size_t size) {
+      if (size > size_t(end - pos))
+         return stream_error::overrun;
+      result = pos;
+      pos += size;
       return outcome::success();
    }
 };
