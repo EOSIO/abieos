@@ -121,7 +121,7 @@ result<void> to_bin(const std::tuple<Ts...>& obj, S& stream) {
 template <typename T, typename S>
 result<void> to_bin(const T& obj, S& stream) {
    if constexpr (std::is_arithmetic_v<T>) {
-      return stream.write((char*)(&obj), sizeof(obj));
+      return stream.write_raw(obj);
    } else {
       result<void> r = outcome::success();
       for_each_field((T*)nullptr, [&](auto* name, auto member_ptr) {

@@ -384,9 +384,9 @@ void check_types() {
     check_error(context, "unsupported abi version", [&] { return abieos_set_abi_hex(context, 8, "00"); });
     check_error(context, "unsupported abi version",
                 [&] { return abieos_set_abi_hex(context, 8, string_to_hex("eosio::abi/9.0").c_str()); });
-    check_error(context, "read past end",
+    check_error(context, "Stream overrun",
                 [&] { return abieos_set_abi_hex(context, 8, string_to_hex("eosio::abi/1.0").c_str()); });
-    check_error(context, "read past end",
+    check_error(context, "Stream overrun",
                 [&] { return abieos_set_abi_hex(context, 8, string_to_hex("eosio::abi/1.1").c_str()); });
 
     check_error(context, "unsupported abi version",
@@ -396,7 +396,7 @@ void check_types() {
 
     check_type(context, 0, "bool", R"(true)");
     check_type(context, 0, "bool", R"(false)");
-    check_error(context, "read past end", [&] { return abieos_hex_to_json(context, 0, "bool", ""); });
+    check_error(context, "Stream overrun", [&] { return abieos_hex_to_json(context, 0, "bool", ""); });
     check_error(context, "failed to parse", [&] { return abieos_json_to_bin(context, 0, "bool", R"(trues)"); });
     check_error(context, "expected number or boolean",
                 [&] { return abieos_json_to_bin(context, 0, "bool", R"(null)"); });
@@ -419,7 +419,7 @@ void check_types() {
     check_type(context, 0, "int16", R"(0)");
     check_type(context, 0, "int16", R"(32767)");
     check_type(context, 0, "int16", R"(-32768)");
-    check_error(context, "read past end", [&] { return abieos_hex_to_json(context, 0, "int16", "01"); });
+    check_error(context, "Stream overrun", [&] { return abieos_hex_to_json(context, 0, "int16", "01"); });
     check_type(context, 0, "uint16", R"(0)");
     check_type(context, 0, "uint16", R"(65535)");
     check_error(context, "number is out of range", [&] { return abieos_json_to_bin(context, 0, "int16", "32768"); });
@@ -559,13 +559,13 @@ void check_types() {
     check_error(context, "expected hex string", [&] { return abieos_json_to_bin(context, 0, "bytes", R"("yz")"); });
     check_error(context, "expected string containing hex digits",
                 [&] { return abieos_json_to_bin(context, 0, "bytes", R"(true)"); });
-    check_error(context, "invalid bytes size", [&] { return abieos_hex_to_json(context, 0, "bytes", "01"); });
+    check_error(context, "Stream overrun", [&] { return abieos_hex_to_json(context, 0, "bytes", "01"); });
     check_type(context, 0, "string", R"("")");
     check_type(context, 0, "string", R"("z")");
     check_type(context, 0, "string", R"("This is a string.")");
     check_type(context, 0, "string", R"("' + '*'.repeat(128) + '")");
     check_type(context, 0, "string", R"("\u0000  这是一个测试  Это тест  هذا اختبار 👍")");
-    check_error(context, "invalid string size", [&] { return abieos_hex_to_json(context, 0, "string", "01"); });
+    check_error(context, "Stream overrun", [&] { return abieos_hex_to_json(context, 0, "string", "01"); });
     check_type(context, 0, "checksum160", R"("0000000000000000000000000000000000000000")");
     check_type(context, 0, "checksum160", R"("123456789ABCDEF01234567890ABCDEF70123456")");
     check_type(context, 0, "checksum256", R"("0000000000000000000000000000000000000000000000000000000000000000")");
@@ -719,13 +719,11 @@ void check_types() {
 
     check_error(context, "abi has a type with a missing name", [&] {
         return abieos_set_abi( //
-            context, 0,
-            R"({"version":"eosio::abi/1.1","types":[{"new_type_name":"","type":"int8"}]})");
+            context, 0, R"({"version":"eosio::abi/1.1","types":[{"new_type_name":"","type":"int8"}]})");
     });
     check_error(context, "can't use extensions ($) within typedefs", [&] {
         return abieos_set_abi( //
-            context, 0,
-            R"({"version":"eosio::abi/1.1","types":[{"new_type_name":"a","type":"int8$"}]})");
+            context, 0, R"({"version":"eosio::abi/1.1","types":[{"new_type_name":"a","type":"int8$"}]})");
     });
     check_error(context, "abi redefines type \"a\"", [&] {
         return abieos_set_abi(

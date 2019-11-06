@@ -70,9 +70,15 @@ struct vector_stream {
       return outcome::success();
    }
 
-   result<void> write(const char* src, size_t size) {
-      data.insert(data.end(), src, src + size);
+   result<void> write(const void* src, size_t size) {
+      auto s = reinterpret_cast<const char*>(src);
+      data.insert(data.end(), s, s + size);
       return outcome::success();
+   }
+
+   template <typename T>
+   result<void> write_raw(const T& v) {
+      return write(&v, sizeof(v));
    }
 };
 
@@ -113,11 +119,11 @@ struct size_stream {
 };
 
 struct input_stream {
-   char* pos;
-   char* end;
+   const char* pos;
+   const char* end;
 
-   input_stream(char* pos, size_t size) : pos{ pos }, end{ pos + size } {}
-   input_stream(char* pos, char* end) : pos{ pos }, end{ end } {}
+   input_stream(const char* pos, size_t size) : pos{ pos }, end{ pos + size } {}
+   input_stream(const char* pos, const char* end) : pos{ pos }, end{ end } {}
    input_stream(const input_stream&) = default;
 
    input_stream& operator=(const input_stream&) = default;
@@ -130,7 +136,7 @@ struct input_stream {
       return outcome::success();
    }
 
-   result<void> read(char* dest, size_t size) {
+   result<void> read(void* dest, size_t size) {
       if (size > size_t(end - pos))
          return stream_error::overrun;
       memcpy(dest, pos, size);
@@ -138,7 +144,19 @@ struct input_stream {
       return outcome::success();
    }
 
-   result<void> read_reuse_storage(char*& result, size_t size) {
+   template <typename T>
+   result<void> read_raw(T& dest) {
+      return read(&dest, sizeof(dest));
+   }
+
+   result<void> skip(size_t size) {
+      if (size > size_t(end - pos))
+         return stream_error::overrun;
+      pos += size;
+      return outcome::success();
+   }
+
+   result<void> read_reuse_storage(const char*& result, size_t size) {
       if (size > size_t(end - pos))
          return stream_error::overrun;
       result = pos;

@@ -80,6 +80,12 @@ inline constexpr bool is_string_v = false;
 template <>
 inline constexpr bool is_string_v<std::string> = true;
 
+template <typename State, typename T>
+ABIEOS_NODISCARD bool set_error(State& state, const eosio::result<T>& res) {
+    state.error = res.error().message();
+    return false;
+}
+
 // Pseudo objects never exist, except in serialized form
 struct pseudo_optional;
 struct pseudo_extension;
@@ -149,53 +155,11 @@ void push_raw(std::vector<char>& bin, const T& obj) {
     bin.insert(bin.end(), reinterpret_cast<const char*>(&obj), reinterpret_cast<const char*>(&obj + 1));
 }
 
+// !!!
 struct input_buffer {
     const char* pos = nullptr;
     const char* end = nullptr;
 };
-
-ABIEOS_NODISCARD inline bool skip_raw(input_buffer& bin, std::string& error, ptrdiff_t size) {
-    if (bin.end - bin.pos < size)
-        return set_error(error, "read past end");
-    bin.pos += size;
-    return true;
-}
-
-ABIEOS_NODISCARD inline bool read_raw(input_buffer& bin, std::string& error, void* dest, ptrdiff_t size) {
-    if (bin.end - bin.pos < size)
-        return set_error(error, "read past end");
-    if (size)
-        memcpy(dest, bin.pos, size);
-    bin.pos += size;
-    return true;
-}
-
-template <typename T>
-ABIEOS_NODISCARD bool read_raw(input_buffer& bin, std::string& error, T& dest) {
-    static_assert(std::is_trivially_copyable_v<T>);
-    return read_raw(bin, error, &dest, sizeof(dest));
-}
-
-ABIEOS_NODISCARD inline bool read_raw(input_buffer& bin, std::string& error, bool& dest) {
-    char tmp;
-    if (!read_raw(bin, error, &tmp, sizeof(tmp)))
-        return false;
-    dest = tmp;
-    return true;
-}
-
-ABIEOS_NODISCARD bool read_varuint32(input_buffer& bin, std::string& error, uint32_t& dest);
-ABIEOS_NODISCARD bool read_varuint64(input_buffer& bin, std::string& error, uint64_t& dest);
-
-ABIEOS_NODISCARD inline bool read_string(input_buffer& bin, std::string& error, std::string& dest) {
-    uint32_t size;
-    if (!read_varuint32(bin, error, size))
-        return false;
-    if (size > bin.end - bin.pos)
-        return set_error(error, "invalid string size");
-    dest.resize(size);
-    return read_raw(bin, error, dest.data(), size);
-}
 
 ///////////////////////////////////////////////////////////////////////////////
 // stream events
@@ -373,12 +337,12 @@ struct json_to_bin_state : json_reader_handler<json_to_bin_state> {
 
 struct bin_to_json_state : json_reader_handler<bin_to_json_state> {
     std::string& error;
-    input_buffer& bin;
+    eosio::input_stream& bin;
     rapidjson::Writer<rapidjson::StringBuffer>& writer;
     std::vector<bin_to_json_stack_entry> stack{};
     bool skipped_extension = false;
 
-    bin_to_json_state(input_buffer& bin, std::string& error, rapidjson::Writer<rapidjson::StringBuffer>& writer)
+    bin_to_json_state(eosio::input_stream& bin, std::string& error, rapidjson::Writer<rapidjson::StringBuffer>& writer)
         : error{error}, bin{bin}, writer{writer} {}
 };
 
@@ -577,15 +541,15 @@ ABIEOS_NODISCARD bool json_to_bin(bytes*, State& state, bool, const abi_type*, e
 
 ABIEOS_NODISCARD inline bool bin_to_json(bytes*, bin_to_json_state& state, bool, const abi_type*, bool start) {
     uint64_t size;
-    if (!read_varuint64(state.bin, state.error, size))
-        return false;
-    if (size > uint64_t(state.bin.end - state.bin.pos))
-        return set_error(state, "invalid bytes size");
-    std::vector<char> raw(size);
-    if (!read_raw(state.bin, state.error, raw.data(), size))
-        return false;
+    auto r = varuint64_from_bin(size, state.bin);
+    if (!r)
+        return set_error(state, r);
+    const char* data;
+    r = state.bin.read_reuse_storage(data, size);
+    if (!r)
+        return set_error(state, r);
     std::string result;
-    hex(raw.begin(), raw.end(), std::back_inserter(result));
+    hex(data, data + size, std::back_inserter(result));
     return state.writer.String(result.c_str(), result.size());
 }
 
@@ -665,8 +629,9 @@ template <unsigned size>
 ABIEOS_NODISCARD inline bool bin_to_json(fixed_binary<size>*, bin_to_json_state& state, bool, const abi_type*,
                                          bool start) {
     fixed_binary<size> v;
-    if (!read_raw(state.bin, state.error, v))
-        return false;
+    auto r = state.bin.read(v.value.data(), v.value.size());
+    if (!r)
+        return set_error(state, r);
     std::string result;
     hex(v.value.begin(), v.value.end(), std::back_inserter(result));
     return state.writer.String(result.c_str(), result.size());
@@ -677,6 +642,11 @@ struct uint128 {
 
     explicit operator std::string() const { return binary_to_decimal(value); }
 };
+
+template <typename S>
+eosio::result<void> from_bin(uint128& obj, S& stream) {
+    return stream.read(obj.value.data(), obj.value.size());
+}
 
 template <typename State>
 ABIEOS_NODISCARD bool json_to_bin(uint128*, State& state, bool, const abi_type*, event_type event, bool start) {
@@ -695,8 +665,9 @@ ABIEOS_NODISCARD bool json_to_bin(uint128*, State& state, bool, const abi_type*,
 
 ABIEOS_NODISCARD inline bool bin_to_json(uint128*, bin_to_json_state& state, bool, const abi_type*, bool start) {
     uint128 v;
-    if (!read_raw(state.bin, state.error, v))
-        return false;
+    auto r = from_bin(v, state.bin);
+    if (!r)
+        return set_error(state, r);
     auto result = binary_to_decimal(v.value);
     return state.writer.String(result.c_str(), result.size());
 }
@@ -742,8 +713,9 @@ ABIEOS_NODISCARD bool json_to_bin(int128*, State& state, bool, const abi_type*, 
 
 ABIEOS_NODISCARD inline bool bin_to_json(int128*, bin_to_json_state& state, bool, const abi_type*, bool start) {
     uint128 v;
-    if (!read_raw(state.bin, state.error, v))
-        return false;
+    auto r = from_bin(v, state.bin);
+    if (!r)
+        return set_error(state, r);
     bool negative = is_negative(v.value);
     if (negative)
         negate(v.value);
@@ -753,39 +725,54 @@ ABIEOS_NODISCARD inline bool bin_to_json(int128*, bin_to_json_state& state, bool
     return state.writer.String(result.c_str(), result.size());
 }
 
-template <typename Key>
-ABIEOS_NODISCARD inline bool bin_to_key(Key& obj, input_buffer& bin, std::string& error) {
-    if (!read_raw(bin, error, obj.type))
-        return false;
+template <typename Key, typename S>
+eosio::result<void> key_from_bin(Key& obj, S& stream) {
+    auto r = stream.read_raw(obj.type);
+    if (!r)
+        return r;
     if (obj.type == key_type::wa) {
         if constexpr (std::is_same_v<std::decay_t<Key>, public_key>) {
-            auto begin = bin.pos;
-            if (!skip_raw(bin, error, 34))
-                return false;
+            auto begin = stream.pos;
+            r = stream.skip(34);
+            if (!r)
+                return r;
             uint32_t size;
-            if (!read_varuint32(bin, error, size) || !skip_raw(bin, error, size))
-                return false;
-            obj.data.resize(bin.pos - begin);
+            r = varuint32_from_bin(size, stream);
+            if (!r)
+                return r;
+            r = stream.skip(size);
+            if (!r)
+                return r;
+            obj.data.resize(stream.pos - begin);
             memcpy(obj.data.data(), begin, obj.data.size());
-            return true;
+            return eosio::outcome::success();
         } else if constexpr (std::is_same_v<std::decay_t<Key>, signature>) {
-            auto begin = bin.pos;
-            if (!skip_raw(bin, error, 65))
-                return false;
+            auto begin = stream.pos;
+            r = stream.skip(65);
+            if (!r)
+                return r;
             uint32_t size;
-            if (!read_varuint32(bin, error, size) || !skip_raw(bin, error, size))
-                return false;
-            if (!read_varuint32(bin, error, size) || !skip_raw(bin, error, size))
-                return false;
-            obj.data.resize(bin.pos - begin);
+            r = varuint32_from_bin(size, stream);
+            if (!r)
+                return r;
+            r = stream.skip(size);
+            if (!r)
+                return r;
+            r = varuint32_from_bin(size, stream);
+            if (!r)
+                return r;
+            r = stream.skip(size);
+            if (!r)
+                return r;
+            obj.data.resize(stream.pos - begin);
             memcpy(obj.data.data(), begin, obj.data.size());
-            return true;
+            return eosio::outcome::success();
         } else {
-            return set_error(error, "Invalid private key type");
+            return eosio::stream_error::bad_variant_index;
         }
     } else {
         obj.data.resize(Key::k1r1_size);
-        return read_raw(bin, error, obj.data.data(), obj.data.size());
+        return stream.read(obj.data.data(), obj.data.size());
     }
 }
 
@@ -805,7 +792,7 @@ eosio::result<void> key_to_bin(const Key& obj, S& stream) {
 
 template <typename S>
 eosio::result<void> from_bin(public_key& obj, S& stream) {
-    return bin_to_key(obj, stream);
+    return key_from_bin(obj, stream);
 }
 
 template <typename S>
@@ -835,8 +822,9 @@ ABIEOS_NODISCARD bool json_to_bin(public_key*, State& state, bool, const abi_typ
 
 ABIEOS_NODISCARD inline bool bin_to_json(public_key*, bin_to_json_state& state, bool, const abi_type*, bool start) {
     public_key v;
-    if (!bin_to_key(v, state.bin, state.error))
-        return false;
+    auto r = key_from_bin(v, state.bin);
+    if (!r)
+        return set_error(state, r);
     std::string result;
     if (!public_key_to_string(result, state.error, v))
         return false;
@@ -845,7 +833,7 @@ ABIEOS_NODISCARD inline bool bin_to_json(public_key*, bin_to_json_state& state, 
 
 template <typename S>
 eosio::result<void> from_bin(private_key& obj, S& stream) {
-    return bin_to_key(obj, stream);
+    return key_from_bin(obj, stream);
 }
 
 template <typename S>
@@ -870,8 +858,9 @@ ABIEOS_NODISCARD bool json_to_bin(private_key*, State& state, bool, const abi_ty
 
 ABIEOS_NODISCARD inline bool bin_to_json(private_key*, bin_to_json_state& state, bool, const abi_type*, bool start) {
     private_key v;
-    if (!bin_to_key(v, state.bin, state.error))
-        return false;
+    auto r = key_from_bin(v, state.bin);
+    if (!r)
+        return set_error(state, r);
     std::string result;
     if (!private_key_to_string(result, state.error, v))
         return false;
@@ -885,7 +874,7 @@ eosio::result<void> to_bin(const signature& obj, S& stream) {
 
 template <typename S>
 eosio::result<void> from_bin(signature& obj, S& stream) {
-    return bin_to_key(obj, stream);
+    return key_from_bin(obj, stream);
 }
 
 ABIEOS_NODISCARD inline bool json_to_native(signature& obj, json_to_native_state& state, event_type event, bool start) {
@@ -912,8 +901,9 @@ ABIEOS_NODISCARD bool json_to_bin(signature*, State& state, bool, const abi_type
 
 ABIEOS_NODISCARD inline bool bin_to_json(signature*, bin_to_json_state& state, bool, const abi_type*, bool start) {
     signature v;
-    if (!bin_to_key(v, state.bin, state.error))
-        return false;
+    auto r = key_from_bin(v, state.bin);
+    if (!r)
+        return set_error(state, r);
     std::string result;
     if (!signature_to_string(result, state.error, v))
         return false;
@@ -973,8 +963,9 @@ ABIEOS_NODISCARD bool json_to_bin(name*, State& state, bool, const abi_type*, ev
 
 ABIEOS_NODISCARD inline bool bin_to_json(name*, bin_to_json_state& state, bool, const abi_type*, bool start) {
     name v;
-    if (!read_raw(state.bin, state.error, v))
-        return false;
+    auto r = from_bin(v, state.bin);
+    if (!r)
+        return set_error(state, r);
     auto s = std::string{v};
     return state.writer.String(s.c_str(), s.size());
 }
@@ -1014,8 +1005,9 @@ ABIEOS_NODISCARD bool json_to_bin(varuint32*, State& state, bool, const abi_type
 
 ABIEOS_NODISCARD inline bool bin_to_json(varuint32*, bin_to_json_state& state, bool, const abi_type*, bool start) {
     uint32_t v;
-    if (!read_varuint32(state.bin, state.error, v))
-        return false;
+    auto r = varuint32_from_bin(v, state.bin);
+    if (!r)
+        return set_error(state, r);
     return state.writer.Uint64(v);
 }
 
@@ -1040,8 +1032,9 @@ ABIEOS_NODISCARD bool json_to_bin(varint32*, State& state, bool, const abi_type*
 
 ABIEOS_NODISCARD inline bool bin_to_json(varint32*, bin_to_json_state& state, bool, const abi_type*, bool start) {
     int32_t v;
-    if (!read_varint32(state.bin, state.error, v))
-        return false;
+    auto r = varint32_from_bin(v, state.bin);
+    if (!r)
+        return set_error(state, r);
     return state.writer.Int64(v);
 }
 
@@ -1092,8 +1085,9 @@ ABIEOS_NODISCARD bool json_to_bin(time_point_sec*, State& state, bool, const abi
 
 ABIEOS_NODISCARD inline bool bin_to_json(time_point_sec*, bin_to_json_state& state, bool, const abi_type*, bool start) {
     time_point_sec v;
-    if (!read_raw(state.bin, state.error, v))
-        return false;
+    auto r = from_bin(v, state.bin);
+    if (!r)
+        return set_error(state, r);
     auto s = std::string{v};
     return state.writer.String(s.c_str(), s.size());
 }
@@ -1143,8 +1137,9 @@ ABIEOS_NODISCARD bool json_to_bin(time_point*, State& state, bool, const abi_typ
 
 ABIEOS_NODISCARD inline bool bin_to_json(time_point*, bin_to_json_state& state, bool, const abi_type*, bool start) {
     time_point v;
-    if (!read_raw(state.bin, state.error, v))
-        return false;
+    auto r = from_bin(v, state.bin);
+    if (!r)
+        return set_error(state, r);
     auto s = std::string{v};
     return state.writer.String(s.c_str(), s.size());
 }
@@ -1196,8 +1191,9 @@ ABIEOS_NODISCARD bool json_to_bin(block_timestamp*, State& state, bool, const ab
 ABIEOS_NODISCARD inline bool bin_to_json(block_timestamp*, bin_to_json_state& state, bool, const abi_type*,
                                          bool start) {
     uint32_t v;
-    if (!read_raw(state.bin, state.error, v))
-        return false;
+    auto r = from_bin(v, state.bin);
+    if (!r)
+        return set_error(state, r);
     auto s = std::string{block_timestamp{v}};
     return state.writer.String(s.c_str(), s.size());
 }
@@ -1205,6 +1201,11 @@ ABIEOS_NODISCARD inline bool bin_to_json(block_timestamp*, bin_to_json_state& st
 struct symbol_code {
     uint64_t value = 0;
 };
+
+template <typename S>
+inline eosio::result<void> from_bin(symbol_code& obj, S& stream) {
+    return from_bin(obj.value, stream);
+}
 
 template <typename State>
 ABIEOS_NODISCARD bool json_to_bin(symbol_code*, State& state, bool, const abi_type*, event_type event, bool start) {
@@ -1223,8 +1224,9 @@ ABIEOS_NODISCARD bool json_to_bin(symbol_code*, State& state, bool, const abi_ty
 
 ABIEOS_NODISCARD inline bool bin_to_json(symbol_code*, bin_to_json_state& state, bool, const abi_type*, bool start) {
     symbol_code v;
-    if (!read_raw(state.bin, state.error, v))
-        return false;
+    auto r = from_bin(v, state.bin);
+    if (!r)
+        return set_error(state, r);
     auto result = eosio::symbol_code_to_string(v.value);
     return state.writer.String(result.c_str(), result.size());
 }
@@ -1254,8 +1256,9 @@ ABIEOS_NODISCARD bool json_to_bin(symbol*, State& state, bool, const abi_type*, 
 
 ABIEOS_NODISCARD inline bool bin_to_json(symbol*, bin_to_json_state& state, bool, const abi_type*, bool start) {
     uint64_t v;
-    if (!read_raw(state.bin, state.error, v))
-        return false;
+    auto r = from_bin(v, state.bin);
+    if (!r)
+        return set_error(state, r);
     std::string result{eosio::symbol_to_string(v)};
     return state.writer.String(result.c_str(), result.size());
 }
@@ -1304,10 +1307,9 @@ ABIEOS_NODISCARD bool json_to_bin(asset*, State& state, bool, const abi_type*, e
 
 ABIEOS_NODISCARD inline bool bin_to_json(asset*, bin_to_json_state& state, bool, const abi_type*, bool start) {
     asset v{};
-    if (!read_raw(state.bin, state.error, v.amount))
-        return false;
-    if (!read_raw(state.bin, state.error, v.sym.value))
-        return false;
+    auto r = from_bin(v, state.bin);
+    if (!r)
+        return set_error(state, r);
     auto s = asset_to_string(v);
     return state.writer.String(s.c_str(), s.size());
 }
@@ -1436,13 +1438,6 @@ ABIEOS_NODISCARD inline bool check_abi_version(const std::string& s, std::string
     if (s.substr(0, 13) != "eosio::abi/1.")
         return set_error(error, "unsupported abi version");
     return true;
-}
-
-ABIEOS_NODISCARD inline bool check_abi_version(input_buffer bin, std::string& error) {
-    std::string version;
-    if (!read_string(bin, error, version))
-        return false;
-    return check_abi_version(version, error);
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -2416,7 +2411,7 @@ ABIEOS_NODISCARD inline bool json_to_bin(std::string*, json_to_bin_state& state,
 // bin_to_json
 ///////////////////////////////////////////////////////////////////////////////
 
-ABIEOS_NODISCARD inline bool bin_to_json(input_buffer& bin, std::string& error, const abi_type* type,
+ABIEOS_NODISCARD inline bool bin_to_json(eosio::input_stream& bin, std::string& error, const abi_type* type,
                                          std::string& dest) {
     if (!type->ser)
         return false;
@@ -2439,8 +2434,9 @@ ABIEOS_NODISCARD inline bool bin_to_json(input_buffer& bin, std::string& error, 
 ABIEOS_NODISCARD inline bool bin_to_json(pseudo_optional*, bin_to_json_state& state, bool allow_extensions,
                                          const abi_type* type, bool) {
     bool present;
-    if (!read_raw(state.bin, state.error, present))
-        return false;
+    auto r = from_bin(present, state.bin);
+    if (!r)
+        return set_error(state, r);
     if (present)
         return type->optional_of->ser &&
                type->optional_of->ser->bin_to_json(state, allow_extensions, type->optional_of, true);
@@ -2489,8 +2485,9 @@ ABIEOS_NODISCARD inline bool bin_to_json(pseudo_array*, bin_to_json_state& state
                                          bool start) {
     if (start) {
         state.stack.push_back({type, false});
-        if (!read_varuint32(state.bin, state.error, state.stack.back().array_size))
-            return false;
+        auto r = varuint32_from_bin(state.stack.back().array_size, state.bin);
+        if (!r)
+            return set_error(state, r);
         if (trace_bin_to_json)
             printf("%*s[ %d items\n", int(state.stack.size() * 4), "", int(state.stack.back().array_size));
         state.writer.StartArray();
@@ -2523,8 +2520,9 @@ ABIEOS_NODISCARD inline bool bin_to_json(pseudo_variant*, bin_to_json_state& sta
     auto& stack_entry = state.stack.back();
     if (++stack_entry.position == 0) {
         uint32_t index;
-        if (!read_varuint32(state.bin, state.error, index))
-            return false;
+        auto r = varuint32_from_bin(index, state.bin);
+        if (!r)
+            return set_error(state, r);
         if (index >= stack_entry.type->fields.size())
             return set_error(state, "invalid variant type index");
         auto& f = stack_entry.type->fields[index];
@@ -2545,8 +2543,9 @@ ABIEOS_NODISCARD auto bin_to_json(T*, bin_to_json_state& state, bool, const abi_
     -> std::enable_if_t<std::is_arithmetic_v<T>, bool> {
 
     T v;
-    if (!read_raw(state.bin, state.error, v))
-        return false;
+    auto r = from_bin(v, state.bin);
+    if (!r)
+        return set_error(state, r);
     if constexpr (std::is_same_v<T, bool>) {
         return state.writer.Bool(v);
     } else if constexpr (std::is_floating_point_v<T>) {
@@ -2563,8 +2562,9 @@ ABIEOS_NODISCARD auto bin_to_json(T*, bin_to_json_state& state, bool, const abi_
 
 ABIEOS_NODISCARD inline bool bin_to_json(std::string*, bin_to_json_state& state, bool, const abi_type*, bool start) {
     std::string s;
-    if (!read_string(state.bin, state.error, s))
-        return false;
+    auto r = from_bin(s, state.bin);
+    if (!r)
+        return set_error(state, r);
     return state.writer.String(s.c_str(), s.size());
 }
 

@@ -128,15 +128,18 @@ extern "C" abieos_bool abieos_set_abi_bin(abieos_context* context, uint64_t cont
         if (!data || !size)
             return set_error(context, "no data");
         std::string error;
-        if (!check_abi_version(input_buffer{data, data + size}, error))
+        eosio::input_stream stream{data, size};
+        std::string version;
+        auto s = from_bin(version, stream);
+        if (!s)
+            return set_error(context, s.error().message());
+        if (!check_abi_version(version, error))
             return set_error(context, std::move(error));
         abi_def def{};
-        input_buffer buf{data, data + size};
-        if (!bin_to_native(def, error, buf)) {
-            if (!error.empty())
-                set_error(context, std::move(error));
-            return false;
-        }
+        stream = {data, size};
+        s = from_bin(def, stream);
+        if (!s)
+            return set_error(context, s.error().message());
         abieos::contract c;
         if (!fill_contract(c, error, def)) {
             if (!error.empty())
@@ -262,7 +265,7 @@ extern "C" const char* abieos_bin_to_json(abieos_context* context, uint64_t cont
             (void)set_error(context, error);
             return nullptr;
         }
-        input_buffer bin{data, data + size};
+        eosio::input_stream bin{data, size};
         if (!bin_to_json(bin, error, t, context->result_str)) {
             if (!error.empty())
                 set_error(context, std::move(error));

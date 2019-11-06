@@ -65,7 +65,7 @@ result<void> from_bin(std::vector<T>& v, S& stream) {
          if (!r)
             return r;
          v.resize(size);
-         return stream.read((char*)v.data(), v.size() * sizeof(T));
+         return stream.read(v.data(), v.size() * sizeof(T));
       } else {
          uint32_t size;
          auto     r = varuint32_from_bin(size, stream);
@@ -75,7 +75,7 @@ result<void> from_bin(std::vector<T>& v, S& stream) {
          if (!r)
             return r;
          v.resize(size);
-         return stream.read((char*)v.data(), v.size() * sizeof(T));
+         return stream.read(v.data(), v.size() * sizeof(T));
       }
    } else {
       uint32_t size;
@@ -150,7 +150,7 @@ result<void> from_bin(std::variant<Ts...>& obj, S& stream) {
 template <typename T, typename S>
 result<void> from_bin(T& obj, S& stream) {
    if constexpr (std::is_arithmetic_v<T>) {
-      return stream.read((char*)(&obj), sizeof(obj));
+      return stream.read_raw(obj);
    } else {
       result<void> r = outcome::success();
       for_each_field((T*)nullptr, [&](auto* name, auto member_ptr) {
