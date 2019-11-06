@@ -4,6 +4,7 @@
 
 #include <eosio/chain_conversions.hpp>
 #include <eosio/from_bin.hpp>
+#include <eosio/from_json.hpp>
 #include <eosio/reflection.hpp>
 #include <eosio/to_bin.hpp>
 
@@ -41,8 +42,6 @@ using eosio::to_bin;
 
 inline constexpr bool trace_json_to_jvalue_event = false;
 inline constexpr bool trace_json_to_jvalue = false;
-inline constexpr bool trace_json_to_native = false;
-inline constexpr bool trace_json_to_native_event = false;
 inline constexpr bool trace_jvalue_to_bin = false;
 inline constexpr bool trace_json_to_bin = false;
 inline constexpr bool trace_json_to_bin_event = false;
@@ -105,6 +104,12 @@ eosio::result<void> from_bin(might_not_exist<T>& obj, S& stream) {
     return eosio::outcome::success();
 }
 
+template <typename T, typename S>
+eosio::result<void> from_json(might_not_exist<T>& obj, S& stream) {
+    return from_json(obj.value, stream);
+}
+
+// !!!
 template <typename SrcIt, typename DestIt>
 void hex(SrcIt begin, SrcIt end, DestIt dest) {
     auto nibble = [&dest](uint8_t i) {
@@ -120,6 +125,7 @@ void hex(SrcIt begin, SrcIt end, DestIt dest) {
     }
 }
 
+// !!!
 template <typename SrcIt>
 std::string hex(SrcIt begin, SrcIt end) {
     std::string s;
@@ -127,6 +133,7 @@ std::string hex(SrcIt begin, SrcIt end) {
     return s;
 }
 
+// !!!
 template <typename SrcIt, typename DestIt>
 ABIEOS_NODISCARD bool unhex(std::string& error, SrcIt begin, SrcIt end, DestIt dest) {
     auto get_digit = [&](uint8_t& nibble) {
@@ -182,7 +189,6 @@ struct event_data {
     std::string key{};
 };
 
-ABIEOS_NODISCARD bool receive_event(struct json_to_native_state&, event_type, bool start);
 ABIEOS_NODISCARD bool receive_event(struct json_to_bin_state&, event_type, bool start);
 
 template <typename Derived>
@@ -268,15 +274,6 @@ struct json_to_jvalue_stack_entry {
     std::string key = "";
 };
 
-struct native_serializer;
-
-struct native_stack_entry {
-    void* obj = nullptr;
-    const native_serializer* ser = nullptr;
-    int position = 0;
-    int array_size = 0;
-};
-
 struct jvalue_to_bin_stack_entry {
     const struct abi_type* type = nullptr;
     bool allow_extensions = false;
@@ -304,13 +301,6 @@ struct json_to_jvalue_state : json_reader_handler<json_to_jvalue_state> {
     std::vector<json_to_jvalue_stack_entry> stack;
 
     json_to_jvalue_state(std::string& error) : error{error} {}
-};
-
-struct json_to_native_state : json_reader_handler<json_to_native_state> {
-    std::string& error;
-    std::vector<native_stack_entry> stack;
-
-    json_to_native_state(std::string& error) : error{error} {}
 };
 
 struct jvalue_to_bin_state {
@@ -346,19 +336,6 @@ struct bin_to_json_state : json_reader_handler<bin_to_json_state> {
         : error{error}, bin{bin}, writer{writer} {}
 };
 
-struct native_serializer {
-    ABIEOS_NODISCARD virtual bool json_to_native(void*, json_to_native_state&, event_type, bool) const = 0;
-};
-
-struct native_field_serializer_methods {
-    ABIEOS_NODISCARD virtual bool json_to_native(void*, json_to_native_state&, event_type, bool) const = 0;
-};
-
-struct native_field_serializer {
-    std::string_view name = "<unknown>";
-    const native_field_serializer_methods* methods = nullptr;
-};
-
 struct abi_serializer {
     ABIEOS_NODISCARD virtual bool json_to_bin(jvalue_to_bin_state& state, bool allow_extensions, const abi_type* type,
                                               event_type event, bool start) const = 0;
@@ -371,27 +348,6 @@ struct abi_serializer {
 ///////////////////////////////////////////////////////////////////////////////
 // serializer function prototypes
 ///////////////////////////////////////////////////////////////////////////////
-
-template <typename T>
-ABIEOS_NODISCARD auto json_to_native(T& obj, json_to_native_state& state, event_type event, bool start)
-    -> std::enable_if_t<std::is_arithmetic_v<T>, bool>;
-template <typename T>
-ABIEOS_NODISCARD auto json_to_native(T& obj, json_to_native_state& state, event_type event, bool start)
-    -> std::enable_if_t<std::is_class_v<T>, bool>;
-template <typename T>
-ABIEOS_NODISCARD bool json_to_native(std::vector<T>& obj, json_to_native_state& state, event_type event, bool start);
-template <typename First, typename Second>
-ABIEOS_NODISCARD bool json_to_native(std::pair<First, Second>& obj, json_to_native_state& state, event_type event,
-                                     bool start);
-ABIEOS_NODISCARD bool json_to_native(std::string& obj, json_to_native_state& state, event_type event, bool start);
-template <typename T>
-ABIEOS_NODISCARD bool json_to_native(std::optional<T>& obj, json_to_native_state& state, event_type event, bool start);
-template <typename... Ts>
-ABIEOS_NODISCARD bool json_to_native(std::variant<Ts...>& obj, json_to_native_state& state, event_type event,
-                                     bool start);
-template <typename T>
-ABIEOS_NODISCARD bool json_to_native(might_not_exist<T>& obj, json_to_native_state& state, event_type event,
-                                     bool start);
 
 ABIEOS_NODISCARD bool json_to_bin(pseudo_optional*, jvalue_to_bin_state& state, bool allow_extensions,
                                   const abi_type* type, event_type event, bool);
@@ -507,22 +463,9 @@ eosio::result<void> to_bin(const input_buffer& obj, S& stream) {
     return to_bin(std::string_view{obj.pos, size_t(obj.end - obj.pos)}, stream);
 }
 
-ABIEOS_NODISCARD inline bool json_to_native(bytes& obj, json_to_native_state& state, event_type event, bool start) {
-    if (event == event_type::received_string) {
-        auto& s = state.get_string();
-        if (trace_json_to_native)
-            printf("%*sbytes (%d hex digits)\n", int(state.stack.size() * 4), "", int(s.size()));
-        if (s.size() & 1)
-            return set_error(state, "odd number of hex digits");
-        obj.data.clear();
-        return unhex(state.error, s.begin(), s.end(), std::back_inserter(obj.data));
-    } else
-        return set_error(state, "expected string containing hex digits");
-}
-
-ABIEOS_NODISCARD inline bool json_to_native(input_buffer& obj, json_to_native_state& state, event_type event,
-                                            bool start) {
-    return set_error(state, "can not convert json to input_buffer");
+template <typename S>
+eosio::result<void> from_json(bytes& obj, S& stream) {
+    return eosio::from_json_hex(obj.data, stream);
 }
 
 template <typename State>
@@ -589,22 +532,16 @@ eosio::result<void> to_bin(const fixed_binary<size>& obj, S& stream) {
     return stream.write(obj.value.data(), obj.value.size());
 }
 
-template <unsigned size>
-ABIEOS_NODISCARD bool json_to_native(fixed_binary<size>& obj, json_to_native_state& state, event_type event,
-                                     bool start) {
-    if (event == event_type::received_string) {
-        auto& s = state.get_string();
-        if (trace_json_to_native)
-            printf("%*schecksum\n", int(state.stack.size() * 4), "");
-        std::vector<uint8_t> v;
-        if (!unhex(state.error, s.begin(), s.end(), std::back_inserter(v)))
-            return false;
-        if (v.size() != size)
-            return set_error(state, "hex string has incorrect length");
-        memcpy(obj.value.data(), v.data(), size);
-        return true;
-    } else
-        return set_error(state, "expected string containing hex");
+template <unsigned size, typename S>
+eosio::result<void> from_json(fixed_binary<size>& obj, S& stream) {
+    std::vector<uint8_t> v;
+    auto r = eosio::from_json_hex(v, stream);
+    if (!r)
+        return r;
+    if (v.size() != size)
+        return eosio::from_json_error::hex_string_incorrect_length;
+    memcpy(obj.value.data(), v.data(), size);
+    return eosio::outcome::success();
 }
 
 template <typename State, unsigned size>
@@ -800,11 +737,6 @@ eosio::result<void> to_bin(const public_key& obj, S& stream) {
     return key_to_bin(obj, stream);
 }
 
-ABIEOS_NODISCARD inline bool json_to_native(public_key& obj, json_to_native_state& state, event_type event,
-                                            bool start) {
-    return set_error(state, "can't convert public_key");
-}
-
 template <typename State>
 ABIEOS_NODISCARD bool json_to_bin(public_key*, State& state, bool, const abi_type*, event_type event, bool start) {
     if (event == event_type::received_string) {
@@ -877,11 +809,16 @@ eosio::result<void> from_bin(signature& obj, S& stream) {
     return key_from_bin(obj, stream);
 }
 
-ABIEOS_NODISCARD inline bool json_to_native(signature& obj, json_to_native_state& state, event_type event, bool start) {
-    if (event == event_type::received_string)
-        return string_to_signature(obj, state.error, state.get_string());
-    else
-        return set_error(state, "expected string containing signature");
+template <typename S>
+eosio::result<void> from_json(signature& obj, S& stream) {
+    auto r = stream.get_string();
+    if (!r)
+        return r.error();
+    auto& s = r.value();
+    std::string error; // !!!
+    if (!string_to_signature(obj, error, r.value()))
+        return eosio::from_json_error::invalid_signature;
+    return eosio::outcome::success();
 }
 
 template <typename State>
@@ -937,15 +874,13 @@ eosio::result<void> to_bin(const name& obj, S& stream) {
     return to_bin(obj.value, stream);
 }
 
-ABIEOS_NODISCARD inline bool json_to_native(name& obj, json_to_native_state& state, event_type event, bool start) {
-    if (event == event_type::received_string) {
-        obj.value = eosio::string_to_name(state.get_string());
-        if (trace_json_to_native)
-            printf("%*sname: %s (%08llx) %s\n", int(state.stack.size() * 4), "", state.get_string().c_str(),
-                   (unsigned long long)obj.value, std::string{obj}.c_str());
-        return true;
-    } else
-        return set_error(state, "expected string containing name");
+template <typename S>
+eosio::result<void> from_json(name& obj, S& stream) {
+    auto r = stream.get_string();
+    if (!r)
+        return r.error();
+    obj.value = eosio::string_to_name(r.value());
+    return eosio::outcome::success();
 }
 
 template <typename State>
@@ -986,12 +921,9 @@ eosio::result<void> to_bin(const varuint32& obj, S& stream) {
     return eosio::varuint32_to_bin(obj.value, stream);
 }
 
-ABIEOS_NODISCARD inline bool json_to_native(varuint32& obj, json_to_native_state& state, event_type event, bool) {
-    uint32_t x;
-    if (!json_to_number(x, state, event))
-        return false;
-    obj = varuint32{x};
-    return true;
+template <typename S>
+eosio::result<void> from_json(varuint32& obj, S& stream) {
+    return from_json(obj.value, stream);
 }
 
 template <typename State>
@@ -1062,11 +994,6 @@ eosio::result<void> to_bin(const time_point_sec& obj, S& stream) {
     return to_bin(obj.utc_seconds, stream);
 }
 
-ABIEOS_NODISCARD inline bool json_to_native(time_point_sec& obj, json_to_native_state& state, event_type event,
-                                            bool start) {
-    return set_error(state, "can't convert time_point_sec");
-}
-
 template <typename State>
 ABIEOS_NODISCARD bool json_to_bin(time_point_sec*, State& state, bool, const abi_type*, event_type event, bool start) {
     if (event == event_type::received_string) {
@@ -1115,11 +1042,6 @@ eosio::result<void> to_bin(const time_point& obj, S& stream) {
     return to_bin(obj.microseconds, stream);
 }
 
-ABIEOS_NODISCARD inline bool json_to_native(time_point& obj, json_to_native_state& state, event_type event,
-                                            bool start) {
-    return set_error(state, "can't convert time_point");
-}
-
 template <typename State>
 ABIEOS_NODISCARD bool json_to_bin(time_point*, State& state, bool, const abi_type*, event_type event, bool start) {
     if (event == event_type::received_string) {
@@ -1165,11 +1087,6 @@ eosio::result<void> from_bin(block_timestamp& obj, S& stream) {
 template <typename S>
 eosio::result<void> to_bin(const block_timestamp& obj, S& stream) {
     return to_bin(obj.slot, stream);
-}
-
-ABIEOS_NODISCARD inline bool json_to_native(block_timestamp& obj, json_to_native_state& state, event_type event,
-                                            bool start) {
-    return set_error(state, "can't convert block_timestamp");
 }
 
 template <typename State>
@@ -1541,186 +1458,6 @@ ABIEOS_NODISCARD inline bool json_to_jarray(jvalue& value, json_to_jvalue_state&
     v.emplace_back();
     state.stack.push_back({&v.back()});
     return receive_event(state, event, true);
-}
-
-///////////////////////////////////////////////////////////////////////////////
-// native serializer implementations
-///////////////////////////////////////////////////////////////////////////////
-
-template <typename T>
-struct native_serializer_impl : native_serializer {
-    ABIEOS_NODISCARD bool json_to_native(void* v, json_to_native_state& state, event_type event,
-                                         bool start) const override {
-        using ::abieos::json_to_native;
-        return json_to_native(*reinterpret_cast<T*>(v), state, event, start);
-    }
-};
-
-template <typename T>
-inline constexpr auto native_serializer_for = native_serializer_impl<T>{};
-
-template <typename member_ptr>
-constexpr auto create_native_field_serializer_methods_impl() {
-    struct impl : native_field_serializer_methods {
-        ABIEOS_NODISCARD bool json_to_native(void* v, json_to_native_state& state, event_type event,
-                                             bool start) const override {
-            using ::abieos::json_to_native;
-            return json_to_native(member_from_void(member_ptr{}, v), state, event, start);
-        }
-    };
-    return impl{};
-}
-
-template <typename member_ptr>
-inline constexpr auto field_serializer_methods_for = create_native_field_serializer_methods_impl<member_ptr>();
-
-template <typename T>
-constexpr auto create_native_field_serializers() {
-    constexpr auto num_fields = ([&]() constexpr {
-        int num_fields = 0;
-        for_each_field((T*)nullptr, [&](auto, auto) { ++num_fields; });
-        return num_fields;
-    }());
-    std::array<native_field_serializer, num_fields> fields;
-    int i = 0;
-    for_each_field((T*)nullptr, [&](auto* name, auto member_ptr) {
-        fields[i++] = {name, &field_serializer_methods_for<decltype(member_ptr)>};
-    });
-    return fields;
-}
-
-template <typename T>
-inline constexpr auto native_field_serializers_for = create_native_field_serializers<T>();
-
-///////////////////////////////////////////////////////////////////////////////
-// json_to_native
-///////////////////////////////////////////////////////////////////////////////
-
-ABIEOS_NODISCARD inline bool receive_event(struct json_to_native_state& state, event_type event, bool start) {
-    if (state.stack.empty())
-        return set_error(state, "extra data");
-    if (state.stack.size() > max_stack_size)
-        return set_error(state, "recursion limit reached");
-    if (trace_json_to_native_event)
-        printf("(event %d)\n", (int)event);
-    auto x = state.stack.back();
-    if (start)
-        state.stack.clear();
-    return x.ser && x.ser->json_to_native(x.obj, state, event, start);
-}
-
-template <typename T>
-ABIEOS_NODISCARD bool json_to_native(T& obj, std::string& error, std::string_view json) {
-    std::string mutable_json{json};
-    mutable_json.push_back(0);
-    json_to_native_state state{error};
-    state.stack.push_back(native_stack_entry{&obj, &native_serializer_for<T>, 0});
-    rapidjson::Reader reader;
-    rapidjson::InsituStringStream ss(mutable_json.data());
-    return reader.Parse<rapidjson::kParseValidateEncodingFlag | rapidjson::kParseIterativeFlag |
-                        rapidjson::kParseNumbersAsStringsFlag>(ss, state);
-}
-
-template <typename T>
-ABIEOS_NODISCARD auto json_to_native(T& obj, json_to_native_state& state, event_type event, bool start)
-    -> std::enable_if_t<std::is_arithmetic_v<T>, bool> {
-
-    return json_to_number(obj, state, event);
-}
-
-template <typename T>
-ABIEOS_NODISCARD auto json_to_native(T& obj, json_to_native_state& state, event_type event, bool start)
-    -> std::enable_if_t<std::is_class_v<T>, bool> {
-
-    if (start) {
-        if (event != event_type::received_start_object)
-            return set_error(state, "expected object");
-        if (trace_json_to_native)
-            printf("%*s{ %d fields\n", int(state.stack.size() * 4), "", int(native_field_serializers_for<T>.size()));
-        state.stack.push_back({&obj, &native_serializer_for<T>});
-        return true;
-    } else if (event == event_type::received_end_object) {
-        if (trace_json_to_native)
-            printf("%*s}\n", int((state.stack.size() - 1) * 4), "");
-        state.stack.pop_back();
-        return true;
-    }
-    auto& stack_entry = state.stack.back();
-    if (event == event_type::received_key) {
-        stack_entry.position = 0;
-        while (stack_entry.position < (ptrdiff_t)native_field_serializers_for<T>.size() &&
-               native_field_serializers_for<T>[stack_entry.position].name != state.received_data.key)
-            ++stack_entry.position;
-        if (stack_entry.position >= (ptrdiff_t)native_field_serializers_for<T>.size())
-            return set_error(state, "unknown field " + state.received_data.key); // TODO: eat unknown subtree
-        return true;
-    } else if (stack_entry.position < (ptrdiff_t)native_field_serializers_for<T>.size()) {
-        auto& field_ser = native_field_serializers_for<T>[stack_entry.position];
-        if (trace_json_to_native)
-            printf("%*sfield %d/%d: %s (event %d)\n", int(state.stack.size() * 4), "", int(stack_entry.position),
-                   int(native_field_serializers_for<T>.size()), std::string{field_ser.name}.c_str(), (int)event);
-        return field_ser.methods->json_to_native(&obj, state, event, true);
-    } else {
-        return true;
-    }
-    return true;
-}
-
-template <typename T>
-ABIEOS_NODISCARD bool json_to_native(std::vector<T>& v, json_to_native_state& state, event_type event, bool start) {
-    if (start) {
-        if (event != event_type::received_start_array)
-            return set_error(state, "expected array");
-        if (trace_json_to_native)
-            printf("%*s[\n", int(state.stack.size() * 4), "");
-        state.stack.push_back({&v, &native_serializer_for<std::vector<T>>});
-        return true;
-    } else if (event == event_type::received_end_array) {
-        if (trace_json_to_native)
-            printf("%*s]\n", int((state.stack.size() - 1) * 4), "");
-        state.stack.pop_back();
-        return true;
-    }
-    if (trace_json_to_native)
-        printf("%*sitem %d (event %d)\n", int(state.stack.size() * 4), "", int(v.size()), (int)event);
-    v.emplace_back();
-    return json_to_native(v.back(), state, event, true);
-}
-
-template <typename First, typename Second>
-ABIEOS_NODISCARD bool json_to_native(std::pair<First, Second>& obj, json_to_native_state& state, event_type event,
-                                     bool start) {
-    return set_error(state, "pair not implemented"); // TODO
-}
-
-ABIEOS_NODISCARD inline bool json_to_native(std::string& obj, json_to_native_state& state, event_type event,
-                                            bool start) {
-    if (event == event_type::received_string) {
-        obj = state.get_string();
-        if (trace_json_to_native)
-            printf("%*sstring: %s\n", int(state.stack.size() * 4), "", obj.c_str());
-        return true;
-    } else
-        return set_error(state, "expected string");
-}
-
-template <typename T>
-ABIEOS_NODISCARD bool json_to_native(std::optional<T>& obj, json_to_native_state& state, event_type event, bool) {
-    if (event == event_type::received_null)
-        return true;
-    obj.emplace();
-    return json_to_native(*obj, state, event, true);
-}
-
-template <typename... Ts>
-ABIEOS_NODISCARD bool json_to_native(std::variant<Ts...>& obj, json_to_native_state& state, event_type event, bool) {
-    return set_error(state, "can not convert json to variant");
-}
-
-template <typename T>
-ABIEOS_NODISCARD bool json_to_native(might_not_exist<T>& obj, json_to_native_state& state, event_type event,
-                                     bool start) {
-    return json_to_native(obj.value, state, event, start);
 }
 
 ///////////////////////////////////////////////////////////////////////////////

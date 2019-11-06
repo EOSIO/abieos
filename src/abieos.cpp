@@ -104,11 +104,11 @@ extern "C" abieos_bool abieos_set_abi(abieos_context* context, uint64_t contract
         context->last_error = "abi parse error";
         abi_def def{};
         std::string error;
-        if (!json_to_native(def, error, abi)) {
-            if (!error.empty())
-                set_error(context, std::move(error));
-            return false;
-        }
+        std::string abi_copy{abi};
+        eosio::json_token_stream stream(abi_copy.data());
+        auto s = from_json(def, stream);
+        if (!s)
+            return set_error(context, s.error().message());
         if (!check_abi_version(def.version, error))
             return set_error(context, std::move(error));
         abieos::contract c;

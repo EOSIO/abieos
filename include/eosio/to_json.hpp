@@ -146,12 +146,13 @@ result<void> to_json(const std::vector<T>& obj, S& stream) {
 }
 
 template <typename S>
-result<void> to_json(const std::vector<char>& obj, S& stream) {
+result<void> to_json_hex(const char* data, size_t size, S& stream) {
    auto r = stream.write('"');
    if (!r)
       return r.error();
-   for (unsigned char byte : obj) {
-      r = stream.write(hex_digits[byte >> 4]);
+   for (size_t i = 0; i < size; ++i) {
+      unsigned char byte = data[i];
+      r                  = stream.write(hex_digits[byte >> 4]);
       if (!r)
          return r.error();
       r = stream.write(hex_digits[byte & 15]);
