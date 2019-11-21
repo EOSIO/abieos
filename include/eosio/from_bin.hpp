@@ -14,7 +14,7 @@ result<void> varuint32_from_bin(uint32_t& dest, S& stream) {
    do {
       if (shift >= 35)
          return stream_error::invalid_varuint_encoding;
-      auto r = from_bin(b, stream);
+      auto r = stream.read_raw(b);
       if (!r)
          return r;
       dest |= uint32_t(b & 0x7f) << shift;
@@ -31,7 +31,7 @@ result<void> varuint64_from_bin(uint64_t& dest, S& stream) {
    do {
       if (shift >= 70)
          return stream_error::invalid_varuint_encoding;
-      auto r = from_bin(b, stream);
+      auto r = stream.read_raw(b);
       if (!r)
          return r;
       dest |= uint64_t(b & 0x7f) << shift;
@@ -61,21 +61,21 @@ result<void> from_bin(std::vector<T>& v, S& stream) {
          auto     r = varuint64_from_bin(size, stream);
          if (!r)
             return r;
-         r = stream.check_available(v.size() * sizeof(T));
+         r = stream.check_available(size * sizeof(T));
          if (!r)
             return r;
          v.resize(size);
-         return stream.read(v.data(), v.size() * sizeof(T));
+         return stream.read(v.data(), size * sizeof(T));
       } else {
          uint32_t size;
          auto     r = varuint32_from_bin(size, stream);
          if (!r)
             return r;
-         r = stream.check_available(v.size() * sizeof(T));
+         r = stream.check_available(size * sizeof(T));
          if (!r)
             return r;
          v.resize(size);
-         return stream.read(v.data(), v.size() * sizeof(T));
+         return stream.read(v.data(), size * sizeof(T));
       }
    } else {
       uint32_t size;
@@ -88,6 +88,36 @@ result<void> from_bin(std::vector<T>& v, S& stream) {
          if (!r)
             return r;
       }
+   }
+   return outcome::success();
+}
+
+template <typename S>
+result<void> from_bin(input_stream& obj, S& stream) {
+   if constexpr (sizeof(size_t) >= 8) {
+      uint64_t size;
+      auto     r = varuint64_from_bin(size, stream);
+      if (!r)
+         return r;
+      r = stream.check_available(size);
+      if (!r)
+         return r;
+      r = stream.read_reuse_storage(obj.pos, size);
+      if (!r)
+         return r;
+      obj.end = obj.pos + size;
+   } else {
+      uint32_t size;
+      auto     r = varuint32_from_bin(size, stream);
+      if (!r)
+         return r;
+      r = stream.check_available(size);
+      if (!r)
+         return r;
+      r = stream.read_reuse_storage(obj.pos, size);
+      if (!r)
+         return r;
+      obj.end = obj.pos + size;
    }
    return outcome::success();
 }
@@ -159,6 +189,30 @@ result<void> from_bin(T& obj, S& stream) {
       });
       return r;
    }
+}
+
+template <typename T, typename S>
+result<T> from_bin(S& stream) {
+   T    obj;
+   auto r = from_bin(obj, stream);
+   if (!r)
+      return r.error();
+   return obj;
+}
+
+template <typename T>
+result<void> convert_from_bin(T& obj, const std::vector<char>& bin) {
+   input_stream stream{ bin };
+   return from_bin(obj, stream);
+}
+
+template <typename T>
+result<T> convert_from_bin(const std::vector<char>& bin) {
+   T    obj;
+   auto r = convert_from_bin(obj, bin);
+   if (!r)
+      return r.error();
+   return obj;
 }
 
 } // namespace eosio

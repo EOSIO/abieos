@@ -162,6 +162,7 @@ class json_token_stream : public rapidjson::BaseReaderHandler<rapidjson::UTF8<>,
  public:
    json_token current_token;
 
+   // This modifies json
    json_token_stream(char* json) : ss{ json } { reader.IterativeParseInit(); }
 
    bool complete() { return reader.IterativeParseComplete(); }

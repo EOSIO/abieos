@@ -278,6 +278,10 @@ inline std::string symbol_to_string(uint64_t v) {
    return true;
 }
 
+[[nodiscard]] inline bool string_to_asset(int64_t& amount, uint64_t& symbol, const char* s, const char* end) {
+   return string_to_asset(amount, symbol, s, end, true);
+}
+
 inline std::string asset_to_string(int64_t amount, uint64_t symbol) {
    std::string result;
    uint64_t    uamount;

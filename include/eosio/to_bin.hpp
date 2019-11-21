@@ -83,6 +83,17 @@ result<void> to_bin(const std::vector<T>& obj, S& stream) {
    return outcome::success();
 }
 
+template <typename S>
+result<void> to_bin(const input_stream& obj, S& stream) {
+   auto r = varuint32_to_bin(obj.end - obj.pos, stream);
+   if (!r)
+      return r.error();
+   r = stream.write(obj.pos, obj.end - obj.pos);
+   if (!r)
+      return r.error();
+   return outcome::success();
+}
+
 template <typename T, typename S>
 result<void> to_bin(const std::optional<T>& obj, S& stream) {
    auto r = to_bin(obj.has_value(), stream);
@@ -133,20 +144,31 @@ result<void> to_bin(const T& obj, S& stream) {
 }
 
 template <typename T>
-result<std::vector<char>> to_bin(const T& t) {
+result<void> convert_to_bin(const T& t, std::vector<char>& bin) {
    size_stream ss;
    auto        r = to_bin(t, ss);
    if (!r)
       return r.error();
-   std::vector<char> result(ss.size, 0);
-   fixed_buf_stream  fbs(result.data(), result.size());
+   auto orig_size = bin.size();
+   bin.resize(orig_size + ss.size);
+   fixed_buf_stream fbs(bin.data() + orig_size, ss.size);
    r = to_bin(t, fbs);
    if (!r)
       return r.error();
    if (fbs.pos == fbs.end)
-      return std::move(result);
+      return outcome::success();
    else
       return stream_error::underrun;
+}
+
+template <typename T>
+result<std::vector<char>> convert_to_bin(const T& t) {
+   std::vector<char> result;
+   auto              r = convert_to_bin(t, result);
+   if (r)
+      return std::move(result);
+   else
+      return r.error();
 }
 
 } // namespace eosio

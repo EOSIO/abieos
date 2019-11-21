@@ -19,7 +19,7 @@ result<void> to_json(std::string_view sv, S& stream) {
       auto pos = begin;
       while (pos != end && *pos != '"' && *pos != '\\' && (unsigned char)(*pos) >= 32 && *pos != 127) ++pos;
       if (begin != pos) {
-         r = stream.write(std::string_view{ begin, size_t(pos - begin) });
+         r = stream.write(begin, size_t(pos - begin));
          if (!r)
             return r.error();
          begin = pos;
@@ -166,7 +166,7 @@ result<void> to_json_hex(const char* data, size_t size, S& stream) {
 }
 
 template <typename T>
-result<std::string> to_json(const T& t) {
+result<std::string> convert_to_json(const T& t) {
    size_stream ss;
    auto        r = to_json(t, ss);
    if (!r)

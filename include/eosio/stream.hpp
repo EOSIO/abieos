@@ -57,8 +57,7 @@ struct small_buffer {
    char  data[max_size];
    char* pos{ data };
 
-   void             reverse() { std::reverse(data, pos); }
-   std::string_view sv() { return { data, pos - data }; }
+   void reverse() { std::reverse(data, pos); }
 };
 
 struct vector_stream {
@@ -95,12 +94,22 @@ struct fixed_buf_stream {
       return outcome::success();
    }
 
-   result<void> write(const std::string_view& sv) {
-      if (pos + sv.size() >= end)
+   result<void> write(const void* src, size_t size) {
+      if (pos + size > end)
          return stream_error::overrun;
-      memcpy(pos, sv.data(), sv.size());
-      pos += sv.size();
+      memcpy(pos, src, size);
+      pos += size;
       return outcome::success();
+   }
+
+   template <int size>
+   result<void> write(const char (&src)[size]) {
+      return write(src, size);
+   }
+
+   template <typename T>
+   result<void> write_raw(const T& v) {
+      return write(&v, sizeof(v));
    }
 };
 
@@ -112,8 +121,20 @@ struct size_stream {
       return outcome::success();
    }
 
-   result<void> write(const std::string_view& sv) {
-      size += sv.size();
+   result<void> write(const void* src, size_t size) {
+      this->size += size;
+      return outcome::success();
+   }
+
+   template <int size>
+   result<void> write(const char (&src)[size]) {
+      this->size += size;
+      return outcome::success();
+   }
+
+   template <typename T>
+   result<void> write_raw(const T& v) {
+      size += sizeof(v);
       return outcome::success();
    }
 };
@@ -122,8 +143,10 @@ struct input_stream {
    const char* pos;
    const char* end;
 
+   input_stream() : pos{ nullptr }, end{ nullptr } {}
    input_stream(const char* pos, size_t size) : pos{ pos }, end{ pos + size } {}
    input_stream(const char* pos, const char* end) : pos{ pos }, end{ end } {}
+   input_stream(const std::vector<char>& v) : pos{ v.data() }, end{ v.data() + v.size() } {}
    input_stream(const input_stream&) = default;
 
    input_stream& operator=(const input_stream&) = default;

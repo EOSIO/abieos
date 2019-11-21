@@ -1,6 +1,9 @@
 #pragma once
 
-#ifndef EOSIO_CDT_COMPILATION
+#ifdef EOSIO_CDT_COMPILATION
+#   include <eosio/check.hpp>
+#   define OUTCOME_DISABLE_EXECINFO
+#else
 #   include <stdexcept>
 #endif
 
