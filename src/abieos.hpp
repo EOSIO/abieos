@@ -3,11 +3,7 @@
 #pragma once
 
 #ifdef EOSIO_CDT_COMPILATION
-#include <wchar.h>
-
-namespace std {
-inline size_t wcslen(const wchar_t* str) { return ::wcslen(str); }
-} // namespace std
+#include <cwchar>
 
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-W#warnings"
@@ -1890,7 +1886,7 @@ constexpr auto create_native_field_serializer_methods_impl() {
 }
 
 template <typename member_ptr>
-inline constexpr auto field_serializer_methods_for = create_native_field_serializer_methods_impl<member_ptr>();
+inline constexpr decltype(create_native_field_serializer_methods_impl<member_ptr>()) field_serializer_methods_for;
 
 template <typename T>
 constexpr auto create_native_field_serializers() {
@@ -2319,7 +2315,7 @@ struct abi_serializer_impl : abi_serializer {
 };
 
 template <typename T>
-inline constexpr auto abi_serializer_for = abi_serializer_impl<T>{};
+inline constexpr abi_serializer_impl<T> abi_serializer_for;
 
 ///////////////////////////////////////////////////////////////////////////////
 // abi handling
