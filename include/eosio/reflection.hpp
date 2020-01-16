@@ -80,22 +80,23 @@ namespace eosio { namespace reflection {
    template <typename F>                                                                                               \
    constexpr void for_each_field(STRUCT*, F f)
 
+/**
+ * EOSIO_REFLECT(<struct>, <member or base spec>...)
+ * Each parameter should be either the keyword 'base' followed by a base class of the struct or
+ * an identifier which names a non-static data member of the struct.
+ */
 #define EOSIO_REFLECT(...)                                                                                             \
    EOSIO_REFLECT_SIGNATURE(__VA_ARGS__) {                                                                              \
       MAP_REUSE_ARG0(EOSIO_REFLECT_INTERNAL, __VA_ARGS__)                                                              \
    }
 
 // Identity the keyword 'base' followed by at least one token
-#define EOSIO_REFLECT_SELECT1(ignore) EOSIO_REFLECT_MEMBER
-#define EOSIO_REFLECT_SELECT2(tail) EOSIO_REFLECT_BASE
-#define EOSIO_REFLECT_SELECT_I(a, b, c, d, ...) EOSIO_REFLECT_SELECT ## d(b)
+#define EOSIO_REFLECT_SELECT_I(a, b, c, d, ...) EOSIO_REFLECT_ ## d
 #define EOSIO_REFLECT_IS_BASE() ~,~
 #define EOSIO_REFLECT_IS_BASE_TESTbase ~,EOSIO_REFLECT_IS_BASE
 
-#define EOSIO_APPLY_I(m, x) m x
-#define EOSIO_APPLY(m, x) EOSIO_APPLY_I(m, x)
-#define EOSIO_CAT_I(x, y) x ## y
-#define EOSIO_CAT(x, y) EOSIO_CAT_I(x, y)
-#define EOSIO_REFLECT_INTERNAL(STRUCT, FIELD) EOSIO_APPLY(EOSIO_REFLECT_SELECT_I, (EOSIO_CAT(EOSIO_REFLECT_IS_BASE_TEST, FIELD()), 1, 2, 1))(STRUCT, FIELD)
+#define EOSIO_APPLY(m, x) m x
+#define EOSIO_CAT(x, y) x ## y
+#define EOSIO_REFLECT_INTERNAL(STRUCT, FIELD) EOSIO_APPLY(EOSIO_REFLECT_SELECT_I, (EOSIO_CAT(EOSIO_REFLECT_IS_BASE_TEST, FIELD()), MEMBER, BASE, MEMBER))(STRUCT, FIELD)
 
 }} // namespace eosio::reflection
