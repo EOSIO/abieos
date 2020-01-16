@@ -26,33 +26,39 @@
  * prior written authorization from the authors.
  */
 
-#ifndef MAP_MACRO_H_INCLUDED
-#define MAP_MACRO_H_INCLUDED
+/*
+ * This file has been modified by block.one
+ */
 
-#define EVAL0(...) __VA_ARGS__
-#define EVAL1(...) EVAL0(EVAL0(EVAL0(__VA_ARGS__)))
-#define EVAL2(...) EVAL1(EVAL1(EVAL1(__VA_ARGS__)))
-#define EVAL3(...) EVAL2(EVAL2(EVAL2(__VA_ARGS__)))
-#define EVAL4(...) EVAL3(EVAL3(EVAL3(__VA_ARGS__)))
-#define EVAL(...) EVAL4(EVAL4(EVAL4(__VA_ARGS__)))
+#ifndef EOSIO_MAP_MACRO_H_INCLUDED
+#define EOSIO_MAP_MACRO_H_INCLUDED
 
-#define MAP_END(...)
-#define MAP_OUT
-#define MAP_COMMA ,
+#define EOSIO_EVAL0(...) __VA_ARGS__
+#define EOSIO_EVAL1(...) EOSIO_EVAL0(EOSIO_EVAL0(EOSIO_EVAL0(__VA_ARGS__)))
+#define EOSIO_EVAL2(...) EOSIO_EVAL1(EOSIO_EVAL1(EOSIO_EVAL1(__VA_ARGS__)))
+#define EOSIO_EVAL3(...) EOSIO_EVAL2(EOSIO_EVAL2(EOSIO_EVAL2(__VA_ARGS__)))
+#define EOSIO_EVAL4(...) EOSIO_EVAL3(EOSIO_EVAL3(EOSIO_EVAL3(__VA_ARGS__)))
+#define EOSIO_EVAL(...) EOSIO_EVAL4(EOSIO_EVAL4(EOSIO_EVAL4(__VA_ARGS__)))
 
-#define MAP_GET_END2() 0, MAP_END
-#define MAP_GET_END1(...) MAP_GET_END2
-#define MAP_GET_END(...) MAP_GET_END1
-#define MAP_NEXT0(test, next, ...) next MAP_OUT
-#define MAP_NEXT1(test, next) MAP_NEXT0(test, next, 0)
-#define MAP_NEXT(test, next) MAP_NEXT1(MAP_GET_END test, next)
+#define EOSIO_MAP_END(...)
+#define EOSIO_MAP_OUT
+
+#define EOSIO_MAP_GET_END2() 0, EOSIO_MAP_END
+#define EOSIO_MAP_GET_END1(...) EOSIO_MAP_GET_END2
+#define EOSIO_MAP_GET_END(...) EOSIO_MAP_GET_END1
+#define EOSIO_MAP_NEXT0(test, next, ...) next EOSIO_MAP_OUT
+#define EOSIO_MAP_NEXT1(test, next) EOSIO_MAP_NEXT0(test, next, 0)
+#define EOSIO_MAP_NEXT(test, next) EOSIO_MAP_NEXT1(EOSIO_MAP_GET_END test, next)
 
 // Macros below this point added by block.one
 
-#define MAP_REUSE_ARG0_0(f, arg0, x, peek, ...) f(arg0, x) MAP_NEXT(peek, MAP_REUSE_ARG0_1)(f, arg0, peek, __VA_ARGS__)
-#define MAP_REUSE_ARG0_1(f, arg0, x, peek, ...) f(arg0, x) MAP_NEXT(peek, MAP_REUSE_ARG0_0)(f, arg0, peek, __VA_ARGS__)
+#define EOSIO_MAP_REUSE_ARG0_0(f, arg0, x, peek, ...)                                                                  \
+   f(arg0, x) EOSIO_MAP_NEXT(peek, EOSIO_MAP_REUSE_ARG0_1)(f, arg0, peek, __VA_ARGS__)
+#define EOSIO_MAP_REUSE_ARG0_1(f, arg0, x, peek, ...)                                                                  \
+   f(arg0, x) EOSIO_MAP_NEXT(peek, EOSIO_MAP_REUSE_ARG0_0)(f, arg0, peek, __VA_ARGS__)
 // Handle 0 arguments
-#define MAP_REUSE_ARG0_I(f, arg0, peek, ...) MAP_NEXT(peek, MAP_REUSE_ARG0_1)(f, arg0, peek, __VA_ARGS__)
-#define MAP_REUSE_ARG0(f, ...) EVAL(MAP_REUSE_ARG0_I(f, __VA_ARGS__, ()()(), ()()(), ()()(), 0))
+#define EOSIO_MAP_REUSE_ARG0_I(f, arg0, peek, ...)                                                                     \
+   EOSIO_MAP_NEXT(peek, EOSIO_MAP_REUSE_ARG0_1)(f, arg0, peek, __VA_ARGS__)
+#define EOSIO_MAP_REUSE_ARG0(f, ...) EOSIO_EVAL(EOSIO_MAP_REUSE_ARG0_I(f, __VA_ARGS__, ()()(), ()()(), ()()(), 0))
 
 #endif

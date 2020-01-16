@@ -87,7 +87,7 @@ namespace eosio { namespace reflection {
  */
 #define EOSIO_REFLECT(...)                                                                                             \
    EOSIO_REFLECT_SIGNATURE(__VA_ARGS__) {                                                                              \
-      MAP_REUSE_ARG0(EOSIO_REFLECT_INTERNAL, __VA_ARGS__)                                                              \
+      EOSIO_MAP_REUSE_ARG0(EOSIO_REFLECT_INTERNAL, __VA_ARGS__)                                                        \
    }
 
 // Identity the keyword 'base' followed by at least one token
