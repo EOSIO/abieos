@@ -98,13 +98,43 @@ struct member_ptr {
     using member_type = std::decay_t<decltype(member_from_void(std::declval<member_ptr<P>>(), std::declval<void*>()))>;
 };
 
-#define ABIEOS_REFLECT(STRUCT)                                                                                         \
+#define ABIEOS_REFLECT1(STRUCT)                                                                                        \
     template <typename F>                                                                                              \
     constexpr void for_each_field(STRUCT*, F f)
 
 #define ABIEOS_MEMBER(STRUCT, MEMBER) f(#MEMBER, abieos::member_ptr<&STRUCT::MEMBER>{});
 
 #define ABIEOS_BASE(BASE) for_each_field((BASE*)nullptr, f);
+
+#define ABIEOS_REFLECT_IMPL(MEMBER) f(#MEMBER, abieos::member_ptr<&abieos_type::MEMBER>{});
+#define ABIEOS_REFLECT_IMPL1(MEMBER) ABIEOS_REFLECT_IMPL(MEMBER) ABIEOS_REFLECT_IMPL2
+#define ABIEOS_REFLECT_IMPL2(MEMBER) ABIEOS_REFLECT_IMPL(MEMBER) ABIEOS_REFLECT_IMPL1
+
+#define ABIEOS_REFLECT_IMPL1ABIEOS_REFLECT_END
+#define ABIEOS_REFLECT_IMPL2ABIEOS_REFLECT_END
+
+#define ABIEOS_REFLECT_EXPAND_I(BODY) BODY ## ABIEOS_REFLECT_END
+#define ABIEOS_REFLECT_EXPAND(BODY) ABIEOS_REFLECT_EXPAND_I(BODY)
+
+#define ABIEOS_REFLECT2(STRUCT, MEMBERS)                                                                               \
+    template <typename F>                                                                                              \
+    constexpr void for_each_field(STRUCT*, F f) {                                                                      \
+        using abieos_type = STRUCT;                                                                                    \
+        ABIEOS_REFLECT_EXPAND(ABIEOS_REFLECT_IMPL1 MEMBERS)                                                            \
+    }
+
+#define ABIEOS_REFLECT3(STRUCT, BASE, MEMBERS)                                                                         \
+    template <typename F>                                                                                              \
+    constexpr void for_each_field(STRUCT*, F f) {                                                                      \
+        using abieos_type = STRUCT;                                                                                    \
+        for_each_field((BASE*)nullptr, f);                                                                             \
+        ABIEOS_REFLECT_EXPAND(ABIEOS_REFLECT_IMPL1 MEMBERS)                                                            \
+    }
+
+#define ABIEOS_CAT_I(x, y) x ## y
+#define ABIEOS_CAT(x, y) ABIEOS_CAT_I(x, y)
+#define ABIEOS_COUNT_ARGS(a, b, c, d, ...) d
+#define ABIEOS_REFLECT(...) ABIEOS_CAT(ABIEOS_REFLECT, ABIEOS_COUNT_ARGS(__VA_ARGS__, 3, 2, 1))(__VA_ARGS__)
 
 // Pseudo objects never exist, except in serialized form
 struct pseudo_optional;
