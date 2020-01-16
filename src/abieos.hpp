@@ -1152,9 +1152,7 @@ struct symbol {
     uint64_t value = 0;
 };
 
-ABIEOS_REFLECT(symbol) { //
-    ABIEOS_MEMBER(symbol, value);
-}
+EOSIO_REFLECT(symbol, value);
 
 template <typename State>
 ABIEOS_NODISCARD bool json_to_bin(symbol*, State& state, bool, const abi_type*, event_type event, bool start) {
@@ -1185,10 +1183,7 @@ struct asset {
     symbol sym{};
 };
 
-ABIEOS_REFLECT(asset) {
-    ABIEOS_MEMBER(asset, amount);
-    ABIEOS_MEMBER(asset, sym);
-}
+EOSIO_REFLECT(asset, amount, sym);
 
 ABIEOS_NODISCARD inline bool string_to_asset(asset& result, std::string& error, const char*& s, const char* end,
                                              bool expect_end) {
@@ -1242,20 +1237,14 @@ struct type_def {
     std::string type{};
 };
 
-ABIEOS_REFLECT(type_def) {
-    ABIEOS_MEMBER(type_def, new_type_name)
-    ABIEOS_MEMBER(type_def, type)
-}
+EOSIO_REFLECT(type_def, new_type_name, type);
 
 struct field_def {
     std::string name{};
     std::string type{};
 };
 
-ABIEOS_REFLECT(field_def) {
-    ABIEOS_MEMBER(field_def, name)
-    ABIEOS_MEMBER(field_def, type)
-}
+EOSIO_REFLECT(field_def, name, type);
 
 struct struct_def {
     std::string name{};
@@ -1263,11 +1252,7 @@ struct struct_def {
     std::vector<field_def> fields{};
 };
 
-ABIEOS_REFLECT(struct_def) {
-    ABIEOS_MEMBER(struct_def, name)
-    ABIEOS_MEMBER(struct_def, base)
-    ABIEOS_MEMBER(struct_def, fields)
-}
+EOSIO_REFLECT(struct_def, name, base, fields);
 
 struct action_def {
     ::abieos::name name{};
@@ -1275,11 +1260,7 @@ struct action_def {
     std::string ricardian_contract{};
 };
 
-ABIEOS_REFLECT(action_def) {
-    ABIEOS_MEMBER(action_def, name)
-    ABIEOS_MEMBER(action_def, type)
-    ABIEOS_MEMBER(action_def, ricardian_contract)
-}
+EOSIO_REFLECT(action_def, name, type, ricardian_contract);
 
 struct table_def {
     ::abieos::name name{};
@@ -1289,43 +1270,28 @@ struct table_def {
     std::string type{};
 };
 
-ABIEOS_REFLECT(table_def) {
-    ABIEOS_MEMBER(table_def, name)
-    ABIEOS_MEMBER(table_def, index_type)
-    ABIEOS_MEMBER(table_def, key_names)
-    ABIEOS_MEMBER(table_def, key_types)
-    ABIEOS_MEMBER(table_def, type)
-}
+EOSIO_REFLECT(table_def, name, index_type, key_names, key_types, type);
 
 struct clause_pair {
     std::string id{};
     std::string body{};
 };
 
-ABIEOS_REFLECT(clause_pair) {
-    ABIEOS_MEMBER(clause_pair, id)
-    ABIEOS_MEMBER(clause_pair, body)
-}
+EOSIO_REFLECT(clause_pair, id, body);
 
 struct error_message {
     uint64_t error_code{};
     std::string error_msg{};
 };
 
-ABIEOS_REFLECT(error_message) {
-    ABIEOS_MEMBER(error_message, error_code)
-    ABIEOS_MEMBER(error_message, error_msg)
-}
+EOSIO_REFLECT(error_message, error_code, error_msg);
 
 struct variant_def {
     std::string name{};
     std::vector<std::string> types{};
 };
 
-ABIEOS_REFLECT(variant_def) {
-    ABIEOS_MEMBER(variant_def, name)
-    ABIEOS_MEMBER(variant_def, types)
-}
+EOSIO_REFLECT(variant_def, name, types);
 
 struct abi_def {
     std::string version{};
@@ -1339,17 +1305,8 @@ struct abi_def {
     might_not_exist<std::vector<variant_def>> variants{};
 };
 
-ABIEOS_REFLECT(abi_def) {
-    ABIEOS_MEMBER(abi_def, version);
-    ABIEOS_MEMBER(abi_def, types);
-    ABIEOS_MEMBER(abi_def, structs);
-    ABIEOS_MEMBER(abi_def, actions);
-    ABIEOS_MEMBER(abi_def, tables);
-    ABIEOS_MEMBER(abi_def, ricardian_clauses);
-    ABIEOS_MEMBER(abi_def, error_messages);
-    ABIEOS_MEMBER(abi_def, abi_extensions);
-    ABIEOS_MEMBER(abi_def, variants);
-}
+EOSIO_REFLECT(abi_def, version, types, structs, actions, tables, ricardian_clauses, error_messages, abi_extensions,
+              variants);
 
 ABIEOS_NODISCARD inline bool check_abi_version(const std::string& s, std::string& error) {
     if (s.substr(0, 13) != "eosio::abi/1.")
