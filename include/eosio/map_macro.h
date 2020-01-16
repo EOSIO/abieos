@@ -47,38 +47,12 @@
 #define MAP_NEXT1(test, next) MAP_NEXT0(test, next, 0)
 #define MAP_NEXT(test, next) MAP_NEXT1(MAP_GET_END test, next)
 
-#define MAP0(f, x, peek, ...) f(x) MAP_NEXT(peek, MAP1)(f, peek, __VA_ARGS__)
-#define MAP1(f, x, peek, ...) f(x) MAP_NEXT(peek, MAP0)(f, peek, __VA_ARGS__)
-
-#define MAP_LIST_NEXT1(test, next) MAP_NEXT0(test, MAP_COMMA next, 0)
-#define MAP_LIST_NEXT(test, next) MAP_LIST_NEXT1(MAP_GET_END test, next)
-
-#define MAP_LIST0(f, x, peek, ...) f(x) MAP_LIST_NEXT(peek, MAP_LIST1)(f, peek, __VA_ARGS__)
-#define MAP_LIST1(f, x, peek, ...) f(x) MAP_LIST_NEXT(peek, MAP_LIST0)(f, peek, __VA_ARGS__)
-
-/**
- * Applies the function macro `f` to each of the remaining parameters.
- */
-#define MAP(f, ...) EVAL(MAP1(f, __VA_ARGS__, ()()(), ()()(), ()()(), 0))
-
-/**
- * Applies the function macro `f` to each of the remaining parameters and
- * inserts commas between the results.
- */
-#define MAP_LIST(f, ...) EVAL(MAP_LIST1(f, __VA_ARGS__, ()()(), ()()(), ()()(), 0))
-
 // Macros below this point added by block.one
 
 #define MAP_REUSE_ARG0_0(f, arg0, x, peek, ...) f(arg0, x) MAP_NEXT(peek, MAP_REUSE_ARG0_1)(f, arg0, peek, __VA_ARGS__)
 #define MAP_REUSE_ARG0_1(f, arg0, x, peek, ...) f(arg0, x) MAP_NEXT(peek, MAP_REUSE_ARG0_0)(f, arg0, peek, __VA_ARGS__)
-#define MAP_REUSE_ARG0(f, arg0, ...) EVAL(MAP_REUSE_ARG0_1(f, arg0, __VA_ARGS__, ()()(), ()()(), ()()(), 0))
-
-#define MAP_SEPARATED_NEXT1(sep, test, next) MAP_NEXT0(test, sep next, 0)
-#define MAP_SEPARATED_NEXT(sep, test, next) MAP_SEPARATED_NEXT1(sep, MAP_GET_END test, next)
-#define MAP_SEPARATED0(sep, f, x, peek, ...)                                                                           \
-   f(x) MAP_SEPARATED_NEXT(sep, peek, MAP_SEPARATED1)(sep, f, peek, __VA_ARGS__)
-#define MAP_SEPARATED1(sep, f, x, peek, ...)                                                                           \
-   f(x) MAP_SEPARATED_NEXT(sep, peek, MAP_SEPARATED0)(sep, f, peek, __VA_ARGS__)
-#define MAP_SEPARATED(sep, f, ...) EVAL(MAP_SEPARATED1(sep, f, __VA_ARGS__, ()()(), ()()(), ()()(), 0))
+// Handle 0 arguments
+#define MAP_REUSE_ARG0_I(f, arg0, peek, ...) MAP_NEXT(peek, MAP_REUSE_ARG0_1)(f, arg0, peek, __VA_ARGS__)
+#define MAP_REUSE_ARG0(f, ...) EVAL(MAP_REUSE_ARG0_I(f, __VA_ARGS__, ()()(), ()()(), ()()(), 0))
 
 #endif
