@@ -9,11 +9,7 @@
 #include <eosio/to_bin.hpp>
 
 #ifdef EOSIO_CDT_COMPILATION
-#include <wchar.h>
-
-namespace std {
-inline size_t wcslen(const wchar_t* str) { return ::wcslen(str); }
-} // namespace std
+#include <cwchar>
 
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-W#warnings"
@@ -445,7 +441,7 @@ eosio::result<void> from_bin(input_buffer& obj, S& stream) {
     auto r = varuint64_from_bin(size, stream);
     if (!r)
         return r;
-    char* buf;
+    const char* buf;
     r = stream.read_reuse_storage(buf, size);
     if (!r)
         return r;
@@ -721,7 +717,7 @@ inline void key_to_bin(const Key& obj, std::vector<char>& bin) {
 
 template <typename Key, typename S>
 eosio::result<void> key_to_bin(const Key& obj, S& stream) {
-    auto r = raw_to_bin(obj.type, stream);
+    auto r = eosio::to_bin(obj.type, stream);
     if (!r)
         return r.error();
     return stream.write(obj.data.data(), obj.data.size());
@@ -1184,6 +1180,15 @@ struct asset {
 };
 
 EOSIO_REFLECT(asset, amount, sym);
+
+inline eosio::result<void> from_string(asset& result, eosio::input_stream& stream) {
+    int64_t amount;
+    uint64_t sym;
+    if (!eosio::string_to_asset(amount, sym, stream.pos, stream.end, true))
+        return eosio::stream_error::invalid_asset_format;
+    result = asset{amount, symbol{sym}};
+    return eosio::outcome::success();
+}
 
 ABIEOS_NODISCARD inline bool string_to_asset(asset& result, std::string& error, const char*& s, const char* end,
                                              bool expect_end) {

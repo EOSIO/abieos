@@ -55,7 +55,7 @@ result<void> varint32_from_bin(int32_t& result, S& stream) {
 
 template <typename T, typename S>
 result<void> from_bin(std::vector<T>& v, S& stream) {
-   if constexpr (std::is_arithmetic_v<T>) {
+   if constexpr (has_bitwise_serialization<T>()) {
       if constexpr (sizeof(size_t) >= 8) {
          uint64_t size;
          auto     r = varuint64_from_bin(size, stream);
@@ -179,7 +179,7 @@ result<void> from_bin(std::variant<Ts...>& obj, S& stream) {
 
 template <typename T, typename S>
 result<void> from_bin(T& obj, S& stream) {
-   if constexpr (std::is_arithmetic_v<T>) {
+   if constexpr (has_bitwise_serialization<T>()) {
       return stream.read_raw(obj);
    } else {
       result<void> r = outcome::success();

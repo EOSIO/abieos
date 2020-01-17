@@ -4,6 +4,7 @@
 #include <string>
 #include <string_view>
 #include <vector>
+#include <type_traits>
 
 namespace eosio {
 enum class stream_error {
@@ -14,6 +15,7 @@ enum class stream_error {
    varuint_too_big,
    invalid_varuint_encoding,
    bad_variant_index,
+   invalid_asset_format,
 }; // stream_error
 } // namespace eosio
 
@@ -38,6 +40,7 @@ class stream_error_category_type : public std::error_category {
          case stream_error::varuint_too_big:          return "Varuint too big";
          case stream_error::invalid_varuint_encoding: return "Invalid varuint encoding";
          case stream_error::bad_variant_index:        return "Bad variant index";
+         case stream_error::invalid_asset_format:     return "Invalid asset format";
             // clang-format on
 
          default: return "unknown";
@@ -51,6 +54,19 @@ inline const stream_error_category_type& stream_error_category() {
 }
 
 inline std::error_code make_error_code(stream_error e) { return { static_cast<int>(e), stream_error_category() }; }
+
+
+template<typename T>
+constexpr bool has_bitwise_serialization() {
+   if constexpr (std::is_arithmetic_v<T>) {
+      return true;
+   } else if constexpr (std::is_enum_v<T>) {
+      static_assert(!std::is_convertible_v<T, std::underlying_type_t<T>>, "Serializing unscoped enum");
+      return true;
+   } else {
+      return false;
+   }
+}
 
 template <int max_size>
 struct small_buffer {
@@ -147,6 +163,7 @@ struct input_stream {
    input_stream(const char* pos, size_t size) : pos{ pos }, end{ pos + size } {}
    input_stream(const char* pos, const char* end) : pos{ pos }, end{ end } {}
    input_stream(const std::vector<char>& v) : pos{ v.data() }, end{ v.data() + v.size() } {}
+   input_stream(std::string_view v) : pos{ v.data() }, end{ v.data() + v.size() } {}
    input_stream(const input_stream&) = default;
 
    input_stream& operator=(const input_stream&) = default;

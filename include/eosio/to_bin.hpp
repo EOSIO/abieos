@@ -69,7 +69,7 @@ result<void> to_bin(const std::vector<T>& obj, S& stream) {
    auto r = varuint32_to_bin(obj.size(), stream);
    if (!r)
       return r.error();
-   if constexpr (std::is_arithmetic_v<T>) {
+   if constexpr (has_bitwise_serialization<T>()) {
       r = stream.write(obj.data(), obj.size() * sizeof(T));
       if (!r)
          return r.error();
@@ -131,7 +131,7 @@ result<void> to_bin(const std::tuple<Ts...>& obj, S& stream) {
 
 template <typename T, typename S>
 result<void> to_bin(const T& obj, S& stream) {
-   if constexpr (std::is_arithmetic_v<T>) {
+   if constexpr (has_bitwise_serialization<T>()) {
       return stream.write_raw(obj);
    } else {
       result<void> r = outcome::success();
