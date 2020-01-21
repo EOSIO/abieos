@@ -113,6 +113,8 @@ struct member_ptr {
 // Pseudo objects never exist, except in serialized form
 struct pseudo_optional;
 struct pseudo_extension;
+struct pseudo_sized;
+struct pseudo_fixed_sized;
 struct pseudo_object;
 struct pseudo_array;
 struct pseudo_variant;
@@ -341,6 +343,8 @@ struct jvalue_to_bin_stack_entry {
     bool allow_extensions = false;
     const jvalue* value = nullptr;
     int position = -1;
+    size_t size_insertion_index = 0;
+    size_t byte_position = 0;
 };
 
 struct json_to_bin_stack_entry {
@@ -348,6 +352,7 @@ struct json_to_bin_stack_entry {
     bool allow_extensions = false;
     int position = -1;
     size_t size_insertion_index = 0;
+    size_t byte_position = 0;
     size_t variant_type_index = 0;
 };
 
@@ -356,6 +361,7 @@ struct bin_to_json_stack_entry {
     bool allow_extensions = false;
     int position = -1;
     uint32_t array_size = 0;
+    input_buffer saved_bin = {};
 };
 
 struct json_to_jvalue_state : json_reader_handler<json_to_jvalue_state> {
@@ -380,8 +386,9 @@ struct bin_to_native_state {
 
 struct jvalue_to_bin_state {
     std::string& error;
-    std::vector<char>& bin;
+    std::vector<char> bin;
     const jvalue* received_value = nullptr;
+    std::vector<size_insertion> size_insertions{};
     std::vector<jvalue_to_bin_stack_entry> stack{};
     bool skipped_extension = false;
 
@@ -494,6 +501,10 @@ ABIEOS_NODISCARD bool json_to_bin(pseudo_optional*, jvalue_to_bin_state& state, 
                                   const abi_type* type, event_type event, bool);
 ABIEOS_NODISCARD bool json_to_bin(pseudo_extension*, jvalue_to_bin_state& state, bool allow_extensions,
                                   const abi_type* type, event_type event, bool);
+ABIEOS_NODISCARD bool json_to_bin(pseudo_sized*, jvalue_to_bin_state& state, bool allow_extensions,
+                                  const abi_type* type, event_type event, bool);
+ABIEOS_NODISCARD bool json_to_bin(pseudo_fixed_sized*, jvalue_to_bin_state& state, bool allow_extensions,
+                                  const abi_type* type, event_type event, bool);
 ABIEOS_NODISCARD bool json_to_bin(pseudo_object*, jvalue_to_bin_state& state, bool allow_extensions,
                                   const abi_type* type, event_type event, bool start);
 ABIEOS_NODISCARD bool json_to_bin(pseudo_array*, jvalue_to_bin_state& state, bool allow_extensions,
@@ -515,6 +526,10 @@ ABIEOS_NODISCARD bool json_to_bin(pseudo_optional*, json_to_bin_state& state, bo
                                   const abi_type* type, event_type event, bool start);
 ABIEOS_NODISCARD bool json_to_bin(pseudo_extension*, json_to_bin_state& state, bool allow_extensions,
                                   const abi_type* type, event_type event, bool start);
+ABIEOS_NODISCARD bool json_to_bin(pseudo_sized*, json_to_bin_state& state, bool allow_extensions, const abi_type* type,
+                                  event_type event, bool start);
+ABIEOS_NODISCARD bool json_to_bin(pseudo_fixed_sized*, json_to_bin_state& state, bool allow_extensions,
+                                  const abi_type* type, event_type event, bool start);
 ABIEOS_NODISCARD bool json_to_bin(pseudo_object*, json_to_bin_state& state, bool allow_extensions, const abi_type* type,
                                   event_type event, bool start);
 ABIEOS_NODISCARD bool json_to_bin(pseudo_array*, json_to_bin_state& state, bool allow_extensions, const abi_type* type,
@@ -530,6 +545,10 @@ ABIEOS_NODISCARD bool bin_to_json(std::string*, bin_to_json_state& state, bool a
 ABIEOS_NODISCARD bool bin_to_json(pseudo_optional*, bin_to_json_state& state, bool allow_extensions,
                                   const abi_type* type, bool start);
 ABIEOS_NODISCARD bool bin_to_json(pseudo_extension*, bin_to_json_state& state, bool allow_extensions,
+                                  const abi_type* type, bool start);
+ABIEOS_NODISCARD bool bin_to_json(pseudo_sized*, bin_to_json_state& state, bool allow_extensions, const abi_type* type,
+                                  bool start);
+ABIEOS_NODISCARD bool bin_to_json(pseudo_fixed_sized*, bin_to_json_state& state, bool allow_extensions,
                                   const abi_type* type, bool start);
 ABIEOS_NODISCARD bool bin_to_json(pseudo_object*, bin_to_json_state& state, bool allow_extensions, const abi_type* type,
                                   bool start);
@@ -1102,6 +1121,16 @@ inline void push_varuint32(std::vector<char>& bin, uint32_t v) {
         b |= ((val > 0) << 7);
         bin.push_back(b);
     } while (val);
+}
+
+inline uint32_t varuint32_size(uint32_t v) {
+    uint32_t size = 0;
+    uint64_t val = v;
+    do {
+        val >>= 7;
+        ++size;
+    } while (val);
+    return size;
 }
 
 ABIEOS_NODISCARD inline bool read_varuint32(input_buffer& bin, std::string& error, uint32_t& dest) {
@@ -2338,8 +2367,11 @@ struct abi_type {
     abi_type* alias_of{};
     abi_type* optional_of{};
     abi_type* extension_of{};
+    abi_type* sized_of{};
+    abi_type* fixed_sized_of{};
     abi_type* array_of{};
     abi_type* base{};
+    uint32_t fixed_size{};
     std::vector<abi_field> fields{};
     bool filled_struct{};
     bool filled_variant{};
@@ -2362,6 +2394,32 @@ struct contract {
 template <int i>
 bool ends_with(const std::string& s, const char (&suffix)[i]) {
     return s.size() >= i - 1 && !strcmp(s.c_str() + s.size() - (i - 1), suffix);
+}
+
+struct size_suffix {
+    uint32_t value = 0;
+    size_t suffix_length = 0;
+};
+
+ABIEOS_NODISCARD inline std::optional<size_suffix> get_size_suffix(const std::string& type) {
+    size_suffix result;
+    uint64_t multiplier = 1;
+    while (result.suffix_length < type.size()) {
+        auto ch = type[type.size() - 1 - result.suffix_length++];
+        if (ch == '#')
+            break;
+        if (ch < '0' || ch > '9')
+            return {};
+        uint32_t v = result.value + (ch - '0') * multiplier;
+        multiplier *= 10;
+        if (v < result.value)
+            return {};
+        result.value = v;
+    }
+    if (result.suffix_length >= 2)
+        return result;
+    else
+        return {};
 }
 
 ABIEOS_NODISCARD inline bool get_type(abi_type*& result, std::string& error, std::map<std::string, abi_type>& abi_types,
@@ -2402,6 +2460,26 @@ ABIEOS_NODISCARD inline bool get_type(abi_type*& result, std::string& error, std
             if (type.extension_of->extension_of)
                 return set_error(error, "binary extensions ($) may not contain binary extensions ($)");
             type.ser = &abi_serializer_for<pseudo_extension>;
+            result = &type;
+            return true;
+        } else if (ends_with(name, "#")) {
+            abi_type& type = abi_types[name];
+            type.name = name;
+            if (!get_type(type.sized_of, error, abi_types, name.substr(0, name.size() - 1), depth + 1))
+                return false;
+            type.ser = &abi_serializer_for<pseudo_sized>;
+            result = &type;
+            return true;
+        } else if (auto suffix = get_size_suffix(name)) {
+            abi_type& type = abi_types[name];
+            type.name = name;
+            type.fixed_size = suffix->value;
+            if (type.fixed_size < 1 || type.fixed_size > 1024)
+                return set_error(error, "size suffix (#) is out of range 1-1024");
+            if (!get_type(type.fixed_sized_of, error, abi_types, name.substr(0, name.size() - suffix->suffix_length),
+                          depth + 1))
+                return false;
+            type.ser = &abi_serializer_for<pseudo_fixed_sized>;
             result = &type;
             return true;
         } else
@@ -2539,6 +2617,17 @@ ABIEOS_NODISCARD inline bool fill_contract(contract& c, std::string& error, cons
 // json_to_bin (jvalue)
 ///////////////////////////////////////////////////////////////////////////////
 
+inline void insert_sizes(std::vector<char>& dest, const char* src, const char* src_end, const size_insertion* sizes,
+                         const size_insertion* sizes_end, size_t size_offset = 0) {
+    size_t pos = 0;
+    for (auto size = sizes; size != sizes_end; ++size) {
+        dest.insert(dest.end(), src + pos, src + (size->position + size_offset));
+        push_varuint32(dest, size->size);
+        pos = size->position;
+    }
+    dest.insert(dest.end(), src + pos, src_end);
+}
+
 ABIEOS_NODISCARD inline bool json_to_bin(std::vector<char>& bin, std::string& error, const abi_type* type,
                                          const jvalue& value) {
     jvalue_to_bin_state state{error, bin, &value};
@@ -2553,29 +2642,33 @@ ABIEOS_NODISCARD inline bool json_to_bin(std::vector<char>& bin, std::string& er
         }
         return true;
     }();
-    if (result)
+    if (result) {
+        insert_sizes(bin, state.bin.data(), state.bin.data() + state.bin.size(), state.size_insertions.data(),
+                     state.size_insertions.data() + state.size_insertions.size());
         return true;
-    std::string s;
-    if (!state.stack.empty() && state.stack[0].type->filled_struct)
-        s += state.stack[0].type->name;
-    for (auto& entry : state.stack) {
-        if (entry.type->array_of)
-            s += "[" + std::to_string(entry.position) + "]";
-        else if (entry.type->filled_struct) {
-            if (entry.position >= 0 && entry.position < (int)entry.type->fields.size())
-                s += "." + entry.type->fields[entry.position].name;
-        } else if (entry.type->optional_of) {
-            s += "<optional>";
-        } else if (entry.type->filled_variant) {
-            s += "<variant>";
-        } else {
-            s += "<?>";
+    } else {
+        std::string s;
+        if (!state.stack.empty() && state.stack[0].type->filled_struct)
+            s += state.stack[0].type->name;
+        for (auto& entry : state.stack) {
+            if (entry.type->array_of)
+                s += "[" + std::to_string(entry.position) + "]";
+            else if (entry.type->filled_struct) {
+                if (entry.position >= 0 && entry.position < (int)entry.type->fields.size())
+                    s += "." + entry.type->fields[entry.position].name;
+            } else if (entry.type->optional_of) {
+                s += "<optional>";
+            } else if (entry.type->filled_variant) {
+                s += "<variant>";
+            } else {
+                s += "<?>";
+            }
         }
+        if (!s.empty())
+            s += ": ";
+        error = s + error;
+        return false;
     }
-    if (!s.empty())
-        s += ": ";
-    error = s + error;
-    return false;
 }
 
 ABIEOS_NODISCARD inline bool json_to_bin(pseudo_optional*, jvalue_to_bin_state& state, bool allow_extensions,
@@ -2593,6 +2686,55 @@ ABIEOS_NODISCARD inline bool json_to_bin(pseudo_extension*, jvalue_to_bin_state&
                                          const abi_type* type, event_type event, bool) {
     return type->extension_of->ser &&
            type->extension_of->ser->json_to_bin(state, allow_extensions, type->extension_of, event, true);
+}
+
+ABIEOS_NODISCARD inline bool json_to_bin(pseudo_sized*, jvalue_to_bin_state& state, bool, const abi_type* type,
+                                         event_type event, bool start) {
+    if (start) {
+        if (trace_jvalue_to_bin)
+            printf("%*s#{\n", int(state.stack.size() * 4), "");
+        state.stack.push_back({type, true, state.received_value, -1, state.size_insertions.size()});
+        state.size_insertions.push_back({state.bin.size()});
+        return type->sized_of->ser && type->sized_of->ser->json_to_bin(state, true, type->sized_of, event, true);
+    }
+    auto& stack_entry = state.stack.back();
+    auto& insertion = state.size_insertions[stack_entry.size_insertion_index];
+    size_t size = state.bin.size() - insertion.position;
+    for (auto i = stack_entry.size_insertion_index + 1; i < state.size_insertions.size(); ++i)
+        size += varuint32_size(state.size_insertions[i].size);
+    if (size > 0xffff'ffffull)
+        return set_error(state, "sized data is too large");
+    insertion.size = size;
+    if (trace_jvalue_to_bin)
+        printf("%*s#} size=%u\n", int((state.stack.size() - 1) * 4), "", unsigned(insertion.size));
+    state.stack.pop_back();
+    return true;
+}
+
+ABIEOS_NODISCARD inline bool json_to_bin(pseudo_fixed_sized*, jvalue_to_bin_state& state, bool, const abi_type* type,
+                                         event_type event, bool start) {
+    if (start) {
+        if (trace_jvalue_to_bin)
+            printf("%*s##{\n", int(state.stack.size() * 4), "");
+        state.stack.push_back({type, true, state.received_value, -1, state.size_insertions.size(), state.bin.size()});
+        return type->fixed_sized_of->ser &&
+               type->fixed_sized_of->ser->json_to_bin(state, true, type->fixed_sized_of, event, true);
+    }
+    auto& stack_entry = state.stack.back();
+    std::vector<char> bin;
+    insert_sizes(bin, state.bin.data() + stack_entry.byte_position, state.bin.data() + state.bin.size(),
+                 state.size_insertions.data() + stack_entry.size_insertion_index,
+                 state.size_insertions.data() + state.size_insertions.size(), -stack_entry.byte_position);
+    state.bin.resize(stack_entry.byte_position);
+    state.size_insertions.resize(stack_entry.size_insertion_index);
+    if (bin.size() > type->fixed_size)
+        return set_error(state, "data exceeds fixed-size limit (#)");
+    bin.resize(type->fixed_size);
+    state.bin.insert(state.bin.end(), bin.begin(), bin.end());
+    if (trace_jvalue_to_bin)
+        printf("%*s##}\n", int((state.stack.size() - 1) * 4), "");
+    state.stack.pop_back();
+    return true;
 }
 
 ABIEOS_NODISCARD inline bool json_to_bin(pseudo_object*, jvalue_to_bin_state& state, bool allow_extensions,
@@ -2738,7 +2880,15 @@ ABIEOS_NODISCARD inline bool receive_event(struct json_to_bin_state& state, even
         state.stack.clear();
     if (state.stack.size() > max_stack_size)
         return set_error(state, "recursion limit reached");
-    return type->ser && type->ser->json_to_bin(state, entry.allow_extensions, type, event, start);
+    if (!type->ser || !type->ser->json_to_bin(state, entry.allow_extensions, type, event, start))
+        return false;
+    while (!state.stack.empty() && (state.stack.back().type->sized_of || state.stack.back().type->fixed_sized_of)) {
+        auto entry = state.stack.back();
+        auto* type = entry.type;
+        if (!type->ser || !type->ser->json_to_bin(state, entry.allow_extensions, type, event, false))
+            return false;
+    }
+    return true;
 }
 
 ABIEOS_NODISCARD inline bool json_to_bin(std::vector<char>& bin, std::string& error, const abi_type* type,
@@ -2777,13 +2927,8 @@ ABIEOS_NODISCARD inline bool json_to_bin(std::vector<char>& bin, std::string& er
         return false;
     }
 
-    size_t pos = 0;
-    for (auto& insertion : state.size_insertions) {
-        bin.insert(bin.end(), state.bin.begin() + pos, state.bin.begin() + insertion.position);
-        push_varuint32(bin, insertion.size);
-        pos = insertion.position;
-    }
-    bin.insert(bin.end(), state.bin.begin() + pos, state.bin.end());
+    insert_sizes(bin, state.bin.data(), state.bin.data() + state.bin.size(), state.size_insertions.data(),
+                 state.size_insertions.data() + state.size_insertions.size());
     return true;
 }
 
@@ -2802,6 +2947,55 @@ ABIEOS_NODISCARD inline bool json_to_bin(pseudo_extension*, json_to_bin_state& s
                                          const abi_type* type, event_type event, bool) {
     return type->extension_of->ser &&
            type->extension_of->ser->json_to_bin(state, allow_extensions, type->extension_of, event, true);
+}
+
+ABIEOS_NODISCARD inline bool json_to_bin(pseudo_sized*, json_to_bin_state& state, bool, const abi_type* type,
+                                         event_type event, bool start) {
+    if (start) {
+        if (trace_json_to_bin)
+            printf("%*s#{\n", int(state.stack.size() * 4), "");
+        state.stack.push_back({type, true, -1, state.size_insertions.size()});
+        state.size_insertions.push_back({state.bin.size()});
+        return type->sized_of->ser && type->sized_of->ser->json_to_bin(state, true, type->sized_of, event, true);
+    }
+    auto& stack_entry = state.stack.back();
+    auto& insertion = state.size_insertions[stack_entry.size_insertion_index];
+    size_t size = state.bin.size() - insertion.position;
+    for (auto i = stack_entry.size_insertion_index + 1; i < state.size_insertions.size(); ++i)
+        size += varuint32_size(state.size_insertions[i].size);
+    if (size > 0xffff'ffffull)
+        return set_error(state, "sized data is too large");
+    insertion.size = size;
+    if (trace_json_to_bin)
+        printf("%*s#} size=%u\n", int((state.stack.size() - 1) * 4), "", unsigned(insertion.size));
+    state.stack.pop_back();
+    return true;
+}
+
+ABIEOS_NODISCARD inline bool json_to_bin(pseudo_fixed_sized*, json_to_bin_state& state, bool, const abi_type* type,
+                                         event_type event, bool start) {
+    if (start) {
+        if (trace_json_to_bin)
+            printf("%*s##{\n", int(state.stack.size() * 4), "");
+        state.stack.push_back({type, true, -1, state.size_insertions.size(), state.bin.size()});
+        return type->fixed_sized_of->ser &&
+               type->fixed_sized_of->ser->json_to_bin(state, true, type->fixed_sized_of, event, true);
+    }
+    auto& stack_entry = state.stack.back();
+    std::vector<char> bin;
+    insert_sizes(bin, state.bin.data() + stack_entry.byte_position, state.bin.data() + state.bin.size(),
+                 state.size_insertions.data() + stack_entry.size_insertion_index,
+                 state.size_insertions.data() + state.size_insertions.size(), -stack_entry.byte_position);
+    state.bin.resize(stack_entry.byte_position);
+    state.size_insertions.resize(stack_entry.size_insertion_index);
+    if (bin.size() > type->fixed_size)
+        return set_error(state, "data exceeds fixed-size limit (#)");
+    bin.resize(type->fixed_size);
+    state.bin.insert(state.bin.end(), bin.begin(), bin.end());
+    if (trace_json_to_bin)
+        printf("%*s##}\n", int((state.stack.size() - 1) * 4), "");
+    state.stack.pop_back();
+    return true;
 }
 
 ABIEOS_NODISCARD inline bool json_to_bin(pseudo_object*, json_to_bin_state& state, bool allow_extensions,
@@ -2984,6 +3178,52 @@ ABIEOS_NODISCARD inline bool bin_to_json(pseudo_extension*, bin_to_json_state& s
                                          const abi_type* type, bool) {
     return type->extension_of->ser &&
            type->extension_of->ser->bin_to_json(state, allow_extensions, type->extension_of, true);
+}
+
+ABIEOS_NODISCARD inline bool bin_to_json(pseudo_sized*, bin_to_json_state& state, bool allow_extensions,
+                                         const abi_type* type, bool start) {
+    if (start) {
+        if (trace_bin_to_json)
+            printf("%*s#{\n", int(state.stack.size() * 4), "");
+        uint32_t size;
+        if (!read_varuint32(state.bin, state.error, size))
+            return false;
+        auto content_begin = state.bin.pos;
+        if (!skip_raw(state.bin, state.error, size))
+            return false;
+        auto content_end = state.bin.pos;
+        state.stack.push_back({type, true});
+        state.stack.back().saved_bin = state.bin;
+        state.bin = {content_begin, content_end};
+        return type->sized_of->ser && type->sized_of->ser->bin_to_json(state, true, type->sized_of, true);
+    }
+    state.bin = state.stack.back().saved_bin;
+    state.stack.pop_back();
+    if (trace_bin_to_json)
+        printf("%*s#}\n", int((state.stack.size()) * 4), "");
+    return true;
+}
+
+ABIEOS_NODISCARD inline bool bin_to_json(pseudo_fixed_sized*, bin_to_json_state& state, bool allow_extensions,
+                                         const abi_type* type, bool start) {
+    if (start) {
+        if (trace_bin_to_json)
+            printf("%*s##{\n", int(state.stack.size() * 4), "");
+        auto content_begin = state.bin.pos;
+        if (!skip_raw(state.bin, state.error, type->fixed_size))
+            return false;
+        auto content_end = state.bin.pos;
+        state.stack.push_back({type, true});
+        state.stack.back().saved_bin = state.bin;
+        state.bin = {content_begin, content_end};
+        return type->fixed_sized_of->ser &&
+               type->fixed_sized_of->ser->bin_to_json(state, true, type->fixed_sized_of, true);
+    }
+    state.bin = state.stack.back().saved_bin;
+    state.stack.pop_back();
+    if (trace_bin_to_json)
+        printf("%*s##}\n", int((state.stack.size()) * 4), "");
+    return true;
 }
 
 ABIEOS_NODISCARD inline bool bin_to_json(pseudo_object*, bin_to_json_state& state, bool allow_extensions,
