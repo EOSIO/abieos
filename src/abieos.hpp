@@ -1080,15 +1080,8 @@ struct block_timestamp {
     explicit operator std::string() const { return std::string{(time_point)(*this)}; }
 }; // block_timestamp
 
-template <typename S>
-eosio::result<void> from_bin(block_timestamp& obj, S& stream) {
-    return from_bin(obj.slot, stream);
-}
 
-template <typename S>
-eosio::result<void> to_bin(const block_timestamp& obj, S& stream) {
-    return to_bin(obj.slot, stream);
-}
+EOSIO_REFLECT(block_timestamp, slot);
 
 template <typename State>
 ABIEOS_NODISCARD bool json_to_bin(block_timestamp*, State& state, bool, const abi_type*, event_type event, bool start) {
