@@ -526,7 +526,7 @@ result<void> from_json(T& obj, S& stream) {
       result<void> r     = outcome::success();
       for_each_field((T*)nullptr, [&](std::string_view member_name, auto member) {
          if (!found && key == member_name) {
-            r     = from_json(member_from_void(member, &obj), stream);
+            r     = from_json(member(&obj), stream);
             found = true;
          }
       });

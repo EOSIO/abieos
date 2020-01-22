@@ -1,6 +1,7 @@
 #pragma once
 
 #include <eosio/stream.hpp>
+#include <eosio/convert.hpp>
 #include <optional>
 #include <variant>
 
@@ -181,13 +182,19 @@ template <typename T, typename S>
 result<void> from_bin(T& obj, S& stream) {
    if constexpr (has_bitwise_serialization<T>()) {
       return stream.read_raw(obj);
-   } else {
+   } else if constexpr (std::is_same_v<serialization_type<T>, void>) {
       result<void> r = outcome::success();
       for_each_field((T*)nullptr, [&](auto* name, auto member_ptr) {
          if (r)
-            r = from_bin(member_from_void(member_ptr, &obj), stream);
+            r = from_bin(member_ptr(&obj), stream);
       });
       return r;
+   } else {
+      // TODO: This can operate in place for standard serializers
+      decltype(serialize_as(obj)) temp;
+      OUTCOME_TRY(from_bin(temp, stream));
+      convert(temp, obj, choose_first);
+      return outcome::success();
    }
 }
 

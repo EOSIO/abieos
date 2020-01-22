@@ -907,6 +907,11 @@ struct varuint32 {
     explicit operator std::string() const { return std::to_string(value); }
 };
 
+template<typename F>
+void convert(const varuint32& src, uint32_t& dst, F&& chooser) {
+   dst = src.value;
+}
+
 template <typename S>
 eosio::result<void> from_bin(varuint32& obj, S& stream) {
     return varuint32_from_bin(obj.value, stream);

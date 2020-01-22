@@ -67,7 +67,7 @@ namespace eosio { namespace reflection {
 // todo: remove
 #define ABIEOS_BASE(BASE) for_each_field((BASE*)nullptr, f);
 
-#define EOSIO_REFLECT_MEMBER(STRUCT, FIELD) f(#FIELD, eosio::reflection::field_ptr<&STRUCT::FIELD>{});
+#define EOSIO_REFLECT_MEMBER(STRUCT, FIELD) f(#FIELD, [](auto p) -> decltype((p->FIELD)) { return (p->FIELD); });
 
 #define EOSIO_REFLECT_STRIP_BASEbase
 #define EOSIO_REFLECT_BASE(STRUCT, BASE)                                                                               \

@@ -137,7 +137,7 @@ result<void> to_bin(const T& obj, S& stream) {
       result<void> r = outcome::success();
       for_each_field((T*)nullptr, [&](auto* name, auto member_ptr) {
          if (r)
-            r = to_bin(member_from_void(member_ptr, &obj), stream);
+            r = to_bin(member_ptr(&obj), stream);
       });
       return r;
    }
