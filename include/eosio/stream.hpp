@@ -16,6 +16,7 @@ enum class stream_error {
    invalid_varuint_encoding,
    bad_variant_index,
    invalid_asset_format,
+   json_writer_error, // !!!
 }; // stream_error
 } // namespace eosio
 
@@ -41,6 +42,7 @@ class stream_error_category_type : public std::error_category {
          case stream_error::invalid_varuint_encoding: return "Invalid varuint encoding";
          case stream_error::bad_variant_index:        return "Bad variant index";
          case stream_error::invalid_asset_format:     return "Invalid asset format";
+         case stream_error::json_writer_error: return "Error writing json";
             // clang-format on
 
          default: return "unknown";

@@ -15,12 +15,26 @@ enum class from_json_error {
    expected_hex_string,
    hex_string_incorrect_length,
    invalid_signature,
+   invalid_name,
    expected_start_object,
    expected_key,
    expected_end_object,
    expected_start_array,
    expected_end_array,
    expected_positive_uint,
+   expected_field,
+   expected_variant,
+   expected_public_key,
+   expected_private_key,
+   expected_signature,
+   expected_number,
+   expected_int,
+   expected_time_point,
+   expected_symbol_code,
+   expected_symbol,
+   expected_asset,
+   invalid_type_for_variant,
+   unexpected_field,
    from_json_no_pair,
 
    // These are from rapidjson:
@@ -67,12 +81,26 @@ class from_json_error_category_type : public std::error_category {
                case from_json_error::expected_hex_string:                 return "Expected string containing hex";
                case from_json_error::hex_string_incorrect_length:         return "Hex string has incorrect length";
                case from_json_error::invalid_signature:                   return "Invalid signature format";
+               case from_json_error::invalid_name:                        return "Invalid name";
                case from_json_error::expected_start_object:               return "Expected {";
                case from_json_error::expected_key:                        return "Expected key";
                case from_json_error::expected_end_object:                 return "Expected }";
                case from_json_error::expected_start_array:                return "Expected [";
                case from_json_error::expected_end_array:                  return "Expected ]";
                case from_json_error::expected_positive_uint:              return "Expected positive integer";
+               case from_json_error::expected_field:                      return "Expected field";
+               case from_json_error::expected_variant:                    return R"(Expected variant: ["type", value])";
+               case from_json_error::expected_public_key:                 return "Expected public key";
+               case from_json_error::expected_private_key:                return "Expected public key";
+               case from_json_error::expected_signature:                  return "Expected signature";
+               case from_json_error::expected_number:                     return "Expected number or boolean";
+               case from_json_error::expected_int:                        return "Expected integer";
+               case from_json_error::expected_time_point:                 return "Expected time point";
+               case from_json_error::expected_symbol_code:                return "Expected symbol code";
+               case from_json_error::expected_symbol:                     return "Expected symbol";
+               case from_json_error::expected_asset:                      return "Expected asset";
+               case from_json_error::invalid_type_for_variant:            return "Invalid type for variant";
+               case from_json_error::unexpected_field:                    return "Unexpected field";
                case from_json_error::from_json_no_pair:                   return "from_json does not support std::pair";
 
                case from_json_error::document_empty:                      return "The document is empty";

@@ -209,9 +209,8 @@ extern "C" abieos_bool abieos_json_to_bin(abieos_context* context, uint64_t cont
         if (!get_type(t, error, contract_it->second.abi_types, type, 0))
             return set_error(context, error);
         context->result_bin.clear();
-        if (!json_to_bin(context->result_bin, error, t, json)) {
-            if (!error.empty())
-                set_error(context, std::move(error));
+        if (auto result = (json_to_bin(context->result_bin, t, json)); !result) {
+            set_error(context, result.error().message());
             return false;
         }
         return true;
@@ -238,9 +237,8 @@ extern "C" abieos_bool abieos_json_to_bin_reorderable(abieos_context* context, u
                 set_error(context, std::move(error));
             return false;
         }
-        if (!json_to_bin(context->result_bin, error, t, value)) {
-            if (!error.empty())
-                set_error(context, std::move(error));
+        if (auto result = json_to_bin(context->result_bin, t, value); !result) {
+            set_error(context, result.error().message());
             return false;
         }
         return true;
@@ -266,9 +264,8 @@ extern "C" const char* abieos_bin_to_json(abieos_context* context, uint64_t cont
             return nullptr;
         }
         eosio::input_stream bin{data, size};
-        if (!bin_to_json(bin, error, t, context->result_str)) {
-            if (!error.empty())
-                set_error(context, std::move(error));
+        if (auto result = bin_to_json(bin, t, context->result_str); !result) {
+            set_error(context, result.error().message());
             return nullptr;
         }
         if (bin.pos != bin.end)
