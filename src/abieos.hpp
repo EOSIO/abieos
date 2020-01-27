@@ -359,7 +359,7 @@ struct json_to_bin_state : json_reader_handler<json_to_bin_state> {
     json_to_bin_state() = default;
 };
 
-struct bin_to_json_state : json_reader_handler<bin_to_json_state> {
+struct bin_to_json_state {
     eosio::input_stream& bin;
     rapidjson::Writer<rapidjson::StringBuffer>& writer;
     std::vector<bin_to_json_stack_entry> stack{};
