@@ -512,10 +512,10 @@ void check_types() {
                 [&] { return abieos_json_to_bin(context, 0, "varuint32", "-1"); });
     check_error(context, "number is out of range",
                 [&] { return abieos_json_to_bin(context, 0, "varuint32", "4294967296"); });
-    check_type(context, 0, "float32", R"(0.0)");
+    check_type(context, 0, "float32", R"(0.0)", "0");
     check_type(context, 0, "float32", R"(0.125)");
     check_type(context, 0, "float32", R"(-0.125)");
-    check_type(context, 0, "float64", R"(0.0)");
+    check_type(context, 0, "float64", R"(0.0)", "0");
     check_type(context, 0, "float64", R"(0.125)");
     check_type(context, 0, "float64", R"(-0.125)");
     check_type(context, 0, "float128", R"("00000000000000000000000000000000")");

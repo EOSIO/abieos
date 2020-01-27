@@ -3,7 +3,7 @@
 set(CMAKE_OSX_DEPLOYMENT_TARGET 10.14)
 
 cmake_minimum_required (VERSION 3.11)
-project(abieos VERSION 0.1 LANGUAGES CXX)
+project(abieos VERSION 0.1 LANGUAGES CXX C)
 
 set(default_build_type "Release")
 
@@ -31,13 +31,13 @@ Please run the command 'git submodule update --init --recursive'.")
   endif()
 endif()
 
-add_library(abieos MODULE src/abieos.cpp)
+add_library(abieos MODULE src/abieos.cpp include/eosio/fpconv.c)
 target_include_directories(abieos PRIVATE include external/outcome/single-header external/rapidjson/include external/date/include)
 
-add_executable(test src/test.cpp src/abieos.cpp)
+add_executable(test src/test.cpp src/abieos.cpp include/eosio/fpconv.c)
 target_include_directories(test PRIVATE include external/outcome/single-header external/rapidjson/include external/date/include)
 
-add_executable(test-sanitize src/test.cpp src/abieos.cpp)
+add_executable(test-sanitize src/test.cpp src/abieos.cpp include/eosio/fpconv.c)
 target_include_directories(test-sanitize PRIVATE include external/outcome/single-header external/rapidjson/include external/date/include)
 target_link_libraries(test-sanitize -fno-omit-frame-pointer -fsanitize=address,undefined)
 target_compile_options(test-sanitize PUBLIC -fno-omit-frame-pointer -fsanitize=address,undefined)

@@ -26,15 +26,15 @@ result<void> to_json(std::string_view sv, S& stream) {
       }
       if (begin != end) {
          if (*begin == '"') {
-            r = stream.write("\\\"");
+            r = stream.write("\\\"", 2);
             if (!r)
                return r.error();
          } else if (*begin == '\\') {
-            r = stream.write("\\\\");
+            r = stream.write("\\\\", 2);
             if (!r)
                return r.error();
          } else {
-            r = stream.write("\\u00");
+            r = stream.write("\\u00", 4);
             if (!r)
                return r.error();
             r = stream.write(hex_digits[(unsigned char)(*begin) >> 4]);
@@ -73,9 +73,9 @@ result<void> to_json(const shared_memory<std::string_view>& s, S& stream) {
 template <typename S>
 result<void> to_json(bool value, S& stream) {
    if (value)
-      return stream.write("true");
+      return stream.write("true", 4);
    else
-      return stream.write("false");
+      return stream.write("false", 5);
 }
 
 template <typename T, typename S>
@@ -96,7 +96,7 @@ result<void> int_to_json(T value, S& stream) {
    if (sizeof(T) > 4)
       *b.pos++ = '"';
    b.reverse();
-   return stream.write(b.sv());
+   return stream.write(b.data, b.pos - b.data);
 }
 
 template <typename S>
@@ -106,20 +106,20 @@ result<void> fp_to_json(double value, S& stream) {
    if (n <= 0)
       return stream_error::float_error;
    b.pos += n;
-   return stream.write(b);
+   return stream.write(b.data, b.pos - b.data);
 }
 
 // clang-format off
-template <typename S> result<void> int_to_json(uint8_t value, S& stream)   { return int_to_json(value, stream); }
-template <typename S> result<void> int_to_json(uint16_t value, S& stream)  { return int_to_json(value, stream); }
-template <typename S> result<void> int_to_json(uint32_t value, S& stream)  { return int_to_json(value, stream); }
-template <typename S> result<void> int_to_json(uint64_t value, S& stream)  { return int_to_json(value, stream); }
-template <typename S> result<void> int_to_json(int8_t value, S& stream)    { return int_to_json(value, stream); }
-template <typename S> result<void> int_to_json(int16_t value, S& stream)   { return int_to_json(value, stream); }
-template <typename S> result<void> int_to_json(int32_t value, S& stream)   { return int_to_json(value, stream); }
-template <typename S> result<void> int_to_json(int64_t value, S& stream)   { return int_to_json(value, stream); }
-template <typename S> result<void> int_to_json(double value, S& stream)    { return fp_to_json(value, stream); }
-template <typename S> result<void> int_to_json(float value, S& stream)     { return fp_to_json(value, stream); }
+template <typename S> result<void> to_json(uint8_t value, S& stream)   { return int_to_json(value, stream); }
+template <typename S> result<void> to_json(uint16_t value, S& stream)  { return int_to_json(value, stream); }
+template <typename S> result<void> to_json(uint32_t value, S& stream)  { return int_to_json(value, stream); }
+template <typename S> result<void> to_json(uint64_t value, S& stream)  { return int_to_json(value, stream); }
+template <typename S> result<void> to_json(int8_t value, S& stream)    { return int_to_json(value, stream); }
+template <typename S> result<void> to_json(int16_t value, S& stream)   { return int_to_json(value, stream); }
+template <typename S> result<void> to_json(int32_t value, S& stream)   { return int_to_json(value, stream); }
+template <typename S> result<void> to_json(int64_t value, S& stream)   { return int_to_json(value, stream); }
+template <typename S> result<void> to_json(double value, S& stream)    { return fp_to_json(value, stream); }
+template <typename S> result<void> to_json(float value, S& stream)     { return fp_to_json(value, stream); }
 // clang-format on
 
 template <typename T, typename S>
