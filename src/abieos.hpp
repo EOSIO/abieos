@@ -381,11 +381,6 @@ eosio::result<void> json_to_bin(pseudo_array*, json_to_bin_state& state, bool al
 eosio::result<void> json_to_bin(pseudo_variant*, json_to_bin_state& state, bool allow_extensions,
                                 const abi_type* type, event_type event, bool start);
 
-template <typename T>
-auto bin_to_json(T*, bin_to_json_state& state, bool allow_extensions, const abi_type*, bool start)
-    -> std::enable_if_t<std::is_arithmetic_v<T>, eosio::result<void>>;
-eosio::result<void> bin_to_json(std::string*, bin_to_json_state& state, bool allow_extensions, const abi_type*,
-                                bool start);
 eosio::result<void> bin_to_json(pseudo_optional*, bin_to_json_state& state, bool allow_extensions,
                                 const abi_type* type, bool start);
 eosio::result<void> bin_to_json(pseudo_extension*, bin_to_json_state& state, bool allow_extensions,
@@ -543,6 +538,11 @@ eosio::result<void> from_json(fixed_binary<size>& obj, S& stream) {
     return eosio::outcome::success();
 }
 
+template<unsigned size, typename S>
+eosio::result<void> to_json(const fixed_binary<size>& obj, S& stream) {
+    return eosio::to_json_hex((const char*)obj.value.data(), obj.value.size(), stream);
+}
+
 template <typename State, unsigned size>
 eosio::result<void> json_to_bin(fixed_binary<size>*, State& state, bool, const abi_type*, event_type event,
                                   bool start) {
@@ -561,16 +561,6 @@ eosio::result<void> json_to_bin(fixed_binary<size>*, State& state, bool, const a
         return eosio::from_json_error::expected_hex_string;
 }
 
-template <unsigned size>
-inline eosio::result<void> bin_to_json(fixed_binary<size>*, bin_to_json_state& state, bool, const abi_type*,
-                                         bool start) {
-    fixed_binary<size> v;
-    OUTCOME_TRY(state.bin.read(v.value.data(), v.value.size()));
-    std::string result;
-    hex(v.value.begin(), v.value.end(), std::back_inserter(result));
-    return to_json(result, state.writer);
-}
-
 struct uint128 {
     std::array<uint8_t, 16> value{{0}};
 
@@ -580,6 +570,16 @@ struct uint128 {
 template <typename S>
 eosio::result<void> from_bin(uint128& obj, S& stream) {
     return stream.read(obj.value.data(), obj.value.size());
+}
+
+template <typename S>
+eosio::result<void> to_bin(const uint128& obj, S& stream) {
+    return stream.write(obj.value.data(), obj.value.size());
+}
+
+template <typename S>
+eosio::result<void> to_json(const uint128& obj, S& stream) {
+    return to_json(binary_to_decimal(obj.value), stream);
 }
 
 template <typename State>
@@ -598,12 +598,6 @@ eosio::result<void> json_to_bin(uint128*, State& state, bool, const abi_type*, e
         return eosio::from_json_error::expected_positive_uint;
 }
 
-inline eosio::result<void> bin_to_json(uint128*, bin_to_json_state& state, bool, const abi_type*, bool start) {
-    uint128 v;
-    OUTCOME_TRY(from_bin(v, state.bin));
-    return to_json(binary_to_decimal(v.value), state.writer);
-}
-
 struct int128 {
     std::array<uint8_t, 16> value{{0}};
 
@@ -618,6 +612,28 @@ struct int128 {
         return result;
     }
 };
+
+template <typename S>
+eosio::result<void> from_bin(int128& obj, S& stream) {
+    return stream.read(obj.value.data(), obj.value.size());
+}
+
+template <typename S>
+eosio::result<void> to_bin(const int128& obj, S& stream) {
+    return stream.write(obj.value.data(), obj.value.size());
+}
+
+template <typename S>
+eosio::result<void> to_json(const int128& obj, S& stream) {
+    int128 v = obj;
+    bool negative = is_negative(v.value);
+    if (negative)
+        negate(v.value);
+    auto result = binary_to_decimal(v.value);
+    if (negative)
+        result = "-" + result;
+    return to_json(result, stream);
+}
 
 template <typename State>
 eosio::result<void> json_to_bin(int128*, State& state, bool, const abi_type*, event_type event, bool start) {
@@ -642,18 +658,6 @@ eosio::result<void> json_to_bin(int128*, State& state, bool, const abi_type*, ev
         return eosio::outcome::success();
     } else
         return eosio::from_json_error::expected_int;
-}
-
-inline eosio::result<void> bin_to_json(int128*, bin_to_json_state& state, bool, const abi_type*, bool start) {
-    uint128 v;
-    OUTCOME_TRY(from_bin(v, state.bin));
-    bool negative = is_negative(v.value);
-    if (negative)
-        negate(v.value);
-    auto result = binary_to_decimal(v.value);
-    if (negative)
-        result = "-" + result;
-    return to_json(result, state.writer);
 }
 
 template <typename Key, typename S>
@@ -731,6 +735,15 @@ eosio::result<void> to_bin(const public_key& obj, S& stream) {
     return key_to_bin(obj, stream);
 }
 
+template <typename S>
+eosio::result<void> to_json(const public_key& obj, S& stream) {
+    std::string result;
+    std::string error; // !!!
+    if (!public_key_to_string(result, error, obj))
+        return eosio::stream_error::json_writer_error;
+    return to_json(result, stream);
+}
+
 template <typename State>
 eosio::result<void> json_to_bin(public_key*, State& state, bool, const abi_type*, event_type event, bool start) {
     if (event == event_type::received_string) {
@@ -747,16 +760,6 @@ eosio::result<void> json_to_bin(public_key*, State& state, bool, const abi_type*
         return eosio::from_json_error::expected_public_key;
 }
 
-inline eosio::result<void> bin_to_json(public_key*, bin_to_json_state& state, bool, const abi_type*, bool start) {
-    public_key v;
-    OUTCOME_TRY(key_from_bin(v, state.bin));
-    std::string result;
-    std::string error; // !!!
-    if (!public_key_to_string(result, error, v))
-        return eosio::stream_error::json_writer_error;
-    return to_json(result, state.writer);
-}
-
 template <typename S>
 eosio::result<void> from_bin(private_key& obj, S& stream) {
     return key_from_bin(obj, stream);
@@ -765,6 +768,15 @@ eosio::result<void> from_bin(private_key& obj, S& stream) {
 template <typename S>
 eosio::result<void> to_bin(const private_key& obj, S& stream) {
     return key_to_bin(obj, stream);
+}
+
+template <typename S>
+eosio::result<void> to_json(const private_key& obj, S& stream) {
+    std::string result;
+    std::string error; // !!!
+    if (!private_key_to_string(result, error, obj))
+        return eosio::stream_error::json_writer_error;
+    return to_json(result, stream);
 }
 
 template <typename State>
@@ -781,16 +793,6 @@ eosio::result<void> json_to_bin(private_key*, State& state, bool, const abi_type
         return eosio::outcome::success();
     } else
         return eosio::from_json_error::expected_private_key;
-}
-
-inline eosio::result<void> bin_to_json(private_key*, bin_to_json_state& state, bool, const abi_type*, bool start) {
-    private_key v;
-    OUTCOME_TRY(key_from_bin(v, state.bin));
-    std::string result;
-    std::string error; // !!!
-    if (!private_key_to_string(result, error, v))
-        return eosio::stream_error::json_writer_error;
-    return to_json(result, state.writer);
 }
 
 template <typename S>
@@ -815,6 +817,15 @@ eosio::result<void> from_json(signature& obj, S& stream) {
     return eosio::outcome::success();
 }
 
+template <typename S>
+eosio::result<void> to_json(const signature& obj, S& stream) {
+    std::string result;
+    std::string error; // !!!
+    if (!signature_to_string(result, error, obj))
+        return eosio::stream_error::json_writer_error;
+    return to_json(result, stream);
+}
+
 template <typename State>
 eosio::result<void> json_to_bin(signature*, State& state, bool, const abi_type*, event_type event, bool start) {
     if (event == event_type::received_string) {
@@ -831,16 +842,6 @@ eosio::result<void> json_to_bin(signature*, State& state, bool, const abi_type*,
         return eosio::from_json_error::expected_signature;
 }
 
-inline eosio::result<void> bin_to_json(signature*, bin_to_json_state& state, bool, const abi_type*, bool start) {
-    signature v;
-    OUTCOME_TRY(key_from_bin(v, state.bin));
-    std::string result;
-    std::string error; // !!!
-    if (!signature_to_string(result, error, v))
-        return eosio::stream_error::json_writer_error;
-    return to_json(result, state.writer);
-}
-
 using eosio::abieos::name;
 
 template <typename State>
@@ -854,12 +855,6 @@ eosio::result<void> json_to_bin(name*, State& state, bool, const abi_type*, even
         return eosio::outcome::success();
     } else
         return eosio::from_json_error::invalid_name;
-}
-
-inline eosio::result<void> bin_to_json(name*, bin_to_json_state& state, bool, const abi_type*, bool start) {
-    name v;
-    OUTCOME_TRY(from_bin(v, state.bin));
-    return to_json(v, state.writer);
 }
 
 struct varuint32 {
@@ -901,12 +896,6 @@ eosio::result<void> json_to_bin(varuint32*, State& state, bool, const abi_type*,
     return eosio::outcome::success();
 }
 
-inline eosio::result<void> bin_to_json(varuint32*, bin_to_json_state& state, bool, const abi_type*, bool start) {
-    varuint32 v;
-    OUTCOME_TRY(from_bin(v, state.bin));
-    return to_json(v, state.writer);
-}
-
 struct varint32 {
     int32_t value = 0;
 
@@ -917,6 +906,21 @@ inline void push_varint32(std::vector<char>& bin, int32_t v) {
     eosio::push_varuint32(bin, (uint32_t(v) << 1) ^ uint32_t(v >> 31));
 }
 
+template<typename S>
+eosio::result<void> from_bin(varint32& obj, S& stream) {
+    return varint32_from_bin(obj.value, stream);
+}
+
+template<typename S>
+eosio::result<void> to_bin(const varint32& obj, S& stream) {
+    return eosio::varuint32_to_bin((uint32_t(obj.value) << 1) ^ uint32_t(obj.value >> 31), stream);
+}
+
+template<typename S>
+eosio::result<void> to_json(const varint32& obj, S& stream) {
+    return to_json(obj.value, stream);
+}
+
 template <typename State>
 eosio::result<void> json_to_bin(varint32*, State& state, bool, const abi_type*, event_type event, bool start) {
     int32_t x;
@@ -925,11 +929,6 @@ eosio::result<void> json_to_bin(varint32*, State& state, bool, const abi_type*, 
     return eosio::outcome::success();
 }
 
-inline eosio::result<void> bin_to_json(varint32*, bin_to_json_state& state, bool, const abi_type*, bool start) {
-    int32_t v;
-    OUTCOME_TRY(varint32_from_bin(v, state.bin));
-    return to_json(v, state.writer);
-}
 
 struct time_point_sec {
     uint32_t utc_seconds = 0;
@@ -955,6 +954,11 @@ eosio::result<void> to_bin(const time_point_sec& obj, S& stream) {
     return to_bin(obj.utc_seconds, stream);
 }
 
+template <typename S>
+eosio::result<void> to_json(const time_point_sec& obj, S& stream) {
+    return to_json(std::string{obj}, stream);
+}
+
 template <typename State>
 eosio::result<void> json_to_bin(time_point_sec*, State& state, bool, const abi_type*, event_type event, bool start) {
     if (event == event_type::received_string) {
@@ -970,12 +974,6 @@ eosio::result<void> json_to_bin(time_point_sec*, State& state, bool, const abi_t
         return eosio::outcome::success();
     } else
         return eosio::from_json_error::expected_time_point;
-}
-
-inline eosio::result<void> bin_to_json(time_point_sec*, bin_to_json_state& state, bool, const abi_type*, bool start) {
-    time_point_sec v;
-    OUTCOME_TRY(from_bin(v, state.bin));
-    return to_json(std::string{v}, state.writer);
 }
 
 struct time_point {
@@ -1001,6 +999,11 @@ eosio::result<void> to_bin(const time_point& obj, S& stream) {
     return to_bin(obj.microseconds, stream);
 }
 
+template <typename S>
+eosio::result<void> to_json(const time_point& obj, S& stream) {
+    return to_json(std::string{obj}, stream);
+}
+
 template <typename State>
 eosio::result<void> json_to_bin(time_point*, State& state, bool, const abi_type*, event_type event, bool start) {
     if (event == event_type::received_string) {
@@ -1015,12 +1018,6 @@ eosio::result<void> json_to_bin(time_point*, State& state, bool, const abi_type*
         return eosio::outcome::success();
     } else
         return eosio::from_json_error::expected_time_point;
-}
-
-inline eosio::result<void> bin_to_json(time_point*, bin_to_json_state& state, bool, const abi_type*, bool start) {
-    time_point v;
-    OUTCOME_TRY(from_bin(v, state.bin));
-    return to_json(std::string{v}, state.writer);
 }
 
 struct block_timestamp {
@@ -1039,6 +1036,11 @@ struct block_timestamp {
 
 EOSIO_REFLECT(block_timestamp, slot);
 
+template<typename S>
+eosio::result<void> to_json(const block_timestamp& obj, S& stream) {
+    return to_json(std::string{obj}, stream);
+}
+
 template <typename State>
 eosio::result<void> json_to_bin(block_timestamp*, State& state, bool, const abi_type*, event_type event, bool start) {
     if (event == event_type::received_string) {
@@ -1056,13 +1058,6 @@ eosio::result<void> json_to_bin(block_timestamp*, State& state, bool, const abi_
         return eosio::from_json_error::expected_time_point;
 }
 
-inline eosio::result<void> bin_to_json(block_timestamp*, bin_to_json_state& state, bool, const abi_type*,
-                                         bool start) {
-    uint32_t v;
-    OUTCOME_TRY(from_bin(v, state.bin));
-    return to_json(std::string{block_timestamp{v}}, state.writer);
-}
-
 struct symbol_code {
     uint64_t value = 0;
 };
@@ -1070,6 +1065,11 @@ struct symbol_code {
 template <typename S>
 inline eosio::result<void> from_bin(symbol_code& obj, S& stream) {
     return from_bin(obj.value, stream);
+}
+
+template <typename S>
+inline eosio::result<void> to_json(const symbol_code& obj, S& stream) {
+    return to_json(eosio::symbol_code_to_string(obj.value), stream);
 }
 
 template <typename State>
@@ -1087,17 +1087,16 @@ eosio::result<void> json_to_bin(symbol_code*, State& state, bool, const abi_type
         return eosio::from_json_error::expected_symbol_code;
 }
 
-inline eosio::result<void> bin_to_json(symbol_code*, bin_to_json_state& state, bool, const abi_type*, bool start) {
-    symbol_code v;
-    OUTCOME_TRY(from_bin(v, state.bin));
-    return to_json(eosio::symbol_code_to_string(v.value), state.writer);
-}
-
 struct symbol {
     uint64_t value = 0;
 };
 
 EOSIO_REFLECT(symbol, value);
+
+template<typename S>
+inline eosio::result<void> to_json(const symbol& obj, S& stream) {
+    return to_json(eosio::symbol_to_string(obj.value), stream);
+}
 
 template <typename State>
 eosio::result<void> json_to_bin(symbol*, State& state, bool, const abi_type*, event_type event, bool start) {
@@ -1112,12 +1111,6 @@ eosio::result<void> json_to_bin(symbol*, State& state, bool, const abi_type*, ev
         return eosio::outcome::success();
     } else
         return eosio::from_json_error::expected_symbol;
-}
-
-inline eosio::result<void> bin_to_json(symbol*, bin_to_json_state& state, bool, const abi_type*, bool start) {
-    uint64_t v;
-    OUTCOME_TRY(from_bin(v, state.bin));
-    return to_json(eosio::symbol_to_string(v), state.writer);
 }
 
 struct asset {
@@ -1152,6 +1145,11 @@ ABIEOS_NODISCARD inline bool string_to_asset(asset& result, const char* s, const
 
 inline std::string asset_to_string(const asset& v) { return eosio::asset_to_string(v.amount, v.sym.value); }
 
+template<typename S>
+eosio::result<void> to_json(const asset& obj, S& stream) {
+    return to_json(asset_to_string(obj), stream);
+}
+
 template <typename State>
 eosio::result<void> json_to_bin(asset*, State& state, bool, const abi_type*, event_type event, bool start) {
     if (event == event_type::received_string) {
@@ -1166,12 +1164,6 @@ eosio::result<void> json_to_bin(asset*, State& state, bool, const abi_type*, eve
         return eosio::outcome::success();
     } else
       return eosio::from_json_error::expected_asset;
-}
-
-inline eosio::result<void> bin_to_json(asset*, bin_to_json_state& state, bool, const abi_type*, bool start) {
-    asset v{};
-    OUTCOME_TRY(from_bin(v, state.bin));
-    return to_json(asset_to_string(v), state.writer);
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -1797,18 +1789,11 @@ inline eosio::result<void> bin_to_json(pseudo_variant*, bin_to_json_state& state
 }
 
 template <typename T>
-auto bin_to_json(T*, bin_to_json_state& state, bool, const abi_type*, bool start)
-    -> std::enable_if_t<std::is_arithmetic_v<T>, eosio::result<void>> {
-
+auto bin_to_json(T* t, bin_to_json_state& state, bool, const abi_type*, bool start)
+    -> eosio::result<std::void_t<decltype(from_bin(*t, state.bin)), decltype(to_json(*t, state.writer))>> {
     T v;
     OUTCOME_TRY(from_bin(v, state.bin));
     return to_json(v, state.writer);
-}
-
-inline eosio::result<void> bin_to_json(std::string*, bin_to_json_state& state, bool, const abi_type*, bool start) {
-    std::string s;
-    OUTCOME_TRY(from_bin(s, state.bin));
-    return to_json(s, state.writer);
 }
 
 inline namespace literals {
