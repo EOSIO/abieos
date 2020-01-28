@@ -49,6 +49,7 @@ void test(const T& value, eosio::abi& abi) {
 
    {
       // Get the ABI
+      using eosio::get_type_name;
       const eosio::abi_type* type = abi.get_type(get_type_name((T*)nullptr)).value();
 
       // bin_to_json
@@ -72,6 +73,20 @@ int main() {
    eosio::abi_def def = eosio::from_json<eosio::abi_def>(stream).value();
    eosio::abi abi;
    CHECK(convert(def, abi));
+   test(true, abi);
+   test(false, abi);
+   for(int i = -128; i <= 127; ++i) {
+      test(static_cast<std::int8_t>(i), abi);
+   }
+   for(int i = 0; i <= 255; ++i) {
+      test(static_cast<std::uint8_t>(i), abi);
+   }
+   for(int i = -32768; i <= 32767; ++i) {
+      test(static_cast<std::int16_t>(i), abi);
+   }
+   for(int i = 0; i <= 65535; ++i) {
+      test(static_cast<std::uint16_t>(i), abi);
+   }
    test(abieos::name("eosio"), abi);
    test(abieos::name(), abi);
    if(error_count) return 1;

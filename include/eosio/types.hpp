@@ -4,6 +4,12 @@
 
 namespace eosio {
 
+inline constexpr const char* get_type_name(bool*) { return "bool"; }
+inline constexpr const char* get_type_name(int8_t*) { return "int8"; }
+inline constexpr const char* get_type_name(uint8_t*) { return "uint8"; }
+inline constexpr const char* get_type_name(int16_t*) { return "int16"; }
+inline constexpr const char* get_type_name(uint16_t*) { return "uint16"; }
+
 namespace abieos {
 
 struct name {

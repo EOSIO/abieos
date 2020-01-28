@@ -388,7 +388,7 @@ result<void> from_json(std::string& result, S& stream) {
 
 /// \exclude
 template <typename T, typename S>
-result<void> from_json_uint(T& result, S& stream) {
+result<void> from_json_int(T& result, S& stream) {
    auto r = stream.get_string();
    if (!r)
       return r.error();
@@ -396,8 +396,13 @@ result<void> from_json_uint(T& result, S& stream) {
    auto end   = pos + r.value().size();
    bool found = false;
    result     = 0;
+   int sign = 1;
+   if(std::is_signed_v<T> && pos != end && *pos == '-') {
+      sign = -1;
+      ++pos;
+   }
    while (pos != end && *pos >= '0' && *pos <= '9') {
-      result = result * 10 + *pos++ - '0';
+      result = result * 10 + (*pos++ - '0') * sign;
       found  = true;
    }
    if (pos != end || !found)
@@ -408,25 +413,49 @@ result<void> from_json_uint(T& result, S& stream) {
 /// \group from_json_explicit
 template <typename S>
 result<void> from_json(uint8_t& result, S& stream) {
-   return from_json_uint(result, stream);
+   return from_json_int(result, stream);
 }
 
 /// \group from_json_explicit
 template <typename S>
 result<void> from_json(uint16_t& result, S& stream) {
-   return from_json_uint(result, stream);
+   return from_json_int(result, stream);
 }
 
 /// \group from_json_explicit
 template <typename S>
 result<void> from_json(uint32_t& result, S& stream) {
-   return from_json_uint(result, stream);
+   return from_json_int(result, stream);
 }
 
 /// \group from_json_explicit
 template <typename S>
 result<void> from_json(uint64_t& result, S& stream) {
-   return from_json_uint(result, stream);
+   return from_json_int(result, stream);
+}
+
+/// \group from_json_explicit
+template <typename S>
+result<void> from_json(int8_t& result, S& stream) {
+   return from_json_int(result, stream);
+}
+
+/// \group from_json_explicit
+template <typename S>
+result<void> from_json(int16_t& result, S& stream) {
+   return from_json_int(result, stream);
+}
+
+/// \group from_json_explicit
+template <typename S>
+result<void> from_json(int32_t& result, S& stream) {
+   return from_json_int(result, stream);
+}
+
+/// \group from_json_explicit
+template <typename S>
+result<void> from_json(int64_t& result, S& stream) {
+   return from_json_int(result, stream);
 }
 
 /*
