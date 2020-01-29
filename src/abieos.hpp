@@ -516,6 +516,8 @@ using checksum160 = fixed_binary<20>;
 using checksum256 = fixed_binary<32>;
 using checksum512 = fixed_binary<64>;
 
+inline constexpr const char* get_type_name(float128*) { return "float128"; }
+
 template <unsigned size, typename S>
 eosio::result<void> from_bin(fixed_binary<size>& obj, S& stream) {
     return stream.read(obj.value.data(), size);
@@ -528,7 +530,7 @@ eosio::result<void> to_bin(const fixed_binary<size>& obj, S& stream) {
 
 template <unsigned size, typename S>
 eosio::result<void> from_json(fixed_binary<size>& obj, S& stream) {
-    std::vector<uint8_t> v;
+    std::vector<char> v;
     auto r = eosio::from_json_hex(v, stream);
     if (!r)
         return r;

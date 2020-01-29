@@ -548,10 +548,7 @@ result<void> from_json(std::vector<T>& result, S& stream) {
 /// \group from_json_explicit
 template <typename S>
 result<void> from_json_hex(std::vector<char>& result, S& stream) {
-   auto r = stream.get_string();
-   if (!r)
-      return r.error();
-   auto& s = r.value().get();
+   OUTCOME_TRY(s, stream.get_string());
    if (s.size() & 1)
       return from_json_error::expected_hex_string;
    result.clear();
