@@ -77,6 +77,8 @@ void test_int(eosio::abi& abi) {
 
 using abieos::int128;
 using abieos::uint128;
+using abieos::varint32;
+using abieos::varuint32;
 
 int main() {
    eosio::json_token_stream stream(empty_abi);
@@ -111,6 +113,30 @@ int main() {
    test(uint128{0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF}, abi);
    test(uint128{0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0x7F}, abi);
    test(uint128{0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x80}, abi);
+   test(varuint32{0}, abi);
+   test(varuint32{1}, abi);
+   test(varuint32{0xFFFFFFFFu}, abi);
+   test(varint32{0}, abi);
+   test(varint32{1}, abi);
+   test(varint32{-1}, abi);
+   test(varint32{0x7FFFFFFF}, abi);
+   test(varint32{std::numeric_limits<int32_t>::min()}, abi);
+   test(0.0f, abi);
+   test(1.0f, abi);
+   test(-1.0f, abi);
+   test(std::numeric_limits<float>::min(), abi);
+   test(std::numeric_limits<float>::max(), abi);
+   test(std::numeric_limits<float>::infinity(), abi);
+   test(-std::numeric_limits<float>::infinity(), abi);
+   // nans are not equal
+   // test(std::numeric_limits<float>::quiet_NaN(), abi);
+   test(0.0, abi);
+   test(1.0, abi);
+   test(-1.0, abi);
+   test(std::numeric_limits<double>::min(), abi);
+   test(std::numeric_limits<double>::max(), abi);
+   test(std::numeric_limits<double>::infinity(), abi);
+   test(-std::numeric_limits<double>::infinity(), abi);
    test(abieos::name("eosio"), abi);
    test(abieos::name(), abi);
    if(error_count) return 1;

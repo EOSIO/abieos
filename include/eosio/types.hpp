@@ -13,6 +13,8 @@ inline constexpr const char* get_type_name(int32_t*) { return "int32"; }
 inline constexpr const char* get_type_name(uint32_t*) { return "uint32"; }
 inline constexpr const char* get_type_name(int64_t*) { return "int64"; }
 inline constexpr const char* get_type_name(uint64_t*) { return "uint64"; }
+inline constexpr const char* get_type_name(float*) { return "float32"; }
+inline constexpr const char* get_type_name(double*) { return "float64"; }
 
 namespace abieos {
 

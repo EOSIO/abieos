@@ -3,6 +3,7 @@
 #include <eosio/eosio_outcome.hpp>
 #include <rapidjson/reader.h>
 #include <vector>
+#include <cstdlib>
 
 namespace eosio {
 enum class from_json_error {
@@ -456,6 +457,32 @@ result<void> from_json(int32_t& result, S& stream) {
 template <typename S>
 result<void> from_json(int64_t& result, S& stream) {
    return from_json_int(result, stream);
+}
+
+template<typename S>
+result<void> from_json(float& result, S& stream) {
+   OUTCOME_TRY(sv, stream.get_string());
+   if (sv.empty()) return from_json_error::expected_number;
+   std::string s(sv); // strtof expects a null-terminated string
+   errno = 0;
+   char* end;
+   result = std::strtof(s.c_str(), &end);
+   if (errno || end != s.c_str() + s.size())
+      return from_json_error::expected_number;
+   return outcome::success();
+}
+
+template<typename S>
+result<void> from_json(double& result, S& stream) {
+   OUTCOME_TRY(sv, stream.get_string());
+   if (sv.empty()) return from_json_error::expected_number;
+   std::string s(sv);
+   errno = 0;
+   char* end;
+   result = std::strtod(s.c_str(), &end);
+   if (errno || end != s.c_str() + s.size())
+      return from_json_error::expected_number;
+   return outcome::success();
 }
 
 /*

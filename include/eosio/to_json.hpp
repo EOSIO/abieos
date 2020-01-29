@@ -2,6 +2,8 @@
 
 #include <eosio/fpconv.h>
 #include <eosio/stream.hpp>
+#include <cmath>
+#include <limits>
 
 namespace eosio {
 
@@ -101,6 +103,14 @@ result<void> int_to_json(T value, S& stream) {
 
 template <typename S>
 result<void> fp_to_json(double value, S& stream) {
+   // fpconv is not quite consistent with javascript for nans and infinities
+   if (value == std::numeric_limits<double>::infinity()) {
+      return stream.write("\"Infinity\"", 10);
+   } else if (value == -std::numeric_limits<double>::infinity()) {
+      return stream.write("\"-Infinity\"", 11);
+   } else if(std::isnan(value)) {
+      return stream.write("\"NaN\"", 5);
+   }
    small_buffer<std::numeric_limits<double>::digits10 + 2> b;
    int                                                     n = fpconv_dtoa(value, b.pos);
    if (n <= 0)
