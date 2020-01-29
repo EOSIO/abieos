@@ -80,6 +80,9 @@ using abieos::uint128;
 using abieos::varint32;
 using abieos::varuint32;
 using abieos::float128;
+using abieos::time_point;
+using abieos::time_point_sec;
+using abieos::block_timestamp;
 
 int main() {
    eosio::json_token_stream stream(empty_abi);
@@ -141,6 +144,20 @@ int main() {
    test(float128{0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00}, abi);
    test(float128{0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x80}, abi);
    test(float128{0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF}, abi);
+   for(uint64_t i = 0; i < 10000; ++i) {
+      test(time_point{i * 1000}, abi);
+   }
+   // This is the largest time that can be parsed by the current implementation,
+   // because of the dependency on time_point_sec.
+   test(time_point{0xFFFFFFFFull * 1000000}, abi);
+   for(uint32_t i = 0; i < 10000; ++i) {
+      test(time_point_sec{i}, abi);
+   }
+   test(time_point_sec{0xFFFFFFFFu}, abi);
+   for(uint32_t i = 0; i < 10000; ++i) {
+      test(block_timestamp{i}, abi);
+   }
+   test(block_timestamp{0xFFFFFFFFu}, abi);
    test(abieos::name("eosio"), abi);
    test(abieos::name(), abi);
    if(error_count) return 1;

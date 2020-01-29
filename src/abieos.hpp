@@ -991,6 +991,9 @@ ABIEOS_NODISCARD inline bool string_to_time_point_sec(time_point_sec& result, st
         return set_error(error, "expected string containing time_point_sec");
 }
 
+inline constexpr const char* get_type_name(time_point_sec*) { return "time_point_sec"; }
+inline constexpr bool operator==(const time_point_sec& lhs, const time_point_sec& rhs) { return lhs.utc_seconds == rhs.utc_seconds; }
+
 template <typename S>
 eosio::result<void> from_bin(time_point_sec& obj, S& stream) {
     return from_bin(obj.utc_seconds, stream);
@@ -999,6 +1002,15 @@ eosio::result<void> from_bin(time_point_sec& obj, S& stream) {
 template <typename S>
 eosio::result<void> to_bin(const time_point_sec& obj, S& stream) {
     return to_bin(obj.utc_seconds, stream);
+}
+
+template<typename S>
+eosio::result<void> from_json(time_point_sec& obj, S& stream) {
+    OUTCOME_TRY(s, stream.get_string());
+    const char * p = s.data();
+    if (!eosio::string_to_utc_seconds(obj.utc_seconds, p, s.data() + s.size(), true, true))
+        return eosio::from_json_error::expected_time_point;
+    return eosio::outcome::success();
 }
 
 template <typename S>
@@ -1029,12 +1041,15 @@ struct time_point {
     explicit operator std::string() const { return eosio::microseconds_to_str(microseconds); }
 };
 
-ABIEOS_NODISCARD inline bool string_to_time_point(time_point& dest, std::string& error, const std::string& s) {
+ABIEOS_NODISCARD inline bool string_to_time_point(time_point& dest, std::string& error, std::string_view s) {
     if (eosio::string_to_utc_microseconds(dest.microseconds, s.data(), s.data() + s.size()))
         return true;
     else
         return set_error(error, "expected string containing time_point");
 }
+
+inline constexpr const char* get_type_name(time_point*) { return "time_point"; }
+inline constexpr bool operator==(const time_point& lhs, const time_point& rhs) { return lhs.microseconds == rhs.microseconds; }
 
 template <typename S>
 eosio::result<void> from_bin(time_point& obj, S& stream) {
@@ -1044,6 +1059,15 @@ eosio::result<void> from_bin(time_point& obj, S& stream) {
 template <typename S>
 eosio::result<void> to_bin(const time_point& obj, S& stream) {
     return to_bin(obj.microseconds, stream);
+}
+
+template<typename S>
+eosio::result<void> from_json(time_point& obj, S& stream) {
+   OUTCOME_TRY(s, stream.get_string());
+   std::string error; // !!!
+   if (!string_to_time_point(obj, error, s))
+      return eosio::from_json_error::expected_time_point;
+   return eosio::outcome::success();
 }
 
 template <typename S>
@@ -1080,12 +1104,22 @@ struct block_timestamp {
     explicit operator std::string() const { return std::string{(time_point)(*this)}; }
 }; // block_timestamp
 
+inline constexpr bool operator==(const block_timestamp& lhs, const block_timestamp& rhs) { return lhs.slot == rhs.slot; }
 
-EOSIO_REFLECT(block_timestamp, slot);
+using block_timestamp_type = block_timestamp;
+EOSIO_REFLECT(block_timestamp_type, slot);
+
+template<typename S>
+eosio::result<void> from_json(block_timestamp& obj, S& stream) {
+    time_point tp;
+    OUTCOME_TRY(from_json(tp, stream));
+    obj = block_timestamp(tp);
+    return eosio::outcome::success();
+}
 
 template<typename S>
 eosio::result<void> to_json(const block_timestamp& obj, S& stream) {
-    return to_json(std::string{obj}, stream);
+    return to_json(time_point(obj), stream);
 }
 
 template <typename State>

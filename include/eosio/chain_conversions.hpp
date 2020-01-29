@@ -105,7 +105,7 @@ inline std::string microseconds_to_str(uint64_t microseconds) {
    std::chrono::microseconds us{ microseconds };
    date::sys_days            sd(std::chrono::floor<date::days>(us));
    auto                      ymd = date::year_month_day{ sd };
-   uint32_t                  ms  = (std::chrono::round<std::chrono::milliseconds>(us) - sd.time_since_epoch()).count();
+   uint32_t                  ms  = (std::chrono::floor<std::chrono::milliseconds>(us) - sd.time_since_epoch()).count();
    us -= sd.time_since_epoch();
    append_uint((int)ymd.year(), 4);
    result.push_back('-');
