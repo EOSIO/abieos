@@ -567,6 +567,10 @@ struct uint128 {
     explicit operator std::string() const { return binary_to_decimal(value); }
 };
 
+inline constexpr const char* get_type_name(uint128*) { return "uint128"; }
+
+inline bool operator==(const uint128& lhs, const uint128& rhs) { return lhs.value == rhs.value; }
+
 template <typename S>
 eosio::result<void> from_bin(uint128& obj, S& stream) {
     return stream.read(obj.value.data(), obj.value.size());
@@ -575,6 +579,15 @@ eosio::result<void> from_bin(uint128& obj, S& stream) {
 template <typename S>
 eosio::result<void> to_bin(const uint128& obj, S& stream) {
     return stream.write(obj.value.data(), obj.value.size());
+}
+
+template <typename S>
+eosio::result<void> from_json(uint128& obj, S& stream) {
+    OUTCOME_TRY(s, stream.get_string());
+    std::string error; // !!!
+    if (!decimal_to_binary<16>(obj.value, error, s))
+        return eosio::from_json_error::expected_positive_uint;
+    return eosio::outcome::success();
 }
 
 template <typename S>
@@ -589,7 +602,7 @@ eosio::result<void> json_to_bin(uint128*, State& state, bool, const abi_type*, e
         if (trace_json_to_bin)
             printf("%*suint128\n", int(state.stack.size() * 4), "");
         std::array<uint8_t, 16> value;
-        std::string error;
+        std::string error; // !!!
         if (!decimal_to_binary<16>(value, error, s))
             return eosio::from_json_error::expected_positive_uint;
         push_raw(state.bin, value);
@@ -613,6 +626,9 @@ struct int128 {
     }
 };
 
+inline constexpr const char* get_type_name(int128*) { return "int128"; }
+inline bool operator==(const int128& lhs, const int128& rhs) { return lhs.value == rhs.value; }
+
 template <typename S>
 eosio::result<void> from_bin(int128& obj, S& stream) {
     return stream.read(obj.value.data(), obj.value.size());
@@ -621,6 +637,24 @@ eosio::result<void> from_bin(int128& obj, S& stream) {
 template <typename S>
 eosio::result<void> to_bin(const int128& obj, S& stream) {
     return stream.write(obj.value.data(), obj.value.size());
+}
+
+template <typename S>
+eosio::result<void> from_json(int128& obj, S& stream) {
+    OUTCOME_TRY(s, stream.get_string());
+    bool negative = false;
+    if (!s.empty() && s[0] == '-') {
+        negative = true;
+        s = s.substr(1);
+    }
+    std::string error; // !!!
+    if (!decimal_to_binary<16>(obj.value, error, s))
+        return eosio::from_json_error::expected_int;
+    if (negative)
+        negate(obj.value);
+    if (is_negative(obj.value) != negative)
+        return eosio::from_json_error::expected_int;
+    return eosio::outcome::success();
 }
 
 template <typename S>

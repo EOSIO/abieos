@@ -9,6 +9,10 @@ inline constexpr const char* get_type_name(int8_t*) { return "int8"; }
 inline constexpr const char* get_type_name(uint8_t*) { return "uint8"; }
 inline constexpr const char* get_type_name(int16_t*) { return "int16"; }
 inline constexpr const char* get_type_name(uint16_t*) { return "uint16"; }
+inline constexpr const char* get_type_name(int32_t*) { return "int32"; }
+inline constexpr const char* get_type_name(uint32_t*) { return "uint32"; }
+inline constexpr const char* get_type_name(int64_t*) { return "int64"; }
+inline constexpr const char* get_type_name(uint64_t*) { return "uint64"; }
 
 namespace abieos {
 
