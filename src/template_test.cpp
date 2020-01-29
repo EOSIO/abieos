@@ -83,6 +83,7 @@ using abieos::float128;
 using abieos::time_point;
 using abieos::time_point_sec;
 using abieos::block_timestamp;
+using abieos::bytes;
 
 int main() {
    eosio::json_token_stream stream(empty_abi);
@@ -160,5 +161,8 @@ int main() {
    test(block_timestamp{0xFFFFFFFFu}, abi);
    test(abieos::name("eosio"), abi);
    test(abieos::name(), abi);
+   test(bytes(), abi);
+   test(bytes{{0, 0, 0, 0}}, abi);
+   test(bytes{{'\xff', '\xff', '\xff', '\xff'}}, abi);
    if(error_count) return 1;
 }

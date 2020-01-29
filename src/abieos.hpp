@@ -432,6 +432,9 @@ struct bytes {
     std::vector<char> data;
 };
 
+inline constexpr const char* get_type_name(bytes*) { return "bytes"; }
+inline bool operator==(const bytes& lhs, const bytes& rhs) { return lhs.data == rhs.data; }
+
 template <typename S>
 eosio::result<void> from_bin(bytes& obj, S& stream) {
     return from_bin(obj.data, stream);
@@ -464,6 +467,11 @@ eosio::result<void> to_bin(const input_buffer& obj, S& stream) {
 template <typename S>
 eosio::result<void> from_json(bytes& obj, S& stream) {
     return eosio::from_json_hex(obj.data, stream);
+}
+
+template <typename S>
+eosio::result<void> to_json(const bytes& obj, S& stream) {
+    return eosio::to_json_hex(obj.data.data(), obj.data.size(), stream);
 }
 
 template <typename State>
