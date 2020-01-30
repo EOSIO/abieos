@@ -32,6 +32,9 @@ endif()
 add_library(abieos MODULE src/abieos.cpp)
 target_include_directories(abieos PRIVATE external/rapidjson/include external/date/include)
 
+add_library(abieos_headers INTERFACE)
+target_include_directories(abieos_headers INTERFACE src external/date/include external/rapidjson/include)
+
 add_executable(test src/test.cpp src/abieos.cpp)
 target_include_directories(test PRIVATE external/rapidjson/include external/date/include)
 
