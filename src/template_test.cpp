@@ -89,6 +89,10 @@ using abieos::bytes;
 using abieos::checksum160;
 using abieos::checksum256;
 using abieos::checksum512;
+using abieos::key_type;
+using abieos::public_key;
+using abieos::private_key;
+using abieos::signature;
 
 int main() {
    eosio::json_token_stream stream(empty_abi);
@@ -181,5 +185,10 @@ int main() {
                     0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
                     0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
                     0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF}, abi);
+   test(public_key{key_type::k1, std::vector<uint8_t>(33, 1)}, abi);
+   test(public_key{key_type::r1, std::vector<uint8_t>(33, 1)}, abi);
+   test(private_key{key_type::r1, std::vector<uint8_t>(32, 1)}, abi);
+   test(signature{key_type::k1, std::vector<uint8_t>(65, 1)}, abi);
+   test(signature{key_type::r1, std::vector<uint8_t>(65, 1)}, abi);
    if(error_count) return 1;
 }

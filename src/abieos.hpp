@@ -707,6 +707,15 @@ eosio::result<void> json_to_bin(int128*, State& state, bool, const abi_type*, ev
         return eosio::from_json_error::expected_int;
 }
 
+inline constexpr const char* get_type_name(public_key*) { return "public_key"; }
+inline bool operator==(const public_key& lhs, const public_key& rhs) { return lhs.type == rhs.type && lhs.data == rhs.data; }
+
+inline constexpr const char* get_type_name(private_key*) { return "private_key"; }
+inline bool operator==(const private_key& lhs, const private_key& rhs) { return lhs.type == rhs.type && lhs.data == rhs.data; }
+
+inline constexpr const char* get_type_name(signature*) { return "signature"; }
+inline bool operator==(const signature& lhs, const signature& rhs) { return lhs.type == rhs.type && lhs.data == rhs.data; }
+
 template <typename Key, typename S>
 eosio::result<void> key_from_bin(Key& obj, S& stream) {
     auto r = stream.read_raw(obj.type);
@@ -783,6 +792,15 @@ eosio::result<void> to_bin(const public_key& obj, S& stream) {
 }
 
 template <typename S>
+eosio::result<void> from_json(public_key& obj, S& stream) {
+    OUTCOME_TRY(s, stream.get_string());
+    std::string error; // !!!
+    if (!string_to_public_key(obj, error, s))
+        return eosio::from_json_error::expected_public_key;
+    return eosio::outcome::success();
+}
+
+template <typename S>
 eosio::result<void> to_json(const public_key& obj, S& stream) {
     std::string result;
     std::string error; // !!!
@@ -815,6 +833,15 @@ eosio::result<void> from_bin(private_key& obj, S& stream) {
 template <typename S>
 eosio::result<void> to_bin(const private_key& obj, S& stream) {
     return key_to_bin(obj, stream);
+}
+
+template <typename S>
+eosio::result<void> from_json(private_key& obj, S& stream) {
+    OUTCOME_TRY(s, stream.get_string());
+    std::string error;
+    if (!string_to_private_key(obj, error, s))
+        return eosio::from_json_error::expected_private_key;
+    return eosio::outcome::success();
 }
 
 template <typename S>
