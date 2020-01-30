@@ -1318,6 +1318,8 @@ ABIEOS_NODISCARD inline bool receive_event(struct json_to_jvalue_state& state, e
 ABIEOS_NODISCARD inline bool json_to_jvalue(jvalue& value, std::string& error, std::string_view json) {
     std::string mutable_json{json};
     mutable_json.push_back(0);
+    mutable_json.push_back(0);
+    mutable_json.push_back(0);
     json_to_jvalue_state state{error};
     state.stack.push_back({&value});
     rapidjson::Reader reader;
@@ -1574,6 +1576,8 @@ ABIEOS_NODISCARD inline bool receive_event(struct json_to_bin_state& state, even
 
 inline eosio::result<void> json_to_bin(std::vector<char>& bin, const abi_type* type, std::string_view json) {
     std::string mutable_json{json};
+    mutable_json.push_back(0);
+    mutable_json.push_back(0);
     mutable_json.push_back(0);
     json_to_bin_state state;
     state.stack.push_back({type, true});
