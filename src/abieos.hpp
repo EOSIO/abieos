@@ -1181,9 +1181,15 @@ struct symbol_code {
     uint64_t value = 0;
 };
 
+inline constexpr bool operator==(const symbol_code& lhs, const symbol_code& rhs) { return lhs.value == rhs.value; }
+EOSIO_REFLECT(symbol_code, value);
+
 template <typename S>
-inline eosio::result<void> from_bin(symbol_code& obj, S& stream) {
-    return from_bin(obj.value, stream);
+inline eosio::result<void> from_json(symbol_code& obj, S& stream) {
+    OUTCOME_TRY(s, stream.get_string());
+    if (!eosio::string_to_symbol_code(obj.value, s.data(), s.data() + s.size()))
+        return eosio::from_json_error::expected_symbol_code;
+    return eosio::outcome::success();
 }
 
 template <typename S>
@@ -1210,7 +1216,16 @@ struct symbol {
     uint64_t value = 0;
 };
 
+inline constexpr bool operator==(const symbol& lhs, const symbol& rhs) { return lhs.value == rhs.value; }
 EOSIO_REFLECT(symbol, value);
+
+template<typename S>
+inline eosio::result<void> from_json(symbol& obj, S& stream) {
+    OUTCOME_TRY(s, stream.get_string());
+    if (!eosio::string_to_symbol(obj.value, s.data(), s.data() + s.size()))
+        return eosio::from_json_error::expected_symbol;
+    return eosio::outcome::success();
+}
 
 template<typename S>
 inline eosio::result<void> to_json(const symbol& obj, S& stream) {
