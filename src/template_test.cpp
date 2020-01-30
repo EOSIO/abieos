@@ -95,6 +95,7 @@ using abieos::private_key;
 using abieos::signature;
 using abieos::symbol;
 using abieos::symbol_code;
+using abieos::asset;
 
 int main() {
    eosio::json_token_stream stream(empty_abi);
@@ -194,5 +195,6 @@ int main() {
    test(signature{key_type::r1, std::vector<uint8_t>(65, 1)}, abi);
    test(symbol{unsigned('ZYX\x08')}, abi);
    test(symbol_code{unsigned('ZYXW')}, abi);
+   test(asset{5, {'ZYX\x08'}}, abi);
    if(error_count) return 1;
 }

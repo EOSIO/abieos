@@ -1252,6 +1252,8 @@ struct asset {
     symbol sym{};
 };
 
+inline constexpr bool operator==(const asset& lhs, const asset& rhs) { return lhs.amount == rhs.amount && lhs.sym == rhs.sym; }
+
 EOSIO_REFLECT(asset, amount, sym);
 
 inline eosio::result<void> from_string(asset& result, eosio::input_stream& stream) {
@@ -1278,6 +1280,14 @@ ABIEOS_NODISCARD inline bool string_to_asset(asset& result, const char* s, const
 }
 
 inline std::string asset_to_string(const asset& v) { return eosio::asset_to_string(v.amount, v.sym.value); }
+
+template<typename S>
+eosio::result<void> from_json(asset& obj, S& stream) {
+    OUTCOME_TRY(s, stream.get_string());
+    if (!string_to_asset(obj, s.data(), s.data() + s.size()))
+        return eosio::from_json_error::expected_asset;
+    return eosio::outcome::success();
+}
 
 template<typename S>
 eosio::result<void> to_json(const asset& obj, S& stream) {
