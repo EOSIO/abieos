@@ -1,6 +1,7 @@
 #include <eosio/from_json.hpp>
 #include <eosio/reflection.hpp>
 #include <eosio/chain_conversions.hpp>
+#include <string>
 
 namespace eosio {
 
@@ -15,6 +16,7 @@ inline constexpr const char* get_type_name(int64_t*) { return "int64"; }
 inline constexpr const char* get_type_name(uint64_t*) { return "uint64"; }
 inline constexpr const char* get_type_name(float*) { return "float32"; }
 inline constexpr const char* get_type_name(double*) { return "float64"; }
+inline constexpr const char* get_type_name(std::string*) { return "string"; }
 
 namespace abieos {
 

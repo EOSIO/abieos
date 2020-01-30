@@ -164,5 +164,10 @@ int main() {
    test(bytes(), abi);
    test(bytes{{0, 0, 0, 0}}, abi);
    test(bytes{{'\xff', '\xff', '\xff', '\xff'}}, abi);
+   using namespace std::literals::string_literals;
+   test(""s, abi);
+   test("\0"s, abi);
+   // test("\xff"s, abi); // invalid utf8 doesn't round-trip
+   test("abcdefghijklmnopqrstuvwxyz"s, abi);
    if(error_count) return 1;
 }

@@ -2,6 +2,7 @@
 
 #include <eosio/fpconv.h>
 #include <eosio/stream.hpp>
+#include <rapidjson/encodings.h>
 #include <cmath>
 #include <limits>
 
@@ -9,7 +10,23 @@ namespace eosio {
 
 inline constexpr char hex_digits[] = "0123456789ABCDEF";
 
-// todo: use hex if content isn't valid utf-8
+
+// Adaptors for rapidjson
+struct stream_adaptor {
+   stream_adaptor(const char* src, int sz) {
+      int chars = std::min(sz, 4);
+      memcpy(buf, src, chars);
+      memset(buf + chars, 0, 4 - chars);
+   }
+   void Put(char ch) {}
+   char Take() {
+      return buf[idx++];
+   }
+   char buf[4];
+   int idx = 0;
+};
+
+// Replaces any invalid utf-8 bytes with ?
 template <typename S>
 result<void> to_json(std::string_view sv, S& stream) {
    auto r = stream.write('"');
@@ -21,10 +38,16 @@ result<void> to_json(std::string_view sv, S& stream) {
       auto pos = begin;
       while (pos != end && *pos != '"' && *pos != '\\' && (unsigned char)(*pos) >= 32 && *pos != 127) ++pos;
       if (begin != pos) {
-         r = stream.write(begin, size_t(pos - begin));
-         if (!r)
-            return r.error();
-         begin = pos;
+         while(begin != end) {
+            stream_adaptor s2(begin, static_cast<std::size_t>(pos - begin));
+            if(rapidjson::UTF8<>::Validate(s2, s2)) {
+               OUTCOME_TRY(stream.write(begin, s2.idx));
+               begin += s2.idx;
+            } else {
+               ++begin;
+               OUTCOME_TRY(stream.write('?'));
+            }
+         }
       }
       if (begin != end) {
          if (*begin == '"') {
