@@ -525,6 +525,9 @@ using checksum256 = fixed_binary<32>;
 using checksum512 = fixed_binary<64>;
 
 inline constexpr const char* get_type_name(float128*) { return "float128"; }
+inline constexpr const char* get_type_name(checksum160*) { return "checksum160"; }
+inline constexpr const char* get_type_name(checksum256*) { return "checksum256"; }
+inline constexpr const char* get_type_name(checksum512*) { return "checksum512"; }
 
 template <unsigned size, typename S>
 eosio::result<void> from_bin(fixed_binary<size>& obj, S& stream) {
