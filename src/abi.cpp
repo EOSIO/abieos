@@ -13,8 +13,8 @@ bool ends_with(const std::string& s, const char (&suffix)[i]) {
 template <typename T>
 struct abi_serializer_impl : abi_serializer {
     result<void> json_to_bin(::abieos::jvalue_to_bin_state& state, bool allow_extensions, const abi_type* type,
-                             ::abieos::event_type event, bool start) const override {
-        return ::abieos::json_to_bin((T*)nullptr, state, allow_extensions, type, event, start);
+                             bool start) const override {
+        return ::abieos::json_to_bin((T*)nullptr, state, allow_extensions, type, start);
     }
     result<void> json_to_bin(::abieos::json_to_bin_state& state, bool allow_extensions, const abi_type* type,
                              bool start) const override {
