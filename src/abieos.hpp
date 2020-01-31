@@ -9,6 +9,7 @@
 #include <eosio/to_bin.hpp>
 #include <eosio/to_json.hpp>
 #include <eosio/abi.hpp>
+#include <eosio/operators.hpp>
 
 #ifdef EOSIO_CDT_COMPILATION
 #include <cwchar>
@@ -402,13 +403,8 @@ struct bytes {
     std::vector<char> data;
 };
 
-inline constexpr const char* get_type_name(bytes*) { return "bytes"; }
-inline bool operator==(const bytes& lhs, const bytes& rhs) { return lhs.data == rhs.data; }
-
-template <typename S>
-eosio::result<void> from_bin(bytes& obj, S& stream) {
-    return from_bin(obj.data, stream);
-}
+EOSIO_REFLECT(bytes, data);
+EOSIO_COMPARE(bytes);
 
 template <typename S>
 eosio::result<void> from_bin(input_buffer& obj, S& stream) {
@@ -422,11 +418,6 @@ eosio::result<void> from_bin(input_buffer& obj, S& stream) {
         return r;
     obj = {buf, buf + size};
     return eosio::outcome::success();
-}
-
-template <typename S>
-eosio::result<void> to_bin(const bytes& obj, S& stream) {
-    return to_bin(obj.data, stream);
 }
 
 template <typename S>
@@ -861,18 +852,8 @@ ABIEOS_NODISCARD inline bool string_to_time_point_sec(time_point_sec& result, st
         return set_error(error, "expected string containing time_point_sec");
 }
 
-inline constexpr const char* get_type_name(time_point_sec*) { return "time_point_sec"; }
-inline constexpr bool operator==(const time_point_sec& lhs, const time_point_sec& rhs) { return lhs.utc_seconds == rhs.utc_seconds; }
-
-template <typename S>
-eosio::result<void> from_bin(time_point_sec& obj, S& stream) {
-    return from_bin(obj.utc_seconds, stream);
-}
-
-template <typename S>
-eosio::result<void> to_bin(const time_point_sec& obj, S& stream) {
-    return to_bin(obj.utc_seconds, stream);
-}
+EOSIO_REFLECT(time_point_sec, utc_seconds);
+EOSIO_COMPARE(time_point_sec);
 
 template<typename S>
 eosio::result<void> from_json(time_point_sec& obj, S& stream) {
@@ -901,18 +882,8 @@ ABIEOS_NODISCARD inline bool string_to_time_point(time_point& dest, std::string&
         return set_error(error, "expected string containing time_point");
 }
 
-inline constexpr const char* get_type_name(time_point*) { return "time_point"; }
-inline constexpr bool operator==(const time_point& lhs, const time_point& rhs) { return lhs.microseconds == rhs.microseconds; }
-
-template <typename S>
-eosio::result<void> from_bin(time_point& obj, S& stream) {
-    return from_bin(obj.microseconds, stream);
-}
-
-template <typename S>
-eosio::result<void> to_bin(const time_point& obj, S& stream) {
-    return to_bin(obj.microseconds, stream);
-}
+EOSIO_REFLECT(time_point, microseconds);
+EOSIO_COMPARE(time_point);
 
 template<typename S>
 eosio::result<void> from_json(time_point& obj, S& stream) {
@@ -941,10 +912,9 @@ struct block_timestamp {
     explicit operator std::string() const { return std::string{(time_point)(*this)}; }
 }; // block_timestamp
 
-inline constexpr bool operator==(const block_timestamp& lhs, const block_timestamp& rhs) { return lhs.slot == rhs.slot; }
-
 using block_timestamp_type = block_timestamp;
 EOSIO_REFLECT(block_timestamp_type, slot);
+EOSIO_COMPARE(block_timestamp_type);
 
 template<typename S>
 eosio::result<void> from_json(block_timestamp& obj, S& stream) {
@@ -963,8 +933,8 @@ struct symbol_code {
     uint64_t value = 0;
 };
 
-inline constexpr bool operator==(const symbol_code& lhs, const symbol_code& rhs) { return lhs.value == rhs.value; }
 EOSIO_REFLECT(symbol_code, value);
+EOSIO_COMPARE(symbol_code);
 
 template <typename S>
 inline eosio::result<void> from_json(symbol_code& obj, S& stream) {
@@ -983,8 +953,8 @@ struct symbol {
     uint64_t value = 0;
 };
 
-inline constexpr bool operator==(const symbol& lhs, const symbol& rhs) { return lhs.value == rhs.value; }
 EOSIO_REFLECT(symbol, value);
+EOSIO_COMPARE(symbol);
 
 template<typename S>
 inline eosio::result<void> from_json(symbol& obj, S& stream) {
@@ -1004,9 +974,8 @@ struct asset {
     symbol sym{};
 };
 
-inline constexpr bool operator==(const asset& lhs, const asset& rhs) { return lhs.amount == rhs.amount && lhs.sym == rhs.sym; }
-
 EOSIO_REFLECT(asset, amount, sym);
+EOSIO_COMPARE(asset);
 
 inline eosio::result<void> from_string(asset& result, eosio::input_stream& stream) {
     int64_t amount;
