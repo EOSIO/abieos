@@ -36,6 +36,7 @@ enum class from_json_error {
    expected_asset,
    invalid_type_for_variant,
    unexpected_field,
+   number_out_of_range,
    from_json_no_pair,
 
    // These are from rapidjson:
@@ -102,6 +103,7 @@ class from_json_error_category_type : public std::error_category {
                case from_json_error::expected_asset:                      return "Expected asset";
                case from_json_error::invalid_type_for_variant:            return "Invalid type for variant";
                case from_json_error::unexpected_field:                    return "Unexpected field";
+               case from_json_error::number_out_of_range:                 return "number is out of range";
                case from_json_error::from_json_no_pair:                   return "from_json does not support std::pair";
 
                case from_json_error::document_empty:                      return "The document is empty";
@@ -390,24 +392,33 @@ result<void> from_json(std::string& result, S& stream) {
 /// \exclude
 template <typename T, typename S>
 result<void> from_json_int(T& result, S& stream) {
-   auto r = stream.get_string();
-   if (!r)
-      return r.error();
-   auto pos   = r.value().data();
-   auto end   = pos + r.value().size();
+   OUTCOME_TRY(r, stream.get_string());
+   auto pos   = r.data();
+   auto end   = pos + r.size();
    bool found = false;
    result     = 0;
-   int sign = 1;
+   T limit;
+   T sign;
    if(std::is_signed_v<T> && pos != end && *pos == '-') {
-      sign = -1;
       ++pos;
+      sign = -1;
+      limit = std::numeric_limits<T>::min();
+   } else {
+      sign = 1;
+      limit = std::numeric_limits<T>::max();
    }
    while (pos != end && *pos >= '0' && *pos <= '9') {
-      result = result * 10 + (*pos++ - '0') * sign;
+      T digit = (*pos++ - '0');
+      // abs(result) can overflow.  Use -abs(result) instead.
+      if(std::is_signed_v<T> && (-sign*limit + digit)/10 > -sign*result)
+         return from_json_error::number_out_of_range;
+      if(!std::is_signed_v<T> && (limit - digit)/10 < result)
+         return from_json_error::number_out_of_range;
+      result = result * 10 + sign*digit;
       found  = true;
    }
    if (pos != end || !found)
-      return from_json_error::expected_positive_uint;
+      return from_json_error::expected_int;
    return outcome::success();
 }
 

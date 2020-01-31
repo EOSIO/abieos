@@ -17,8 +17,8 @@ struct abi_serializer_impl : abi_serializer {
         return ::abieos::json_to_bin((T*)nullptr, state, allow_extensions, type, event, start);
     }
     result<void> json_to_bin(::abieos::json_to_bin_state& state, bool allow_extensions, const abi_type* type,
-                             ::abieos::event_type event, bool start) const override {
-        return ::abieos::json_to_bin((T*)nullptr, state, allow_extensions, type, event, start);
+                             bool start) const override {
+        return ::abieos::json_to_bin((T*)nullptr, state, allow_extensions, type, start);
     }
     result<void> bin_to_json(::abieos::bin_to_json_state& state, bool allow_extensions, const abi_type* type,
                              bool start) const override {

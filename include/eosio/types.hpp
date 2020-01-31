@@ -42,8 +42,7 @@ EOSIO_REFLECT(name, value);
 template<typename S>
 result<void> from_json(name& obj, S& stream) {
     OUTCOME_TRY(r, stream.get_string());
-    if(!eosio::string_to_name_strict(r, obj.value))
-        return from_json_error::invalid_name;
+    obj = name(r);
     return eosio::outcome::success();
 }
 

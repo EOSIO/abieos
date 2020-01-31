@@ -84,7 +84,7 @@ ABIEOS_NODISCARD inline auto decimal_to_binary(T& result, std::string& error, st
         if (src_digit < '0' || src_digit > '9')
             return set_error(error, "invalid number");
         T x = result * 10 + src_digit - '0';
-        if (x < result)
+        if (x < result) // This test is wrong.  It's only valid for addition, not multiplication.
             return set_error(error, "number is out of range");
         result = x;
     }
