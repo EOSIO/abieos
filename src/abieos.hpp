@@ -538,8 +538,7 @@ eosio::result<void> to_bin(const uint128& obj, S& stream) {
 template <typename S>
 eosio::result<void> from_json(uint128& obj, S& stream) {
     OUTCOME_TRY(s, stream.get_string());
-    std::string error; // !!!
-    if (!decimal_to_binary<16>(obj.value, error, s))
+    if (!decimal_to_binary<16>(obj.value, s))
         return eosio::from_json_error::expected_positive_uint;
     return eosio::outcome::success();
 }
@@ -585,8 +584,7 @@ eosio::result<void> from_json(int128& obj, S& stream) {
         negative = true;
         s = s.substr(1);
     }
-    std::string error; // !!!
-    if (!decimal_to_binary<16>(obj.value, error, s))
+    if (!decimal_to_binary<16>(obj.value, s))
         return eosio::from_json_error::expected_int;
     if (negative)
         negate(obj.value);

@@ -7,6 +7,8 @@
 #include <stdint.h>
 #include <string>
 #include <string_view>
+#include <eosio/eosio_outcome.hpp>
+#include <eosio/from_json.hpp>
 
 #include "abieos_ripemd160.hpp"
 
@@ -54,12 +56,12 @@ void negate(std::array<uint8_t, size>& a) {
 }
 
 template <auto size>
-ABIEOS_NODISCARD inline bool decimal_to_binary(std::array<uint8_t, size>& result, std::string& error,
-                                               std::string_view s) {
+ABIEOS_NODISCARD inline eosio::result<void> decimal_to_binary(std::array<uint8_t, size>& result,
+                                                              std::string_view s) {
     memset(result.begin(), 0, result.size());
     for (auto& src_digit : s) {
         if (src_digit < '0' || src_digit > '9')
-            return set_error(error, "invalid number");
+            return eosio::from_json_error::expected_int;
         uint8_t carry = src_digit - '0';
         for (auto& result_byte : result) {
             int x = result_byte * 10 + carry;
@@ -67,53 +69,9 @@ ABIEOS_NODISCARD inline bool decimal_to_binary(std::array<uint8_t, size>& result
             carry = x >> 8;
         }
         if (carry)
-            return set_error(error, "number is out of range");
+            return eosio::from_json_error::number_out_of_range;
     }
-    return true;
-}
-
-template <typename T>
-ABIEOS_NODISCARD inline auto decimal_to_binary(T& result, std::string& error, std::string_view s)
-    -> std::enable_if_t<std::is_unsigned_v<T>, bool> {
-    result = 0;
-    if (s.empty())
-        return set_error(error, "expected number");
-    if (s[0] == '-')
-        return set_error(error, "expected non-negative number");
-    for (auto& src_digit : s) {
-        if (src_digit < '0' || src_digit > '9')
-            return set_error(error, "invalid number");
-        T x = result * 10 + src_digit - '0';
-        if (x < result) // This test is wrong.  It's only valid for addition, not multiplication.
-            return set_error(error, "number is out of range");
-        result = x;
-    }
-    return true;
-}
-
-template <typename T>
-ABIEOS_NODISCARD inline auto decimal_to_binary(T& result, std::string& error, std::string_view s)
-    -> std::enable_if_t<std::is_signed_v<T>, bool> {
-    bool neg = false;
-    if (!s.empty() && s[0] == '-') {
-        neg = true;
-        s.remove_prefix(1);
-        if (s.empty() || s[0] == '-')
-            return set_error(error, "invalid number");
-    }
-    std::make_unsigned_t<T> u;
-    if (!decimal_to_binary(u, error, s))
-        return false;
-    if (neg) {
-        result = -u;
-        if (result > 0)
-            return set_error(error, "number is out of range");
-    } else {
-        result = u;
-        if (result < 0)
-            return set_error(error, "number is out of range");
-    }
-    return true;
+    return eosio::outcome::success();
 }
 
 template <auto size>
