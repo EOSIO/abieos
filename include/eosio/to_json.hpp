@@ -2,6 +2,7 @@
 
 #include <eosio/fpconv.h>
 #include <eosio/stream.hpp>
+#include <eosio/for_each_field.hpp>
 #include <rapidjson/encodings.h>
 #include <cmath>
 #include <limits>

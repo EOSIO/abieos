@@ -1,6 +1,7 @@
 #pragma once
 
 #include <eosio/eosio_outcome.hpp>
+#include <eosio/for_each_field.hpp>
 #include <rapidjson/reader.h>
 #include <vector>
 #include <cstdlib>
@@ -616,7 +617,7 @@ result<void> from_json(T& obj, S& stream) {
    return from_json_object(stream, [&](std::string_view key) -> result<void> {
       bool         found = false;
       result<void> r     = outcome::success();
-      for_each_field((T*)nullptr, [&](std::string_view member_name, auto member) {
+      for_each_field<T>([&](std::string_view member_name, auto member) {
          if (!found && key == member_name) {
             r     = from_json(member(&obj), stream);
             found = true;

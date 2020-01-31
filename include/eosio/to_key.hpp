@@ -34,9 +34,9 @@ result<void> to_key(const T& obj, S& stream) {
       return stream.write_raw(v);
    } else {
       result<void> r = outcome::success();
-      for_each_field((T*)nullptr, [&](auto* name, auto member_ptr) {
+      for_each_field(obj, [&](const auto& member) {
          if (r)
-            r = to_key(member_from_void(member_ptr, &obj), stream);
+            r = to_key(member, stream);
       });
       return r;
    }

@@ -5,6 +5,7 @@
 #include <optional>
 #include <type_traits>
 #include <utility>
+#include <eosio/for_each_field.hpp>
 
 namespace eosio {
    struct no_conversion { using reverse = no_conversion; };
@@ -49,7 +50,7 @@ namespace eosio {
          dst = src;
       } else {
          static_assert(!std::is_same_v<conversion_kind_t<T, U>, no_conversion>, "Conversion not defined");
-         for_each_field(chooser((T*)nullptr, (U*)nullptr), [&](const char*, auto field) {
+         for_each_field<std::decay_t<decltype(*chooser((T*)nullptr, (U*)nullptr))>>([&](const char*, auto field) {
             convert_impl(field, src, dst, chooser, 0);
          });
       }

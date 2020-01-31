@@ -1,6 +1,7 @@
 #pragma once
 
 #include <eosio/stream.hpp>
+#include <eosio/for_each_field.hpp>
 #include <optional>
 #include <variant>
 
@@ -135,9 +136,9 @@ result<void> to_bin(const T& obj, S& stream) {
       return stream.write_raw(obj);
    } else {
       result<void> r = outcome::success();
-      for_each_field((T*)nullptr, [&](auto* name, auto member_ptr) {
+      for_each_field(obj, [&](auto& member) {
          if (r)
-            r = to_bin(member_ptr(&obj), stream);
+            r = to_bin(member, stream);
       });
       return r;
    }

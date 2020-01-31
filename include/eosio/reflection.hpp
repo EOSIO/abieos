@@ -5,35 +5,6 @@
 
 namespace eosio { namespace reflection {
 
-   template <auto P>
-   struct field_ptr;
-
-   template <class C, typename M>
-   const C* class_from_void(M C::*, const void* v) {
-      return reinterpret_cast<const C*>(v);
-   }
-
-   template <class C, typename M>
-   C* class_from_void(M C::*, void* v) {
-      return reinterpret_cast<C*>(v);
-   }
-
-   template <auto P>
-   auto& member_from_void(const field_ptr<P>&, const void* p) {
-      return class_from_void(P, p)->*P;
-   }
-
-   template <auto P>
-   auto& member_from_void(const field_ptr<P>&, void* p) {
-      return class_from_void(P, p)->*P;
-   }
-
-   template <auto P>
-   struct field_ptr {
-      using member_type = std::decay_t<decltype(member_from_void(std::declval<field_ptr<P>>(), std::declval<void*>()))>;
-      static constexpr member_type* null = nullptr;
-   };
-
    template <typename T>
    struct has_for_each_field {
     private:
@@ -43,7 +14,7 @@ namespace eosio { namespace reflection {
       };
 
       template <typename C>
-      static char test(decltype(for_each_field((C*)nullptr, F{}))*);
+      static char test(decltype(eosio_for_each_field((C*)nullptr, F{}))*);
 
       template <typename C>
       static long test(...);
@@ -55,30 +26,18 @@ namespace eosio { namespace reflection {
    template <typename T>
    inline constexpr bool has_for_each_field_v = has_for_each_field<T>::value;
 
-// todo: remove
-#define ABIEOS_REFLECT(STRUCT)                                                                                         \
-   inline const char* get_type_name(STRUCT*) { return #STRUCT; }                                                       \
-   template <typename F>                                                                                               \
-   constexpr void for_each_field(STRUCT*, F f)
-
-// todo: remove
-#define ABIEOS_MEMBER(STRUCT, FIELD) f(#FIELD, eosio::reflection::field_ptr<&STRUCT::FIELD>{});
-
-// todo: remove
-#define ABIEOS_BASE(BASE) for_each_field((BASE*)nullptr, f);
-
 #define EOSIO_REFLECT_MEMBER(STRUCT, FIELD) f(#FIELD, [](auto p) -> decltype((p->FIELD)) { return (p->FIELD); });
 
 #define EOSIO_REFLECT_STRIP_BASEbase
 #define EOSIO_REFLECT_BASE(STRUCT, BASE)                                                                               \
      static_assert(std::is_base_of_v<EOSIO_REFLECT_STRIP_BASE ## BASE, STRUCT>,                                        \
                    #BASE " is not a base class of " #STRUCT);                                                          \
-     for_each_field((EOSIO_REFLECT_STRIP_BASE ## BASE*)nullptr, f);
+     eosio_for_each_field((EOSIO_REFLECT_STRIP_BASE ## BASE*)nullptr, f);
 
 #define EOSIO_REFLECT_SIGNATURE(STRUCT, ...)                                                                           \
    inline const char* get_type_name(STRUCT*) { return #STRUCT; }                                                       \
    template <typename F>                                                                                               \
-   constexpr void for_each_field(STRUCT*, F f)
+   constexpr void eosio_for_each_field(STRUCT*, F f)
 
 /**
  * EOSIO_REFLECT(<struct>, <member or base spec>...)

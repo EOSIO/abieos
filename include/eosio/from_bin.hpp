@@ -2,6 +2,7 @@
 
 #include <eosio/stream.hpp>
 #include <eosio/convert.hpp>
+#include <eosio/for_each_field.hpp>
 #include <optional>
 #include <variant>
 
@@ -184,9 +185,9 @@ result<void> from_bin(T& obj, S& stream) {
       return stream.read_raw(obj);
    } else if constexpr (std::is_same_v<serialization_type<T>, void>) {
       result<void> r = outcome::success();
-      for_each_field((T*)nullptr, [&](auto* name, auto member_ptr) {
+      for_each_field(obj, [&](auto& member) {
          if (r)
-            r = from_bin(member_ptr(&obj), stream);
+            r = from_bin(member, stream);
       });
       return r;
    } else {

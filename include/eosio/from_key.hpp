@@ -22,9 +22,9 @@ result<void> from_key(T& obj, S& stream) {
       return outcome::success();
    } else {
       result<void> r = outcome::success();
-      for_each_field((T*)nullptr, [&](auto* name, auto member_ptr) {
+      for_each_field(obj, [&](auto& member) {
          if (r)
-            r = from_key(member_from_void(member_ptr, &obj), stream);
+            r = from_key(member, stream);
       });
       return r;
    }

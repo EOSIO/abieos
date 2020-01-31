@@ -1,5 +1,7 @@
 #pragma once
 
+#include <eosio/for_each_field.hpp>
+
 namespace eosio { namespace operators {
 
 // Defines comparison operators for a reflected struct
@@ -16,7 +18,7 @@ namespace eosio { namespace operators {
    template <typename T>
    auto operator==(const T& lhs, const T& rhs) -> decltype(eosio_enable_comparison(lhs)) {
       bool result = true;
-      for_each_field((T*)nullptr, [&](const char*, auto&& member) { result = result && (member(&lhs) == member(&rhs)); });
+      for_each_field<T>([&](const char*, auto&& member) { result = result && (member(&lhs) == member(&rhs)); });
       return result;
    }
    template <typename T>
@@ -40,7 +42,7 @@ namespace eosio { namespace operators {
    template <typename T>
    auto eosio_compare(const T& lhs, const T& rhs) -> decltype((eosio_enable_comparison(lhs), 0)) {
       int result = 0;
-      for_each_field((T*)nullptr, [&](const char*, auto&& member) {
+      for_each_field<T>([&](const char*, auto&& member) {
          if (!result) {
             using internal_use_do_not_use::eosio_compare;
             result = eosio_compare(member(&lhs), member(&rhs));
