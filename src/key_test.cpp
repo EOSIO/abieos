@@ -66,6 +66,16 @@ void test_compare() {
    test_key(int32_t(0), int32_t(1));
    test_key(int32_t(0), int32_t(-1));
    test_key(int32_t(0x7F000000), int32_t(0x100000FF));
+   test_key(0.f, -0.f);
+   test_key(1.f, 0.f);
+   test_key(-std::numeric_limits<float>::infinity(), 0.f);
+   test_key(std::numeric_limits<float>::infinity(), 0.f);
+   test_key(-std::numeric_limits<float>::infinity(), std::numeric_limits<float>::infinity());
+   test_key(0., -0.);
+   test_key(1., 0.);
+   test_key(-std::numeric_limits<double>::infinity(), 0.);
+   test_key(std::numeric_limits<double>::infinity(), 0.);
+   test_key(-std::numeric_limits<double>::infinity(), std::numeric_limits<double>::infinity());
 }
 
 int main() {

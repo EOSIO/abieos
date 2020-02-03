@@ -28,12 +28,33 @@ result<void> to_key(const std::tuple<Ts...>& obj, S& stream) {
 
 template <typename S>
 result<void> to_key(bool obj, S& stream) {
-   return stream.write(static_cast<char>(obj? 1 : 0));
+   return stream.write(static_cast<char>(obj ? 1 : 0));
+}
+
+template <typename UInt, typename T>
+UInt float_to_key(T value) {
+   static_assert(sizeof(T) == sizeof(UInt), "Expected unsigned int of the same size");
+   UInt result;
+   std::memcpy(&result, &value, sizeof(T));
+   UInt signbit = (static_cast<UInt>(1) << (std::numeric_limits<UInt>::digits - 1));
+   UInt mask    = 0;
+   if (result == signbit)
+      result = 0;
+   if (result & signbit)
+      mask = ~mask;
+   return result ^ (mask | signbit);
 }
 
 template <typename T, typename S>
 result<void> to_key(const T& obj, S& stream) {
-   if constexpr (std::is_arithmetic_v<T>) {
+   if constexpr (std::is_floating_point_v<T>) {
+      if constexpr (sizeof(T) == 4) {
+         return to_key(float_to_key<uint32_t>(obj), stream);
+      } else {
+         static_assert(sizeof(T) == 8, "Unknown floating point type");
+         return to_key(float_to_key<uint64_t>(obj), stream);
+      }
+   } else if constexpr (std::is_integral_v<T>) {
       auto v = static_cast<std::make_unsigned_t<T>>(obj);
       v -= static_cast<std::make_unsigned_t<T>>(std::numeric_limits<T>::min());
       std::reverse(reinterpret_cast<char*>(&v), reinterpret_cast<char*>(&v + 1));
