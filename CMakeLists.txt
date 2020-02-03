@@ -40,6 +40,9 @@ target_include_directories(test PRIVATE include external/outcome/single-header e
 add_executable(template_test src/template_test.cpp src/abieos.cpp src/abi.cpp include/eosio/fpconv.c)
 target_include_directories(template_test PRIVATE include external/outcome/single-header external/rapidjson/include external/date/include)
 
+add_executable(key_test src/key_test.cpp src/abieos.cpp src/abi.cpp include/eosio/fpconv.c)
+target_include_directories(key_test PRIVATE include external/outcome/single-header external/rapidjson/include external/date/include)
+
 add_executable(test-sanitize src/test.cpp src/abieos.cpp src/abi.cpp include/eosio/fpconv.c)
 target_include_directories(test-sanitize PRIVATE include external/outcome/single-header external/rapidjson/include external/date/include)
 target_link_libraries(test-sanitize -fno-omit-frame-pointer -fsanitize=address,undefined)

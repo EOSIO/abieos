@@ -26,10 +26,16 @@ result<void> to_key(const std::tuple<Ts...>& obj, S& stream) {
    return to_key_tuple<0>(obj, stream);
 }
 
+template <typename S>
+result<void> to_key(bool obj, S& stream) {
+   return stream.write(static_cast<char>(obj? 1 : 0));
+}
+
 template <typename T, typename S>
 result<void> to_key(const T& obj, S& stream) {
    if constexpr (std::is_arithmetic_v<T>) {
-      T v = obj;
+      auto v = static_cast<std::make_unsigned_t<T>>(obj);
+      v -= static_cast<std::make_unsigned_t<T>>(std::numeric_limits<T>::min());
       std::reverse(reinterpret_cast<char*>(&v), reinterpret_cast<char*>(&v + 1));
       return stream.write_raw(v);
    } else {
