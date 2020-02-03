@@ -97,11 +97,19 @@ using abieos::symbol;
 using abieos::symbol_code;
 using abieos::asset;
 
+using vec_type = std::vector<int>;
+struct struct_type {
+   vec_type v;
+};
+EOSIO_REFLECT(struct_type, v);
+EOSIO_COMPARE(struct_type);
+
 int main() {
    eosio::json_token_stream stream(empty_abi);
    eosio::abi_def def = eosio::from_json<eosio::abi_def>(stream).value();
    eosio::abi abi;
    CHECK(convert(def, abi));
+   CHECK(abi.add_type<struct_type>());
    test(true, abi);
    test(false, abi);
    for(int i = -128; i <= 127; ++i) {
@@ -196,5 +204,6 @@ int main() {
    test(symbol{unsigned('ZYX\x08')}, abi);
    test(symbol_code{unsigned('ZYXW')}, abi);
    test(asset{5, {'ZYX\x08'}}, abi);
+   test(struct_type{}, abi);
    if(error_count) return 1;
 }

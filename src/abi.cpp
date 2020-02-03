@@ -226,3 +226,9 @@ result<void> eosio::convert(const abi_def& abi, eosio::abi& c) {
     }
     return outcome::success();
 }
+
+extern const abi_serializer* const eosio::object_abi_serializer = &abi_serializer_for< ::abieos::pseudo_object>;
+extern const abi_serializer* const eosio::variant_abi_serializer = &abi_serializer_for< ::abieos::pseudo_variant>;
+extern const abi_serializer* const eosio::array_abi_serializer = &abi_serializer_for< ::abieos::pseudo_array>;
+extern const abi_serializer* const eosio::extension_abi_serializer = &abi_serializer_for< ::abieos::pseudo_extension>;
+extern const abi_serializer* const eosio::optional_abi_serializer = &abi_serializer_for< ::abieos::pseudo_optional>;

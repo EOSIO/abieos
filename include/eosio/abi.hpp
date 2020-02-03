@@ -200,8 +200,109 @@ struct abi {
     std::map<abieos::name, std::string> table_types;
     std::map<std::string, abi_type> abi_types;
     result<const abi_type*> get_type(const std::string& name);
+
+    // Adds a type to the abi.  Has no effect if the type is already present.
+    // If the type is a struct, all members will be added recursively.
+    // Exception Safety: basic. If add_type fails, some objects may have
+    // an incomplete list of fields.
+    template<typename T>
+    result<abi_type*> add_type();
 };
 
 result<void> convert(const abi_def& def, abi&);
+
+extern const abi_serializer* const object_abi_serializer;
+extern const abi_serializer* const variant_abi_serializer;
+extern const abi_serializer* const array_abi_serializer;
+extern const abi_serializer* const extension_abi_serializer;
+extern const abi_serializer* const optional_abi_serializer;
+
+template<typename T>
+auto add_type(abi& a, T*) -> std::enable_if_t<reflection::has_for_each_field_v<T>, result<abi_type*>> {
+   std::string name = get_type_name((T*)nullptr);
+   auto [iter, inserted] = a.abi_types.try_emplace(name, name, abi_type::struct_{}, object_abi_serializer);
+   if(!inserted)
+      return &iter->second;
+   auto& s = std::get<abi_type::struct_>(iter->second._data);
+   result<void> okay = outcome::success();
+   for_each_field<T>([&](const char* name, auto&& member){
+      if(okay) {
+         auto member_type = a.add_type<std::decay_t<decltype(member((T*)nullptr))>>();
+         if(member_type) {
+            s.fields.push_back({name, member_type.value()});
+         } else {
+            okay = member_type.error();
+         }
+      }
+   });
+   return &iter->second;
+}
+
+template<typename T>
+auto add_type(abi& a, T* t) -> std::enable_if_t<!reflection::has_for_each_field_v<T>, result<abi_type*>> {
+   auto iter = a.abi_types.find(get_type_name(t));
+   if(iter != a.abi_types.end()) return &iter->second;
+   else return abi_error::unknown_type;
+}
+
+template<typename T>
+result<abi_type*> add_type(abi& a, std::vector<T>*) {
+   OUTCOME_TRY(element_type, a.add_type<T>());
+   if (element_type->optional_of() || element_type->array_of() || element_type->extension_of())
+      return abi_error::invalid_nesting;
+   std::string name = element_type->name + "[]";
+   auto [iter, inserted] = a.abi_types.try_emplace(name, name, abi_type::array{element_type}, array_abi_serializer);
+   return &iter->second;
+}
+
+template<typename... T>
+result<abi_type*> add_type(abi& a, std::variant<T...>*) {
+   abi_type::variant types;
+   result<void> okay = outcome::success();
+   ([&](auto* t) {
+      if(okay) {
+         if(auto type = add_type(a, t)) {
+            types.push_back({type.value()->name, type.value()});
+         } else {
+            okay = type.error();
+         }
+      }
+   }((T*)nullptr), ...);
+   OUTCOME_TRY(okay);
+   std::string name = "variant";
+   for(auto& [name, t] : types) {
+      name += '_';
+      name += t->name;
+   }
+
+   auto [iter, inserted] = a.abi_types.try_emplace(name, name, std::move(types), variant_abi_serializer);
+   return &iter->second;
+}
+
+template<typename T>
+result<abi_type*> add_type(abi& a, std::optional<T>*) {
+   OUTCOME_TRY(element_type, a.add_type<T>());
+   if (element_type->optional_of() || element_type->array_of() || element_type->extension_of())
+      return abi_error::invalid_nesting;
+   std::string name = element_type->name + "?";
+   auto [iter, inserted] = a.abi_types.try_emplace(name, name, abi_type::optional{element_type}, optional_abi_serializer);
+   return &iter->second;
+}
+
+template<typename T>
+result<abi_type*> add_type(abi& a, might_not_exist<T>*) {
+   OUTCOME_TRY(element_type, a.add_type<T>());
+   if (element_type->extension_of())
+      return abi_error::invalid_nesting;
+   std::string name = element_type->name + "$";
+   auto [iter, inserted] = a.abi_types.try_emplace(name, name, abi_type::extension{element_type}, extension_abi_serializer);
+   return &iter->second;
+}
+
+template<typename T>
+result<abi_type*> abi::add_type() {
+   using eosio::add_type;
+   return add_type(*this, (T*)nullptr);
+}
 
 }

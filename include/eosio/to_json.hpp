@@ -1,16 +1,15 @@
 #pragma once
 
+#include <cmath>
+#include <eosio/for_each_field.hpp>
 #include <eosio/fpconv.h>
 #include <eosio/stream.hpp>
-#include <eosio/for_each_field.hpp>
-#include <rapidjson/encodings.h>
-#include <cmath>
 #include <limits>
+#include <rapidjson/encodings.h>
 
 namespace eosio {
 
 inline constexpr char hex_digits[] = "0123456789ABCDEF";
-
 
 // Adaptors for rapidjson
 struct stream_adaptor {
@@ -20,11 +19,9 @@ struct stream_adaptor {
       memset(buf + chars, 0, 4 - chars);
    }
    void Put(char ch) {}
-   char Take() {
-      return buf[idx++];
-   }
+   char Take() { return buf[idx++]; }
    char buf[4];
-   int idx = 0;
+   int  idx = 0;
 };
 
 // Replaces any invalid utf-8 bytes with ?
@@ -39,9 +36,9 @@ result<void> to_json(std::string_view sv, S& stream) {
       auto pos = begin;
       while (pos != end && *pos != '"' && *pos != '\\' && (unsigned char)(*pos) >= 32 && *pos != 127) ++pos;
       if (begin != pos) {
-         while(begin != end) {
+         while (begin != end) {
             stream_adaptor s2(begin, static_cast<std::size_t>(pos - begin));
-            if(rapidjson::UTF8<>::Validate(s2, s2)) {
+            if (rapidjson::UTF8<>::Validate(s2, s2)) {
                OUTCOME_TRY(stream.write(begin, s2.idx));
                begin += s2.idx;
             } else {
@@ -132,7 +129,7 @@ result<void> fp_to_json(double value, S& stream) {
       return stream.write("\"Infinity\"", 10);
    } else if (value == -std::numeric_limits<double>::infinity()) {
       return stream.write("\"-Infinity\"", 11);
-   } else if(std::isnan(value)) {
+   } else if (std::isnan(value)) {
       return stream.write("\"NaN\"", 5);
    }
    small_buffer<std::numeric_limits<double>::digits10 + 2> b;
@@ -177,6 +174,43 @@ result<void> to_json(const std::vector<T>& obj, S& stream) {
    if (!r)
       return r.error();
    return outcome::success();
+}
+
+template <typename T, typename S>
+result<void> to_json(const T& t, S& stream) {
+   result<void> ok    = outcome::success();
+   bool         first = true;
+   OUTCOME_TRY(stream.write('{'));
+   eosio::for_each_field<T>([&](const char* name, auto&& member) {
+      if (ok) {
+         if (first) {
+            first = false;
+         } else {
+            auto r = stream.write(',');
+            if (!r) {
+               ok = r;
+               return;
+            }
+         }
+         auto r = to_json(name, stream);
+         if (!r) {
+            ok = r;
+            return;
+         }
+         r = stream.write(':');
+         if (!r) {
+            ok = r;
+            return;
+         }
+         r = to_json(member(&t), stream);
+         if (!r) {
+            ok = r;
+            return;
+         }
+      }
+   });
+   OUTCOME_TRY(ok);
+   return stream.write('}');
 }
 
 template <typename S>
