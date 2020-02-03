@@ -4,8 +4,11 @@
 #include <eosio/for_each_field.hpp>
 #include <eosio/fpconv.h>
 #include <eosio/stream.hpp>
+#include <eosio/types.hpp>
 #include <limits>
+#include <optional>
 #include <rapidjson/encodings.h>
+#include <variant>
 
 namespace eosio {
 
@@ -174,6 +177,25 @@ result<void> to_json(const std::vector<T>& obj, S& stream) {
    if (!r)
       return r.error();
    return outcome::success();
+}
+
+template <typename T, typename S>
+result<void> to_json(const std::optional<T>& obj, S& stream) {
+   if (obj) {
+      return to_json(*obj, stream);
+   } else {
+      return stream.write("null", 4);
+   }
+}
+
+template <typename... T, typename S>
+result<void> to_json(const std::variant<T...>& obj, S& stream) {
+   OUTCOME_TRY(stream.write('['));
+   OUTCOME_TRY(std::visit(
+         [&](const auto& t) { return to_json(get_type_name((std::decay_t<decltype(t)>*)nullptr), stream); }, obj));
+   OUTCOME_TRY(stream.write(','));
+   OUTCOME_TRY(std::visit([&](auto& x) { return to_json(x, stream); }, obj));
+   return stream.write(']');
 }
 
 template <typename T, typename S>

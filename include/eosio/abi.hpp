@@ -17,7 +17,8 @@ enum class abi_error {
    missing_name,
    redefined_type,
    base_not_a_struct,
-   extension_typedef
+   extension_typedef,
+   bad_abi
 };
 
 }
@@ -210,6 +211,7 @@ struct abi {
 };
 
 result<void> convert(const abi_def& def, abi&);
+result<void> convert(const abi& def, abi_def&);
 
 extern const abi_serializer* const object_abi_serializer;
 extern const abi_serializer* const variant_abi_serializer;
@@ -270,7 +272,7 @@ result<abi_type*> add_type(abi& a, std::variant<T...>*) {
    }((T*)nullptr), ...);
    OUTCOME_TRY(okay);
    std::string name = "variant";
-   for(auto& [name, t] : types) {
+   for(auto& [_, t] : types) {
       name += '_';
       name += t->name;
    }

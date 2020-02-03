@@ -227,6 +227,55 @@ result<void> eosio::convert(const abi_def& abi, eosio::abi& c) {
     return outcome::success();
 }
 
+result<void> to_abi_def(abi_def& def, const std::string& name, const abi_type::builtin&) { return eosio::outcome::success(); }
+result<void> to_abi_def(abi_def& def, const std::string& name, const abi_type::optional&) { return eosio::outcome::success(); }
+result<void> to_abi_def(abi_def& def, const std::string& name, const abi_type::array&) { return eosio::outcome::success(); }
+result<void> to_abi_def(abi_def& def, const std::string& name, const abi_type::extension&) { return eosio::outcome::success(); }
+
+template<typename T>
+result<void> to_abi_def(abi_def& def, const std::string& name, const T*) {
+   return eosio::abi_error::bad_abi;
+}
+
+result<void> to_abi_def(abi_def& def, const std::string& name, const abi_type::alias& alias) {
+   def.types.push_back({name, alias.type->name});
+   return eosio::outcome::success();
+}
+
+result<void> to_abi_def(abi_def& def, const std::string& name, const abi_type::struct_& struct_) {
+   if(name == "extended_asset") return outcome::success();
+   std::size_t field_offset = 0;
+   std::string base;
+   std::vector<field_def> fields;
+   if(struct_.base) {
+      field_offset = struct_.base->as_struct()->fields.size();
+      base = struct_.base->name;
+   }
+   for(std::size_t i = field_offset; i < struct_.fields.size(); ++i) {
+      const abi_field& field = struct_.fields[i];
+      fields.push_back({field.name, field.type->name});
+   }
+   def.structs.push_back({name, std::move(base), std::move(fields)});
+   return eosio::outcome::success();
+}
+
+result<void> to_abi_def(abi_def& def, const std::string& name, const abi_type::variant& variant) {
+   std::vector<std::string> types;
+   for(const auto& [name, type] : variant) {
+      types.push_back(type->name);
+   }
+   def.variants.value.push_back({name, std::move(types)});
+   return eosio::outcome::success();
+}
+
+eosio::result<void> eosio::convert(const eosio::abi& abi, eosio::abi_def& def) {
+   def.version = "eosio::abi/1.0";
+   for(auto& [name, type] : abi.abi_types) {
+      OUTCOME_TRY(std::visit([&name = type.name, &def](const auto& t){ return to_abi_def(def, name, t); }, type._data));
+   }
+   return outcome::success();
+}
+
 extern const abi_serializer* const eosio::object_abi_serializer = &abi_serializer_for< ::abieos::pseudo_object>;
 extern const abi_serializer* const eosio::variant_abi_serializer = &abi_serializer_for< ::abieos::pseudo_variant>;
 extern const abi_serializer* const eosio::array_abi_serializer = &abi_serializer_for< ::abieos::pseudo_array>;

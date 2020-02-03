@@ -1,10 +1,11 @@
 #pragma once
 
+#include <cstdlib>
 #include <eosio/eosio_outcome.hpp>
 #include <eosio/for_each_field.hpp>
+#include <optional>
 #include <rapidjson/reader.h>
 #include <vector>
-#include <cstdlib>
 
 namespace eosio {
 enum class from_json_error {
@@ -400,22 +401,22 @@ result<void> from_json_int(T& result, S& stream) {
    result     = 0;
    T limit;
    T sign;
-   if(std::is_signed_v<T> && pos != end && *pos == '-') {
+   if (std::is_signed_v<T> && pos != end && *pos == '-') {
       ++pos;
-      sign = -1;
+      sign  = -1;
       limit = std::numeric_limits<T>::min();
    } else {
-      sign = 1;
+      sign  = 1;
       limit = std::numeric_limits<T>::max();
    }
    while (pos != end && *pos >= '0' && *pos <= '9') {
       T digit = (*pos++ - '0');
       // abs(result) can overflow.  Use -abs(result) instead.
-      if(std::is_signed_v<T> && (-sign*limit + digit)/10 > -sign*result)
+      if (std::is_signed_v<T> && (-sign * limit + digit) / 10 > -sign * result)
          return from_json_error::number_out_of_range;
-      if(!std::is_signed_v<T> && (limit - digit)/10 < result)
+      if (!std::is_signed_v<T> && (limit - digit) / 10 < result)
          return from_json_error::number_out_of_range;
-      result = result * 10 + sign*digit;
+      result = result * 10 + sign * digit;
       found  = true;
    }
    if (pos != end || !found)
@@ -471,10 +472,11 @@ result<void> from_json(int64_t& result, S& stream) {
    return from_json_int(result, stream);
 }
 
-template<typename S>
+template <typename S>
 result<void> from_json(float& result, S& stream) {
    OUTCOME_TRY(sv, stream.get_string());
-   if (sv.empty()) return from_json_error::expected_number;
+   if (sv.empty())
+      return from_json_error::expected_number;
    std::string s(sv); // strtof expects a null-terminated string
    errno = 0;
    char* end;
@@ -484,10 +486,11 @@ result<void> from_json(float& result, S& stream) {
    return outcome::success();
 }
 
-template<typename S>
+template <typename S>
 result<void> from_json(double& result, S& stream) {
    OUTCOME_TRY(sv, stream.get_string());
-   if (sv.empty()) return from_json_error::expected_number;
+   if (sv.empty())
+      return from_json_error::expected_number;
    std::string s(sv);
    errno = 0;
    char* end;
@@ -554,6 +557,42 @@ result<void> from_json(std::vector<T>& result, S& stream) {
       if (!r)
          return r;
    }
+   return stream.get_end_array();
+}
+
+/// \group from_json_explicit
+template <typename T, typename S>
+result<void> from_json(std::optional<T>& result, S& stream) {
+   if (stream.get_null()) {
+      result = std::nullopt;
+      return eosio::outcome::success();
+   } else {
+      result.emplace();
+      return from_json(*result, stream);
+   }
+}
+
+template <int N = 0, typename... T>
+void set_variant_impl(std::variant<T...>& result, uint32_t type) {
+   if (type == N) {
+      result.template emplace<N>();
+   } else if constexpr (N + 1 < sizeof...(T)) {
+      set_variant_impl<N + 1>(result, type);
+   }
+}
+
+/// \group from_json_explicit
+template <typename... T, typename S>
+result<void> from_json(std::variant<T...>& result, S& stream) {
+   OUTCOME_TRY(stream.get_start_array());
+   std::string_view type;
+   OUTCOME_TRY(from_json(type, stream));
+   const char* const type_names[] = { get_type_name((T*)nullptr)... };
+   uint32_t          type_idx     = std::find(type_names, type_names + sizeof...(T), type) - type_names;
+   if (type_idx >= sizeof...(T))
+      return from_json_error::invalid_type_for_variant;
+   set_variant_impl(result, type_idx);
+   OUTCOME_TRY(std::visit([&](auto& x) { return from_json(x, stream); }, result));
    return stream.get_end_array();
 }
 

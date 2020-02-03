@@ -32,6 +32,14 @@ std::vector<char> test_serialize(const T& value, F&& f) {
    return buf1;
 }
 
+eosio::abi round_trip_abi(const eosio::abi& src) {
+   eosio::abi_def def;
+   CHECK(convert(src, def));
+   eosio::abi result;
+   CHECK(convert(def, result));
+   return result;
+}
+
 // Verifies that all 6 conversions between native/bin/json round-trip
 template<typename T>
 void test(const T& value, eosio::abi& abi) {
@@ -53,6 +61,22 @@ void test(const T& value, eosio::abi& abi) {
       // Get the ABI
       using eosio::get_type_name;
       const eosio::abi_type* type = abi.get_type(get_type_name((T*)nullptr)).value();
+
+      // bin_to_json
+      std::vector<char> bin2;
+      CHECK(abieos::json_to_bin(bin2, type, {json.data(), json.size()}));
+      CHECK(bin2 == bin);
+      // json_to_bin
+      eosio::input_stream bin_stream{bin};
+      std::string json2;
+      CHECK(abieos::bin_to_json(bin_stream, type, json2));
+      CHECK(json2 == std::string(json.data(), json.size()));
+   }
+   {
+      // Repeat with a serialized/deserialized ABI
+      eosio::abi new_abi(round_trip_abi(abi));
+      using eosio::get_type_name;
+      const eosio::abi_type* type = new_abi.get_type(get_type_name((T*)nullptr)).value();
 
       // bin_to_json
       std::vector<char> bin2;
@@ -99,9 +123,11 @@ using abieos::asset;
 
 using vec_type = std::vector<int>;
 struct struct_type {
-   vec_type v;
+   std::vector<int> v;
+   std::optional<int> o;
+   std::variant<int, double> va;
 };
-EOSIO_REFLECT(struct_type, v);
+EOSIO_REFLECT(struct_type, v, o, va);
 EOSIO_COMPARE(struct_type);
 
 int main() {
@@ -205,5 +231,7 @@ int main() {
    test(symbol_code{unsigned('ZYXW')}, abi);
    test(asset{5, {'ZYX\x08'}}, abi);
    test(struct_type{}, abi);
+   test(struct_type{{1},2,3}, abi);
+   test(struct_type{{1,2},3,4.0}, abi);
    if(error_count) return 1;
 }

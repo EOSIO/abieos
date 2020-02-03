@@ -1,5 +1,6 @@
+#pragma once
+
 #include <eosio/chain_conversions.hpp>
-#include <eosio/from_json.hpp>
 #include <eosio/reflection.hpp>
 #include <eosio/operators.hpp>
 #include <string>
