@@ -257,7 +257,7 @@ result<abi_type*> add_type(abi& a, std::vector<T>*) {
    OUTCOME_TRY(element_type, a.add_type<T>());
    if (element_type->optional_of() || element_type->array_of() || element_type->extension_of())
       return abi_error::invalid_nesting;
-   std::string name = element_type->name + "[]";
+   std::string name = get_type_name((std::vector<T>*)nullptr);
    auto [iter, inserted] = a.abi_types.try_emplace(name, name, abi_type::array{element_type}, array_abi_serializer);
    return &iter->second;
 }
@@ -276,11 +276,7 @@ result<abi_type*> add_type(abi& a, std::variant<T...>*) {
       }
    }((T*)nullptr), ...);
    OUTCOME_TRY(okay);
-   std::string name = "variant";
-   for(auto& [_, t] : types) {
-      name += '_';
-      name += t->name;
-   }
+   std::string name = get_type_name((std::variant<T...>*)nullptr);
 
    auto [iter, inserted] = a.abi_types.try_emplace(name, name, std::move(types), variant_abi_serializer);
    return &iter->second;
@@ -291,7 +287,7 @@ result<abi_type*> add_type(abi& a, std::optional<T>*) {
    OUTCOME_TRY(element_type, a.add_type<T>());
    if (element_type->optional_of() || element_type->array_of() || element_type->extension_of())
       return abi_error::invalid_nesting;
-   std::string name = element_type->name + "?";
+   std::string name = get_type_name((std::optional<T>*)nullptr);
    auto [iter, inserted] = a.abi_types.try_emplace(name, name, abi_type::optional{element_type}, optional_abi_serializer);
    return &iter->second;
 }
