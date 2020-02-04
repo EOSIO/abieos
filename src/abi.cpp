@@ -42,37 +42,37 @@ constexpr void for_each_abi_type(F f) {
     static_assert(sizeof(double) == 8);
 
     using namespace ::abieos;
-    f("bool", (bool*)nullptr);
-    f("int8", (int8_t*)nullptr);
-    f("uint8", (uint8_t*)nullptr);
-    f("int16", (int16_t*)nullptr);
-    f("uint16", (uint16_t*)nullptr);
-    f("int32", (int32_t*)nullptr);
-    f("uint32", (uint32_t*)nullptr);
-    f("int64", (int64_t*)nullptr);
-    f("uint64", (uint64_t*)nullptr);
-    f("int128", (int128*)nullptr);
-    f("uint128", (uint128*)nullptr);
-    f("varuint32", (varuint32*)nullptr);
-    f("varint32", (varint32*)nullptr);
-    f("float32", (float*)nullptr);
-    f("float64", (double*)nullptr);
-    f("float128", (float128*)nullptr);
-    f("time_point", (time_point*)nullptr);
-    f("time_point_sec", (time_point_sec*)nullptr);
-    f("block_timestamp_type", (block_timestamp*)nullptr);
-    f("name", (name*)nullptr);
-    f("bytes", (bytes*)nullptr);
-    f("string", (std::string*)nullptr);
-    f("checksum160", (checksum160*)nullptr);
-    f("checksum256", (checksum256*)nullptr);
-    f("checksum512", (checksum512*)nullptr);
-    f("public_key", (public_key*)nullptr);
-    f("private_key", (private_key*)nullptr);
-    f("signature", (signature*)nullptr);
-    f("symbol", (symbol*)nullptr);
-    f("symbol_code", (symbol_code*)nullptr);
-    f("asset", (asset*)nullptr);
+    f((bool*)nullptr);
+    f((int8_t*)nullptr);
+    f((uint8_t*)nullptr);
+    f((int16_t*)nullptr);
+    f((uint16_t*)nullptr);
+    f((int32_t*)nullptr);
+    f((uint32_t*)nullptr);
+    f((int64_t*)nullptr);
+    f((uint64_t*)nullptr);
+    f((int128*)nullptr);
+    f((uint128*)nullptr);
+    f((varuint32*)nullptr);
+    f((varint32*)nullptr);
+    f((float*)nullptr);
+    f((double*)nullptr);
+    f((float128*)nullptr);
+    f((time_point*)nullptr);
+    f((time_point_sec*)nullptr);
+    f((block_timestamp*)nullptr);
+    f((name*)nullptr);
+    f((bytes*)nullptr);
+    f((std::string*)nullptr);
+    f((checksum160*)nullptr);
+    f((checksum256*)nullptr);
+    f((checksum512*)nullptr);
+    f((public_key*)nullptr);
+    f((private_key*)nullptr);
+    f((signature*)nullptr);
+    f((symbol*)nullptr);
+    f((symbol_code*)nullptr);
+    f((asset*)nullptr);
 }
 
 result<abi_type*> get_type(std::map<std::string, abi_type>& abi_types,
@@ -190,7 +190,8 @@ result<void> eosio::convert(const abi_def& abi, eosio::abi& c) {
         c.action_types[a.name] = a.type;
     for (auto& t : abi.tables)
         c.table_types[t.name] = t.type;
-    for_each_abi_type([&](const char* name, auto* p) {
+    for_each_abi_type([&](auto* p) {
+        const char* name = get_type_name(p);
         c.abi_types.try_emplace(name, name, abi_type::builtin{}, &abi_serializer_for<std::decay_t<decltype(*p)>>);
     });
     {
