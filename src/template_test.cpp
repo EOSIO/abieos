@@ -49,7 +49,7 @@ auto check_result(T&& t) {
 
 // Verifies that all 6 conversions between native/bin/json round-trip
 template<typename T>
-void test(const T& value, eosio::abi& abi) {
+void test(const T& value, eosio::abi& abi1, eosio::abi& abi2) {
    std::vector<char> bin = test_serialize(value, [](const T& v, auto& stream) { return to_bin(v, stream); });
    std::vector<char> json = test_serialize(value, [](const T& v, auto& stream) { return to_json(v, stream); });
    {
@@ -64,24 +64,11 @@ void test(const T& value, eosio::abi& abi) {
       CHECK(json_value == value);
    }
 
+   for(eosio::abi* abi : {&abi1, &abi2})
    {
       // Get the ABI
       using eosio::get_type_name;
-      const eosio::abi_type* type = abi.get_type(get_type_name((T*)nullptr)).value();
-
-      // bin_to_json
-      auto bin2 = check_result(type->json_to_bin({json.data(), json.size()}));
-      CHECK(bin2 == bin);
-      // json_to_bin
-      eosio::input_stream bin_stream{bin};
-      auto json2 = check_result(type->bin_to_json(bin_stream));
-      CHECK(json2 == std::string(json.data(), json.size()));
-   }
-   {
-      // Repeat with a serialized/deserialized ABI
-      eosio::abi new_abi(round_trip_abi(abi));
-      using eosio::get_type_name;
-      const eosio::abi_type* type = new_abi.get_type(get_type_name((T*)nullptr)).value();
+      const eosio::abi_type* type = abi->get_type(get_type_name((T*)nullptr)).value();
 
       // bin_to_json
       auto bin2 = check_result(type->json_to_bin({json.data(), json.size()}));
@@ -98,9 +85,9 @@ char empty_abi[] = R"({
 })";
 
 template<typename T>
-void test_int(eosio::abi& abi) {
+void test_int(eosio::abi& abi1, eosio::abi& abi2) {
    for(T i : {T(0), T(1), std::numeric_limits<T>::min(), std::numeric_limits<T>::max()}) {
-      test(i, abi);
+      test(i, abi1, abi2);
    }
 }
 
@@ -139,102 +126,103 @@ int main() {
    eosio::abi abi;
    CHECK(convert(def, abi));
    CHECK(abi.add_type<struct_type>());
-   test(true, abi);
-   test(false, abi);
+   eosio::abi new_abi(round_trip_abi(abi));
+   test(true, abi, new_abi);
+   test(false, abi, new_abi);
    for(int i = -128; i <= 127; ++i) {
-      test(static_cast<std::int8_t>(i), abi);
+      test(static_cast<std::int8_t>(i), abi, new_abi);
    }
    for(int i = 0; i <= 255; ++i) {
-      test(static_cast<std::uint8_t>(i), abi);
+      test(static_cast<std::uint8_t>(i), abi, new_abi);
    }
    for(int i = -32768; i <= 32767; ++i) {
-      test(static_cast<std::int16_t>(i), abi);
+      test(static_cast<std::int16_t>(i), abi, new_abi);
    }
    for(int i = 0; i <= 65535; ++i) {
-      test(static_cast<std::uint16_t>(i), abi);
+      test(static_cast<std::uint16_t>(i), abi, new_abi);
    }
-   test_int<int32_t>(abi);
-   test_int<uint32_t>(abi);
-   test_int<int64_t>(abi);
-   test_int<uint64_t>(abi);
-   test(int128{}, abi);
-   test(int128{0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00}, abi);
-   test(int128{0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF}, abi);
-   test(int128{0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0x7F}, abi);
-   test(int128{0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x80}, abi);
-   test(uint128{}, abi);
-   test(uint128{0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00}, abi);
-   test(uint128{0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF}, abi);
-   test(uint128{0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0x7F}, abi);
-   test(uint128{0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x80}, abi);
-   test(varuint32{0}, abi);
-   test(varuint32{1}, abi);
-   test(varuint32{0xFFFFFFFFu}, abi);
-   test(varint32{0}, abi);
-   test(varint32{1}, abi);
-   test(varint32{-1}, abi);
-   test(varint32{0x7FFFFFFF}, abi);
-   test(varint32{std::numeric_limits<int32_t>::min()}, abi);
-   test(0.0f, abi);
-   test(1.0f, abi);
-   test(-1.0f, abi);
-   test(std::numeric_limits<float>::min(), abi);
-   test(std::numeric_limits<float>::max(), abi);
-   test(std::numeric_limits<float>::infinity(), abi);
-   test(-std::numeric_limits<float>::infinity(), abi);
+   test_int<int32_t>(abi, new_abi);
+   test_int<uint32_t>(abi, new_abi);
+   test_int<int64_t>(abi, new_abi);
+   test_int<uint64_t>(abi, new_abi);
+   test(int128{}, abi, new_abi);
+   test(int128{0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00}, abi, new_abi);
+   test(int128{0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF}, abi, new_abi);
+   test(int128{0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0x7F}, abi, new_abi);
+   test(int128{0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x80}, abi, new_abi);
+   test(uint128{}, abi, new_abi);
+   test(uint128{0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00}, abi, new_abi);
+   test(uint128{0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF}, abi, new_abi);
+   test(uint128{0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0x7F}, abi, new_abi);
+   test(uint128{0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x80}, abi, new_abi);
+   test(varuint32{0}, abi, new_abi);
+   test(varuint32{1}, abi, new_abi);
+   test(varuint32{0xFFFFFFFFu}, abi, new_abi);
+   test(varint32{0}, abi, new_abi);
+   test(varint32{1}, abi, new_abi);
+   test(varint32{-1}, abi, new_abi);
+   test(varint32{0x7FFFFFFF}, abi, new_abi);
+   test(varint32{std::numeric_limits<int32_t>::min()}, abi, new_abi);
+   test(0.0f, abi, new_abi);
+   test(1.0f, abi, new_abi);
+   test(-1.0f, abi, new_abi);
+   test(std::numeric_limits<float>::min(), abi, new_abi);
+   test(std::numeric_limits<float>::max(), abi, new_abi);
+   test(std::numeric_limits<float>::infinity(), abi, new_abi);
+   test(-std::numeric_limits<float>::infinity(), abi, new_abi);
    // nans are not equal
-   // test(std::numeric_limits<float>::quiet_NaN(), abi);
-   test(0.0, abi);
-   test(1.0, abi);
-   test(-1.0, abi);
-   test(std::numeric_limits<double>::min(), abi);
-   test(std::numeric_limits<double>::max(), abi);
-   test(std::numeric_limits<double>::infinity(), abi);
-   test(-std::numeric_limits<double>::infinity(), abi);
-   test(float128{0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00}, abi);
-   test(float128{0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x80}, abi);
-   test(float128{0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF}, abi);
+   // test(std::numeric_limits<float>::quiet_NaN(), abi, new_abi);
+   test(0.0, abi, new_abi);
+   test(1.0, abi, new_abi);
+   test(-1.0, abi, new_abi);
+   test(std::numeric_limits<double>::min(), abi, new_abi);
+   test(std::numeric_limits<double>::max(), abi, new_abi);
+   test(std::numeric_limits<double>::infinity(), abi, new_abi);
+   test(-std::numeric_limits<double>::infinity(), abi, new_abi);
+   test(float128{0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00}, abi, new_abi);
+   test(float128{0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x80}, abi, new_abi);
+   test(float128{0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF}, abi, new_abi);
    for(uint64_t i = 0; i < 10000; ++i) {
-      test(time_point{i * 1000}, abi);
+      test(time_point{i * 1000}, abi, new_abi);
    }
    // This is the largest time that can be parsed by the current implementation,
    // because of the dependency on time_point_sec.
-   test(time_point{0xFFFFFFFFull * 1000000}, abi);
+   test(time_point{0xFFFFFFFFull * 1000000}, abi, new_abi);
    for(uint32_t i = 0; i < 10000; ++i) {
-      test(time_point_sec{i}, abi);
+      test(time_point_sec{i}, abi, new_abi);
    }
-   test(time_point_sec{0xFFFFFFFFu}, abi);
+   test(time_point_sec{0xFFFFFFFFu}, abi, new_abi);
    for(uint32_t i = 0; i < 10000; ++i) {
-      test(block_timestamp{i}, abi);
+      test(block_timestamp{i}, abi, new_abi);
    }
-   test(block_timestamp{0xFFFFFFFFu}, abi);
-   test(abieos::name("eosio"), abi);
-   test(abieos::name(), abi);
-   test(bytes(), abi);
-   test(bytes{{0, 0, 0, 0}}, abi);
-   test(bytes{{'\xff', '\xff', '\xff', '\xff'}}, abi);
+   test(block_timestamp{0xFFFFFFFFu}, abi, new_abi);
+   test(abieos::name("eosio"), abi, new_abi);
+   test(abieos::name(), abi, new_abi);
+   test(bytes(), abi, new_abi);
+   test(bytes{{0, 0, 0, 0}}, abi, new_abi);
+   test(bytes{{'\xff', '\xff', '\xff', '\xff'}}, abi, new_abi);
    using namespace std::literals::string_literals;
-   test(""s, abi);
-   test("\0"s, abi);
-   // test("\xff"s, abi); // invalid utf8 doesn't round-trip
-   test("abcdefghijklmnopqrstuvwxyz"s, abi);
-   test(checksum160{0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF}, abi);
+   test(""s, abi, new_abi);
+   test("\0"s, abi, new_abi);
+   // test("\xff"s, abi, new_abi); // invalid utf8 doesn't round-trip
+   test("abcdefghijklmnopqrstuvwxyz"s, abi, new_abi);
+   test(checksum160{0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF}, abi, new_abi);
    test(checksum256{0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
-                    0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF}, abi);
+                    0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF}, abi, new_abi);
    test(checksum512{0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
                     0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
                     0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
-                    0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF}, abi);
-   test(public_key{key_type::k1, std::vector<uint8_t>(33, 1)}, abi);
-   test(public_key{key_type::r1, std::vector<uint8_t>(33, 1)}, abi);
-   test(private_key{key_type::r1, std::vector<uint8_t>(32, 1)}, abi);
-   test(signature{key_type::k1, std::vector<uint8_t>(65, 1)}, abi);
-   test(signature{key_type::r1, std::vector<uint8_t>(65, 1)}, abi);
-   test(symbol{unsigned('ZYX\x08')}, abi);
-   test(symbol_code{unsigned('ZYXW')}, abi);
-   test(asset{5, {'ZYX\x08'}}, abi);
-   test(struct_type{}, abi);
-   test(struct_type{{1},2,3}, abi);
-   test(struct_type{{1,2},3,4.0}, abi);
+                    0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF}, abi, new_abi);
+   test(public_key{key_type::k1, std::vector<uint8_t>(33, 1)}, abi, new_abi);
+   test(public_key{key_type::r1, std::vector<uint8_t>(33, 1)}, abi, new_abi);
+   test(private_key{key_type::r1, std::vector<uint8_t>(32, 1)}, abi, new_abi);
+   test(signature{key_type::k1, std::vector<uint8_t>(65, 1)}, abi, new_abi);
+   test(signature{key_type::r1, std::vector<uint8_t>(65, 1)}, abi, new_abi);
+   test(symbol{unsigned('ZYX\x08')}, abi, new_abi);
+   test(symbol_code{unsigned('ZYXW')}, abi, new_abi);
+   test(asset{5, {'ZYX\x08'}}, abi, new_abi);
+   test(struct_type{}, abi, new_abi);
+   test(struct_type{{1},2,3}, abi, new_abi);
+   test(struct_type{{1,2},3,4.0}, abi, new_abi);
    if(error_count) return 1;
 }
