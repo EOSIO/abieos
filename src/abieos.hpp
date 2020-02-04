@@ -10,6 +10,7 @@
 #include <eosio/to_json.hpp>
 #include <eosio/abi.hpp>
 #include <eosio/operators.hpp>
+#include <eosio/bytes.hpp>
 
 #ifdef EOSIO_CDT_COMPILATION
 #include <cwchar>
@@ -399,13 +400,6 @@ eosio::result<void> bin_to_json(pseudo_variant*, bin_to_json_state& state, bool 
 // serializable types
 ///////////////////////////////////////////////////////////////////////////////
 
-struct bytes {
-    std::vector<char> data;
-};
-
-EOSIO_REFLECT(bytes, data);
-EOSIO_COMPARE(bytes);
-
 template <typename S>
 eosio::result<void> from_bin(input_buffer& obj, S& stream) {
     uint64_t size;
@@ -425,15 +419,7 @@ eosio::result<void> to_bin(const input_buffer& obj, S& stream) {
     return to_bin(std::string_view{obj.pos, size_t(obj.end - obj.pos)}, stream);
 }
 
-template <typename S>
-eosio::result<void> from_json(bytes& obj, S& stream) {
-    return eosio::from_json_hex(obj.data, stream);
-}
-
-template <typename S>
-eosio::result<void> to_json(const bytes& obj, S& stream) {
-    return eosio::to_json_hex(obj.data.data(), obj.data.size(), stream);
-}
+using eosio::bytes;
 
 template <typename State>
 eosio::result<void> json_to_bin(bytes*, State& state, bool, const abi_type*, bool start) {
