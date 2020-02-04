@@ -49,59 +49,12 @@ inline constexpr bool trace_bin_to_json = false;
 
 inline constexpr size_t max_stack_size = 128;
 
-template <typename T>
-inline constexpr bool is_vector_v = false;
-
-template <typename T>
-inline constexpr bool is_vector_v<std::vector<T>> = true;
-
-template <typename T>
-inline constexpr bool is_pair_v = false;
-
-template <typename First, typename Second>
-inline constexpr bool is_pair_v<std::pair<First, Second>> = true;
-
-template <typename T>
-inline constexpr bool is_optional_v = false;
-
-template <typename T>
-inline constexpr bool is_optional_v<std::optional<T>> = true;
-
-template <typename T>
-inline constexpr bool is_variant_v = false;
-
-template <typename... Ts>
-inline constexpr bool is_variant_v<std::variant<Ts...>> = true;
-
-template <typename T>
-inline constexpr bool is_string_v = false;
-
-template <>
-inline constexpr bool is_string_v<std::string> = true;
-
 // Pseudo objects never exist, except in serialized form
 struct pseudo_optional;
 struct pseudo_extension;
 struct pseudo_object;
 struct pseudo_array;
 struct pseudo_variant;
-
-template <typename T>
-struct might_not_exist {
-    T value{};
-};
-
-template <typename T, typename S>
-eosio::result<void> from_bin(might_not_exist<T>& obj, S& stream) {
-    if (stream.remaining())
-        return from_bin(obj.value, stream);
-    return eosio::outcome::success();
-}
-
-template <typename T, typename S>
-eosio::result<void> from_json(might_not_exist<T>& obj, S& stream) {
-    return from_json(obj.value, stream);
-}
 
 // !!!
 template <typename SrcIt, typename DestIt>
@@ -148,12 +101,6 @@ ABIEOS_NODISCARD bool unhex(std::string& error, SrcIt begin, SrcIt end, DestIt d
         *dest++ = (h << 4) | l;
     }
     return true;
-}
-
-template <typename T>
-void push_raw(std::vector<char>& bin, const T& obj) {
-    static_assert(std::is_trivially_copyable_v<T>);
-    bin.insert(bin.end(), reinterpret_cast<const char*>(&obj), reinterpret_cast<const char*>(&obj + 1));
 }
 
 // !!!
@@ -649,12 +596,6 @@ eosio::result<void> key_from_bin(Key& obj, S& stream) {
         obj.data.resize(Key::k1r1_size);
         return stream.read(obj.data.data(), obj.data.size());
     }
-}
-
-template <typename Key>
-inline void key_to_bin(const Key& obj, std::vector<char>& bin) {
-    push_raw(bin, obj.type);
-    bin.insert(bin.end(), obj.data.begin(), obj.data.end());
 }
 
 template <typename Key, typename S>
