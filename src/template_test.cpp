@@ -224,5 +224,8 @@ int main() {
    test(struct_type{}, abi, new_abi);
    test(struct_type{{1},2,3}, abi, new_abi);
    test(struct_type{{1,2},3,4.0}, abi, new_abi);
+   test(std::vector{1, 2}, abi, new_abi);
+   test(std::optional{3}, abi, new_abi);
+   test(std::variant<int, double>{4}, abi, new_abi);
    if(error_count) return 1;
 }
