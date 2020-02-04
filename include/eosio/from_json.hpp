@@ -95,7 +95,7 @@ class from_json_error_category_type : public std::error_category {
                case from_json_error::expected_field:                      return "Expected field";
                case from_json_error::expected_variant:                    return R"(Expected variant: ["type", value])";
                case from_json_error::expected_public_key:                 return "Expected public key";
-               case from_json_error::expected_private_key:                return "Expected public key";
+               case from_json_error::expected_private_key:                return "Expected private key";
                case from_json_error::expected_signature:                  return "Expected signature";
                case from_json_error::expected_number:                     return "Expected number or boolean";
                case from_json_error::expected_int:                        return "Expected integer";
