@@ -276,8 +276,28 @@ eosio::result<void> eosio::convert(const eosio::abi& abi, eosio::abi_def& def) {
    return outcome::success();
 }
 
-extern const abi_serializer* const eosio::object_abi_serializer = &abi_serializer_for< ::abieos::pseudo_object>;
-extern const abi_serializer* const eosio::variant_abi_serializer = &abi_serializer_for< ::abieos::pseudo_variant>;
-extern const abi_serializer* const eosio::array_abi_serializer = &abi_serializer_for< ::abieos::pseudo_array>;
-extern const abi_serializer* const eosio::extension_abi_serializer = &abi_serializer_for< ::abieos::pseudo_extension>;
-extern const abi_serializer* const eosio::optional_abi_serializer = &abi_serializer_for< ::abieos::pseudo_optional>;
+const abi_serializer* const eosio::object_abi_serializer = &abi_serializer_for< ::abieos::pseudo_object>;
+const abi_serializer* const eosio::variant_abi_serializer = &abi_serializer_for< ::abieos::pseudo_variant>;
+const abi_serializer* const eosio::array_abi_serializer = &abi_serializer_for< ::abieos::pseudo_array>;
+const abi_serializer* const eosio::extension_abi_serializer = &abi_serializer_for< ::abieos::pseudo_extension>;
+const abi_serializer* const eosio::optional_abi_serializer = &abi_serializer_for< ::abieos::pseudo_optional>;
+
+result<std::vector<char>> eosio::abi_type::json_to_bin_reorderable(std::string_view json, std::function<void()> f) const {
+   abieos::jvalue tmp;
+   OUTCOME_TRY(abieos::json_to_jvalue(tmp, json, f));
+   std::vector<char> result;
+   OUTCOME_TRY(abieos::json_to_bin(result, this, tmp, f));
+   return std::move(result);
+}
+
+result<std::vector<char>> eosio::abi_type::json_to_bin(std::string_view json, std::function<void()> f) const {
+   std::vector<char> result;
+   OUTCOME_TRY(abieos::json_to_bin(result, this, json, f));
+   return std::move(result);
+}
+
+result<std::string> eosio::abi_type::bin_to_json(input_stream& bin, std::function<void()> f) const {
+   std::string result;
+   OUTCOME_TRY(abieos::bin_to_json(bin, this, result, f));
+   return std::move(result);
+}

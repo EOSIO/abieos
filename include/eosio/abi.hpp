@@ -195,6 +195,10 @@ struct abi_type {
     const variant* as_variant() const {
        return std::get_if<variant>(&_data);
     }
+
+    result<std::string> bin_to_json(input_stream& bin, std::function<void()> f = []{}) const;
+    result<std::vector<char>> json_to_bin(std::string_view json, std::function<void()> f = []{}) const;
+    result<std::vector<char>> json_to_bin_reorderable(std::string_view json, std::function<void()> f = []{}) const;
 };
 
 struct abi {

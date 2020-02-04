@@ -40,6 +40,13 @@ eosio::abi round_trip_abi(const eosio::abi& src) {
    return result;
 }
 
+template<typename T>
+auto check_result(T&& t) {
+   CHECK(t);
+   if(t) return t.value();
+   else return std::decay_t<decltype(t.value())>{};
+}
+
 // Verifies that all 6 conversions between native/bin/json round-trip
 template<typename T>
 void test(const T& value, eosio::abi& abi) {
@@ -63,13 +70,11 @@ void test(const T& value, eosio::abi& abi) {
       const eosio::abi_type* type = abi.get_type(get_type_name((T*)nullptr)).value();
 
       // bin_to_json
-      std::vector<char> bin2;
-      CHECK(abieos::json_to_bin(bin2, type, {json.data(), json.size()}));
+      auto bin2 = check_result(type->json_to_bin({json.data(), json.size()}));
       CHECK(bin2 == bin);
       // json_to_bin
       eosio::input_stream bin_stream{bin};
-      std::string json2;
-      CHECK(abieos::bin_to_json(bin_stream, type, json2));
+      auto json2 = check_result(type->bin_to_json(bin_stream));
       CHECK(json2 == std::string(json.data(), json.size()));
    }
    {
@@ -79,13 +84,11 @@ void test(const T& value, eosio::abi& abi) {
       const eosio::abi_type* type = new_abi.get_type(get_type_name((T*)nullptr)).value();
 
       // bin_to_json
-      std::vector<char> bin2;
-      CHECK(abieos::json_to_bin(bin2, type, {json.data(), json.size()}));
+      auto bin2 = check_result(type->json_to_bin({json.data(), json.size()}));
       CHECK(bin2 == bin);
       // json_to_bin
       eosio::input_stream bin_stream{bin};
-      std::string json2;
-      CHECK(abieos::bin_to_json(bin_stream, type, json2));
+      auto json2 = check_result(type->bin_to_json(bin_stream));
       CHECK(json2 == std::string(json.data(), json.size()));
    }
 }

@@ -997,17 +997,22 @@ ABIEOS_NODISCARD inline bool receive_event(struct json_to_jvalue_state& state, e
     return true;
 }
 
-ABIEOS_NODISCARD inline bool json_to_jvalue(jvalue& value, std::string& error, std::string_view json) {
+template<typename F>
+ABIEOS_NODISCARD inline eosio::result<void> json_to_jvalue(jvalue& value, std::string_view json, F&& f) {
     std::string mutable_json{json};
     mutable_json.push_back(0);
     mutable_json.push_back(0);
     mutable_json.push_back(0);
+    std::string error; // !!!
     json_to_jvalue_state state{error};
     state.stack.push_back({&value});
     rapidjson::Reader reader;
     rapidjson::InsituStringStream ss(mutable_json.data());
-    return reader.Parse<rapidjson::kParseValidateEncodingFlag | rapidjson::kParseIterativeFlag |
-                        rapidjson::kParseNumbersAsStringsFlag>(ss, state);
+    if (reader.Parse<rapidjson::kParseValidateEncodingFlag | rapidjson::kParseIterativeFlag |
+        rapidjson::kParseNumbersAsStringsFlag>(ss, state))
+        return eosio::outcome::success();
+    else
+        return eosio::from_json_error::unspecific_syntax_error; // !!!
 }
 
 ABIEOS_NODISCARD inline bool json_to_jobject(jvalue& value, json_to_jvalue_state& state, event_type event, bool start) {
@@ -1073,10 +1078,12 @@ using abi = eosio::abi;
 // json_to_bin (jvalue)
 ///////////////////////////////////////////////////////////////////////////////
 
-inline eosio::result<void> json_to_bin(std::vector<char>& bin, const abi_type* type, const jvalue& value) {
+template<typename F>
+inline eosio::result<void> json_to_bin(std::vector<char>& bin, const abi_type* type, const jvalue& value, F&& f) {
     jvalue_to_bin_state state{{bin}, &value};
     OUTCOME_TRY(type->ser->json_to_bin(state, true, type, true));
     while (!state.stack.empty()) {
+        f();
         auto& entry = state.stack.back();
         OUTCOME_TRY(entry.type->ser->json_to_bin(state, entry.allow_extensions, entry.type, false));
     }
@@ -1227,7 +1234,8 @@ inline eosio::result<void> json_to_bin(std::string*, State& state, bool, const a
 // json_to_bin
 ///////////////////////////////////////////////////////////////////////////////
 
-inline eosio::result<void> json_to_bin(std::vector<char>& bin, const abi_type* type, std::string_view json) {
+template<typename F>
+inline eosio::result<void> json_to_bin(std::vector<char>& bin, const abi_type* type, std::string_view json, F&& f) {
     std::string mutable_json{json};
     mutable_json.push_back(0);
     mutable_json.push_back(0);
@@ -1238,6 +1246,7 @@ inline eosio::result<void> json_to_bin(std::vector<char>& bin, const abi_type* t
 
     OUTCOME_TRY(type->ser->json_to_bin(state, true, type, true));
     while(!state.stack.empty()) {
+        f();
         auto entry = state.stack.back();
         auto* type = entry.type;
         if (state.stack.size() > max_stack_size)
@@ -1373,13 +1382,15 @@ inline eosio::result<void> json_to_bin(pseudo_variant*, json_to_bin_state& state
 // bin_to_json
 ///////////////////////////////////////////////////////////////////////////////
 
-inline eosio::result<void> bin_to_json(eosio::input_stream& bin, const abi_type* type, std::string& dest) {
+template<typename F>
+inline eosio::result<void> bin_to_json(eosio::input_stream& bin, const abi_type* type, std::string& dest, F&& f) {
     // FIXME: Write directly to the string instead of creating an additional buffer
     std::vector<char> buffer;
     eosio::vector_stream writer{buffer};
     bin_to_json_state state{bin, writer};
     OUTCOME_TRY(type->ser->bin_to_json(state, true, type, true));
     while (!state.stack.empty()) {
+        f();
         auto& entry = state.stack.back();
         OUTCOME_TRY(entry.type->ser->bin_to_json(state, entry.allow_extensions, entry.type, false));
         if (state.stack.size() > max_stack_size)

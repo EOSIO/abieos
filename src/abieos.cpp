@@ -206,11 +206,13 @@ extern "C" abieos_bool abieos_json_to_bin(abieos_context* context, uint64_t cont
         if (!t)
             return set_error(context, t.error().message());
         context->result_bin.clear();
-        if (auto result = (json_to_bin(context->result_bin, t.value(), json)); !result) {
+        if (auto result = t.value()->json_to_bin(json)) {
+            context->result_bin = std::move(result.value());
+            return true;
+        } else {
             set_error(context, result.error().message());
             return false;
         }
-        return true;
     });
 }
 
@@ -228,17 +230,13 @@ extern "C" abieos_bool abieos_json_to_bin_reorderable(abieos_context* context, u
         if (!t)
             return set_error(context, t.error().message());
         context->result_bin.clear();
-        ::abieos::jvalue value;
-        if (!json_to_jvalue(value, error, json)) {
-            if (!error.empty())
-                set_error(context, std::move(error));
-            return false;
-        }
-        if (auto result = json_to_bin(context->result_bin, t.value(), value); !result) {
+        if (auto result = t.value()->json_to_bin_reorderable(json)) {
+            context->result_bin = std::move(result.value());
+            return true;
+        } else {
             set_error(context, result.error().message());
             return false;
         }
-        return true;
     });
 }
 
@@ -261,7 +259,9 @@ extern "C" const char* abieos_bin_to_json(abieos_context* context, uint64_t cont
             return nullptr;
         }
         eosio::input_stream bin{data, size};
-        if (auto result = bin_to_json(bin, t.value(), context->result_str); !result) {
+        if (auto result = t.value()->bin_to_json(bin)) {
+            context->result_str = std::move(result.value());
+        } else {
             set_error(context, result.error().message());
             return nullptr;
         }
