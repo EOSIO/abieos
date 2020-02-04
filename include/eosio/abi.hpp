@@ -5,6 +5,7 @@
 #include <vector>
 #include <variant>
 #include <eosio/types.hpp>
+#include <eosio/name.hpp>
 
 namespace eosio {
 
@@ -92,7 +93,7 @@ struct struct_def {
 EOSIO_REFLECT(struct_def, name, base, fields);
 
 struct action_def {
-    abieos::name name{};
+    eosio::name name{};
     std::string type{};
     std::string ricardian_contract{};
 };
@@ -100,7 +101,7 @@ struct action_def {
 EOSIO_REFLECT(action_def, name, type, ricardian_contract);
 
 struct table_def {
-    abieos::name name{};
+    eosio::name name{};
     std::string index_type{};
     std::vector<std::string> key_names{};
     std::vector<std::string> key_types{};
@@ -197,8 +198,8 @@ struct abi_type {
 };
 
 struct abi {
-    std::map<abieos::name, std::string> action_types;
-    std::map<abieos::name, std::string> table_types;
+    std::map<eosio::name, std::string> action_types;
+    std::map<eosio::name, std::string> table_types;
     std::map<std::string, abi_type> abi_types;
     result<const abi_type*> get_type(const std::string& name);
 

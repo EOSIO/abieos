@@ -765,7 +765,7 @@ eosio::result<void> to_json(const signature& obj, S& stream) {
     return to_json(result, stream);
 }
 
-using eosio::abieos::name;
+using eosio::name;
 
 struct varuint32 {
     uint32_t value = 0;
