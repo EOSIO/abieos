@@ -14,6 +14,7 @@
 #include <eosio/crypto.hpp>
 #include <eosio/symbol.hpp>
 #include <eosio/asset.hpp>
+#include <eosio/time.hpp>
 
 #ifdef EOSIO_CDT_COMPILATION
 #include <cwchar>
@@ -528,97 +529,9 @@ eosio::result<void> to_json(const varint32& obj, S& stream) {
     return to_json(obj.value, stream);
 }
 
-struct time_point_sec {
-    uint32_t utc_seconds = 0;
-
-    explicit operator std::string() const { return eosio::microseconds_to_str(uint64_t(utc_seconds) * 1'000'000); }
-};
-
-ABIEOS_NODISCARD inline bool string_to_time_point_sec(time_point_sec& result, std::string& error, const char* s,
-                                                      const char* end) {
-    if (eosio::string_to_utc_seconds(result.utc_seconds, s, end, true, true))
-        return true;
-    else
-        return set_error(error, "expected string containing time_point_sec");
-}
-
-EOSIO_REFLECT(time_point_sec, utc_seconds);
-EOSIO_COMPARE(time_point_sec);
-
-template<typename S>
-eosio::result<void> from_json(time_point_sec& obj, S& stream) {
-    OUTCOME_TRY(s, stream.get_string());
-    const char * p = s.data();
-    if (!eosio::string_to_utc_seconds(obj.utc_seconds, p, s.data() + s.size(), true, true))
-        return eosio::from_json_error::expected_time_point;
-    return eosio::outcome::success();
-}
-
-template <typename S>
-eosio::result<void> to_json(const time_point_sec& obj, S& stream) {
-    return to_json(std::string{obj}, stream);
-}
-
-struct time_point {
-    uint64_t microseconds = 0;
-
-    explicit operator std::string() const { return eosio::microseconds_to_str(microseconds); }
-};
-
-ABIEOS_NODISCARD inline bool string_to_time_point(time_point& dest, std::string& error, std::string_view s) {
-    if (eosio::string_to_utc_microseconds(dest.microseconds, s.data(), s.data() + s.size()))
-        return true;
-    else
-        return set_error(error, "expected string containing time_point");
-}
-
-EOSIO_REFLECT(time_point, microseconds);
-EOSIO_COMPARE(time_point);
-
-template<typename S>
-eosio::result<void> from_json(time_point& obj, S& stream) {
-   OUTCOME_TRY(s, stream.get_string());
-   std::string error; // !!!
-   if (!string_to_time_point(obj, error, s))
-      return eosio::from_json_error::expected_time_point;
-   return eosio::outcome::success();
-}
-
-template <typename S>
-eosio::result<void> to_json(const time_point& obj, S& stream) {
-    return to_json(std::string{obj}, stream);
-}
-
-struct block_timestamp {
-    static constexpr uint16_t interval_ms = 500;
-    static constexpr uint64_t epoch_ms = 946684800000ll; // Year 2000
-    uint32_t slot;
-
-    block_timestamp() = default;
-    explicit block_timestamp(uint32_t slot) : slot(slot) {}
-    explicit block_timestamp(time_point t) { slot = (t.microseconds / 1000 - epoch_ms) / interval_ms; }
-
-    explicit operator time_point() const { return time_point{(slot * (uint64_t)interval_ms + epoch_ms) * 1000}; }
-    explicit operator std::string() const { return std::string{(time_point)(*this)}; }
-}; // block_timestamp
-
-using block_timestamp_type = block_timestamp;
-EOSIO_REFLECT(block_timestamp_type, slot);
-EOSIO_COMPARE(block_timestamp_type);
-
-template<typename S>
-eosio::result<void> from_json(block_timestamp& obj, S& stream) {
-    time_point tp;
-    OUTCOME_TRY(from_json(tp, stream));
-    obj = block_timestamp(tp);
-    return eosio::outcome::success();
-}
-
-template<typename S>
-eosio::result<void> to_json(const block_timestamp& obj, S& stream) {
-    return to_json(time_point(obj), stream);
-}
-
+using eosio::time_point;
+using eosio::time_point_sec;
+using eosio::block_timestamp;
 using eosio::symbol_code;
 using eosio::symbol;
 using eosio::asset;

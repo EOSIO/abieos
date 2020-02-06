@@ -96,6 +96,7 @@ using abieos::uint128;
 using abieos::varint32;
 using abieos::varuint32;
 using abieos::float128;
+using eosio::microseconds;
 using abieos::time_point;
 using abieos::time_point_sec;
 using abieos::block_timestamp;
@@ -103,7 +104,6 @@ using abieos::bytes;
 using abieos::checksum160;
 using abieos::checksum256;
 using abieos::checksum512;
-//using abieos::key_type;
 using abieos::public_key;
 using abieos::private_key;
 using abieos::signature;
@@ -183,11 +183,11 @@ int main() {
    test(float128{0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x80}, abi, new_abi);
    test(float128{0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF}, abi, new_abi);
    for(uint64_t i = 0; i < 10000; ++i) {
-      test(time_point{i * 1000}, abi, new_abi);
+     test(time_point{microseconds(i * 1000)}, abi, new_abi);
    }
    // This is the largest time that can be parsed by the current implementation,
    // because of the dependency on time_point_sec.
-   test(time_point{0xFFFFFFFFull * 1000000}, abi, new_abi);
+   test(time_point{microseconds(0xFFFFFFFFull * 1000000)}, abi, new_abi);
    for(uint32_t i = 0; i < 10000; ++i) {
       test(time_point_sec{i}, abi, new_abi);
    }
