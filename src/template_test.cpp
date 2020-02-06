@@ -221,7 +221,7 @@ int main() {
    test(signature{std::in_place_index<1>}, abi, new_abi);
    test(symbol{unsigned('ZYX\x08')}, abi, new_abi);
    test(symbol_code{unsigned('ZYXW')}, abi, new_abi);
-   test(asset{5, {'ZYX\x08'}}, abi, new_abi);
+   test(asset{5, symbol{'ZYX\x08'}}, abi, new_abi);
    test(struct_type{}, abi, new_abi);
    test(struct_type{{1},2,3}, abi, new_abi);
    test(struct_type{{1,2},3,4.0}, abi, new_abi);

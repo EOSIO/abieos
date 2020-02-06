@@ -11,7 +11,8 @@
 #include <eosio/abi.hpp>
 #include <eosio/operators.hpp>
 #include <eosio/bytes.hpp>
-#include "../include/eosio/crypto.hpp"
+#include <eosio/crypto.hpp>
+#include <eosio/symbol.hpp>
 
 #ifdef EOSIO_CDT_COMPILATION
 #include <cwchar>
@@ -704,45 +705,8 @@ eosio::result<void> to_json(const block_timestamp& obj, S& stream) {
     return to_json(time_point(obj), stream);
 }
 
-struct symbol_code {
-    uint64_t value = 0;
-};
-
-EOSIO_REFLECT(symbol_code, value);
-EOSIO_COMPARE(symbol_code);
-
-template <typename S>
-inline eosio::result<void> from_json(symbol_code& obj, S& stream) {
-    OUTCOME_TRY(s, stream.get_string());
-    if (!eosio::string_to_symbol_code(obj.value, s.data(), s.data() + s.size()))
-        return eosio::from_json_error::expected_symbol_code;
-    return eosio::outcome::success();
-}
-
-template <typename S>
-inline eosio::result<void> to_json(const symbol_code& obj, S& stream) {
-    return to_json(eosio::symbol_code_to_string(obj.value), stream);
-}
-
-struct symbol {
-    uint64_t value = 0;
-};
-
-EOSIO_REFLECT(symbol, value);
-EOSIO_COMPARE(symbol);
-
-template<typename S>
-inline eosio::result<void> from_json(symbol& obj, S& stream) {
-    OUTCOME_TRY(s, stream.get_string());
-    if (!eosio::string_to_symbol(obj.value, s.data(), s.data() + s.size()))
-        return eosio::from_json_error::expected_symbol;
-    return eosio::outcome::success();
-}
-
-template<typename S>
-inline eosio::result<void> to_json(const symbol& obj, S& stream) {
-    return to_json(eosio::symbol_to_string(obj.value), stream);
-}
+using eosio::symbol_code;
+using eosio::symbol;
 
 struct asset {
     int64_t amount = 0;
