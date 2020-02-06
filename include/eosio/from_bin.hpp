@@ -1,8 +1,8 @@
 #pragma once
 
-#include <eosio/stream.hpp>
 #include <eosio/convert.hpp>
 #include <eosio/for_each_field.hpp>
+#include <eosio/stream.hpp>
 #include <optional>
 #include <variant>
 
@@ -160,7 +160,7 @@ template <uint32_t I, typename... Ts, typename S>
 result<void> variant_from_bin(std::variant<Ts...>& v, uint32_t i, S& stream) {
    if constexpr (I < std::variant_size_v<std::variant<Ts...>>) {
       if (i == I) {
-         auto& x = v.template emplace<std::variant_alternative_t<I, std::variant<Ts...>>>();
+         auto& x = v.template emplace<I>();
          return from_bin(x, stream);
       } else {
          return variant_from_bin<I + 1>(v, i, stream);
@@ -177,6 +177,12 @@ result<void> from_bin(std::variant<Ts...>& obj, S& stream) {
    if (!r)
       return r;
    return variant_from_bin<0>(obj, u, stream);
+}
+
+template <typename T, std::size_t N, typename S>
+result<void> from_bin(std::array<T, N>& obj, S& stream) {
+   for (T& elem : obj) { OUTCOME_TRY(from_bin(elem, stream)); }
+   return outcome::success();
 }
 
 template <typename T, typename S>

@@ -1,7 +1,7 @@
 #pragma once
 
-#include <eosio/stream.hpp>
 #include <eosio/for_each_field.hpp>
+#include <eosio/stream.hpp>
 #include <optional>
 #include <variant>
 
@@ -128,6 +128,12 @@ result<void> to_bin_tuple(const T& obj, S& stream) {
 template <typename... Ts, typename S>
 result<void> to_bin(const std::tuple<Ts...>& obj, S& stream) {
    return to_bin_tuple<0>(obj, stream);
+}
+
+template <typename T, std::size_t N, typename S>
+result<void> to_bin(const std::array<T, N>& obj, S& stream) {
+   for (const T& elem : obj) { OUTCOME_TRY(to_bin(elem, stream)); }
+   return outcome::success();
 }
 
 template <typename T, typename S>

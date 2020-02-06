@@ -103,7 +103,7 @@ using abieos::bytes;
 using abieos::checksum160;
 using abieos::checksum256;
 using abieos::checksum512;
-using abieos::key_type;
+//using abieos::key_type;
 using abieos::public_key;
 using abieos::private_key;
 using abieos::signature;
@@ -213,11 +213,12 @@ int main() {
                     0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
                     0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
                     0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF}, abi, new_abi);
-   test(public_key{key_type::k1, std::vector<uint8_t>(33, 1)}, abi, new_abi);
-   test(public_key{key_type::r1, std::vector<uint8_t>(33, 1)}, abi, new_abi);
-   test(private_key{key_type::r1, std::vector<uint8_t>(32, 1)}, abi, new_abi);
-   test(signature{key_type::k1, std::vector<uint8_t>(65, 1)}, abi, new_abi);
-   test(signature{key_type::r1, std::vector<uint8_t>(65, 1)}, abi, new_abi);
+   test(public_key{std::in_place_index<0>}, abi, new_abi);
+   test(public_key{std::in_place_index<1>}, abi, new_abi);
+   test(private_key{std::in_place_index<0>}, abi, new_abi);
+   test(private_key{std::in_place_index<1>}, abi, new_abi);
+   test(signature{std::in_place_index<0>}, abi, new_abi);
+   test(signature{std::in_place_index<1>}, abi, new_abi);
    test(symbol{unsigned('ZYX\x08')}, abi, new_abi);
    test(symbol_code{unsigned('ZYXW')}, abi, new_abi);
    test(asset{5, {'ZYX\x08'}}, abi, new_abi);

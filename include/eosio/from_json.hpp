@@ -6,6 +6,7 @@
 #include <optional>
 #include <rapidjson/reader.h>
 #include <vector>
+#include <variant>
 
 namespace eosio {
 enum class from_json_error {

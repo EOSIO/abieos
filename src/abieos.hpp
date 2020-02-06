@@ -11,6 +11,7 @@
 #include <eosio/abi.hpp>
 #include <eosio/operators.hpp>
 #include <eosio/bytes.hpp>
+#include "../include/eosio/crypto.hpp"
 
 #ifdef EOSIO_CDT_COMPILATION
 #include <cwchar>
@@ -538,160 +539,9 @@ eosio::result<void> to_json(const int128& obj, S& stream) {
     return to_json(result, stream);
 }
 
-inline constexpr const char* get_type_name(public_key*) { return "public_key"; }
-inline bool operator==(const public_key& lhs, const public_key& rhs) { return lhs.type == rhs.type && lhs.data == rhs.data; }
-
-inline constexpr const char* get_type_name(private_key*) { return "private_key"; }
-inline bool operator==(const private_key& lhs, const private_key& rhs) { return lhs.type == rhs.type && lhs.data == rhs.data; }
-
-inline constexpr const char* get_type_name(signature*) { return "signature"; }
-inline bool operator==(const signature& lhs, const signature& rhs) { return lhs.type == rhs.type && lhs.data == rhs.data; }
-
-template <typename Key, typename S>
-eosio::result<void> key_from_bin(Key& obj, S& stream) {
-    auto r = stream.read_raw(obj.type);
-    if (!r)
-        return r;
-    if (obj.type == key_type::wa) {
-        if constexpr (std::is_same_v<std::decay_t<Key>, public_key>) {
-            auto begin = stream.pos;
-            r = stream.skip(34);
-            if (!r)
-                return r;
-            uint32_t size;
-            r = varuint32_from_bin(size, stream);
-            if (!r)
-                return r;
-            r = stream.skip(size);
-            if (!r)
-                return r;
-            obj.data.resize(stream.pos - begin);
-            memcpy(obj.data.data(), begin, obj.data.size());
-            return eosio::outcome::success();
-        } else if constexpr (std::is_same_v<std::decay_t<Key>, signature>) {
-            auto begin = stream.pos;
-            r = stream.skip(65);
-            if (!r)
-                return r;
-            uint32_t size;
-            r = varuint32_from_bin(size, stream);
-            if (!r)
-                return r;
-            r = stream.skip(size);
-            if (!r)
-                return r;
-            r = varuint32_from_bin(size, stream);
-            if (!r)
-                return r;
-            r = stream.skip(size);
-            if (!r)
-                return r;
-            obj.data.resize(stream.pos - begin);
-            memcpy(obj.data.data(), begin, obj.data.size());
-            return eosio::outcome::success();
-        } else {
-            return eosio::stream_error::bad_variant_index;
-        }
-    } else {
-        obj.data.resize(Key::k1r1_size);
-        return stream.read(obj.data.data(), obj.data.size());
-    }
-}
-
-template <typename Key, typename S>
-eosio::result<void> key_to_bin(const Key& obj, S& stream) {
-    auto r = eosio::to_bin(obj.type, stream);
-    if (!r)
-        return r.error();
-    return stream.write(obj.data.data(), obj.data.size());
-}
-
-template <typename S>
-eosio::result<void> from_bin(public_key& obj, S& stream) {
-    return key_from_bin(obj, stream);
-}
-
-template <typename S>
-eosio::result<void> to_bin(const public_key& obj, S& stream) {
-    return key_to_bin(obj, stream);
-}
-
-template <typename S>
-eosio::result<void> from_json(public_key& obj, S& stream) {
-    OUTCOME_TRY(s, stream.get_string());
-    std::string error; // !!!
-    if (!string_to_public_key(obj, error, s))
-        return eosio::from_json_error::expected_public_key;
-    return eosio::outcome::success();
-}
-
-template <typename S>
-eosio::result<void> to_json(const public_key& obj, S& stream) {
-    std::string result;
-    std::string error; // !!!
-    if (!public_key_to_string(result, error, obj))
-        return eosio::stream_error::json_writer_error;
-    return to_json(result, stream);
-}
-
-template <typename S>
-eosio::result<void> from_bin(private_key& obj, S& stream) {
-    return key_from_bin(obj, stream);
-}
-
-template <typename S>
-eosio::result<void> to_bin(const private_key& obj, S& stream) {
-    return key_to_bin(obj, stream);
-}
-
-template <typename S>
-eosio::result<void> from_json(private_key& obj, S& stream) {
-    OUTCOME_TRY(s, stream.get_string());
-    std::string error;
-    if (!string_to_private_key(obj, error, s))
-        return eosio::from_json_error::expected_private_key;
-    return eosio::outcome::success();
-}
-
-template <typename S>
-eosio::result<void> to_json(const private_key& obj, S& stream) {
-    std::string result;
-    std::string error; // !!!
-    if (!private_key_to_string(result, error, obj))
-        return eosio::stream_error::json_writer_error;
-    return to_json(result, stream);
-}
-
-template <typename S>
-eosio::result<void> to_bin(const signature& obj, S& stream) {
-    return key_to_bin(obj, stream);
-}
-
-template <typename S>
-eosio::result<void> from_bin(signature& obj, S& stream) {
-    return key_from_bin(obj, stream);
-}
-
-template <typename S>
-eosio::result<void> from_json(signature& obj, S& stream) {
-    auto r = stream.get_string();
-    if (!r)
-        return r.error();
-    std::string error; // !!!
-    if (!string_to_signature(obj, error, r.value()))
-        return eosio::from_json_error::invalid_signature;
-    return eosio::outcome::success();
-}
-
-template <typename S>
-eosio::result<void> to_json(const signature& obj, S& stream) {
-    std::string result;
-    std::string error; // !!!
-    if (!signature_to_string(result, error, obj))
-        return eosio::stream_error::json_writer_error;
-    return to_json(result, stream);
-}
-
+using eosio::public_key;
+using eosio::private_key;
+using eosio::signature;
 using eosio::name;
 
 struct varuint32 {

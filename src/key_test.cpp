@@ -24,7 +24,6 @@ using abieos::bytes;
 using abieos::checksum160;
 using abieos::checksum256;
 using abieos::checksum512;
-using abieos::key_type;
 using abieos::public_key;
 using abieos::private_key;
 using abieos::signature;

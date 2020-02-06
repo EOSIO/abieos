@@ -31,19 +31,19 @@ Please run the command 'git submodule update --init --recursive'.")
   endif()
 endif()
 
-add_library(abieos MODULE src/abieos.cpp src/abi.cpp include/eosio/fpconv.c)
+add_library(abieos MODULE src/abieos.cpp src/abi.cpp src/crypto.cpp include/eosio/fpconv.c)
 target_include_directories(abieos PRIVATE include external/outcome/single-header external/rapidjson/include external/date/include)
 
-add_executable(test src/test.cpp src/abieos.cpp src/abi.cpp include/eosio/fpconv.c)
+add_executable(test src/test.cpp src/abieos.cpp src/abi.cpp src/crypto.cpp include/eosio/fpconv.c)
 target_include_directories(test PRIVATE include external/outcome/single-header external/rapidjson/include external/date/include)
 
-add_executable(template_test src/template_test.cpp src/abieos.cpp src/abi.cpp include/eosio/fpconv.c)
+add_executable(template_test src/template_test.cpp src/abieos.cpp src/abi.cpp src/crypto.cpp include/eosio/fpconv.c)
 target_include_directories(template_test PRIVATE include external/outcome/single-header external/rapidjson/include external/date/include)
 
-add_executable(key_test src/key_test.cpp src/abieos.cpp src/abi.cpp include/eosio/fpconv.c)
+add_executable(key_test src/key_test.cpp src/abieos.cpp src/abi.cpp src/crypto.cpp include/eosio/fpconv.c)
 target_include_directories(key_test PRIVATE include external/outcome/single-header external/rapidjson/include external/date/include)
 
-add_executable(test-sanitize src/test.cpp src/abieos.cpp src/abi.cpp include/eosio/fpconv.c)
+add_executable(test-sanitize src/test.cpp src/abieos.cpp src/abi.cpp src/crypto.cpp include/eosio/fpconv.c)
 target_include_directories(test-sanitize PRIVATE include external/outcome/single-header external/rapidjson/include external/date/include)
 target_link_libraries(test-sanitize -fno-omit-frame-pointer -fsanitize=address,undefined)
 target_compile_options(test-sanitize PUBLIC -fno-omit-frame-pointer -fsanitize=address,undefined)
