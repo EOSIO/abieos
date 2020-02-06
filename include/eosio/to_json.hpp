@@ -148,10 +148,12 @@ template <typename S> result<void> to_json(uint8_t value, S& stream)   { return 
 template <typename S> result<void> to_json(uint16_t value, S& stream)  { return int_to_json(value, stream); }
 template <typename S> result<void> to_json(uint32_t value, S& stream)  { return int_to_json(value, stream); }
 template <typename S> result<void> to_json(uint64_t value, S& stream)  { return int_to_json(value, stream); }
+template <typename S> result<void> to_json(unsigned __int128 value, S& stream)   { return int_to_json(value, stream); }
 template <typename S> result<void> to_json(int8_t value, S& stream)    { return int_to_json(value, stream); }
 template <typename S> result<void> to_json(int16_t value, S& stream)   { return int_to_json(value, stream); }
 template <typename S> result<void> to_json(int32_t value, S& stream)   { return int_to_json(value, stream); }
 template <typename S> result<void> to_json(int64_t value, S& stream)   { return int_to_json(value, stream); }
+template <typename S> result<void> to_json(__int128 value, S& stream)   { return int_to_json(value, stream); }
 template <typename S> result<void> to_json(double value, S& stream)    { return fp_to_json(value, stream); }
 template <typename S> result<void> to_json(float value, S& stream)     { return fp_to_json(value, stream); }
 // clang-format on

@@ -451,6 +451,12 @@ result<void> from_json(uint64_t& result, S& stream) {
 
 /// \group from_json_explicit
 template <typename S>
+result<void> from_json(unsigned __int128& result, S& stream) {
+   return from_json_int(result, stream);
+}
+
+/// \group from_json_explicit
+template <typename S>
 result<void> from_json(int8_t& result, S& stream) {
    return from_json_int(result, stream);
 }
@@ -470,6 +476,12 @@ result<void> from_json(int32_t& result, S& stream) {
 /// \group from_json_explicit
 template <typename S>
 result<void> from_json(int64_t& result, S& stream) {
+   return from_json_int(result, stream);
+}
+
+/// \group from_json_explicit
+template <typename S>
+result<void> from_json(__int128& result, S& stream) {
    return from_json_int(result, stream);
 }
 

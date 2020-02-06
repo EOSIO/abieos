@@ -21,6 +21,8 @@ constexpr const char* get_type_name(std::uint64_t*) { return "uint64"; }
 constexpr const char* get_type_name(float*) { return "float32"; }
 constexpr const char* get_type_name(double*) { return "float64"; }
 constexpr const char* get_type_name(std::string*) { return "string"; }
+constexpr const char* get_type_name(__int128*) { return "int128"; }
+constexpr const char* get_type_name(unsigned __int128*) { return "uint128"; }
 
 template <std::size_t N, std::size_t M>
 constexpr std::array<char, N + M> array_cat(std::array<char, N> lhs, std::array<char, M> rhs) {
