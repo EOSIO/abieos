@@ -13,6 +13,7 @@
 #include <eosio/bytes.hpp>
 #include <eosio/crypto.hpp>
 #include <eosio/symbol.hpp>
+#include <eosio/asset.hpp>
 
 #ifdef EOSIO_CDT_COMPILATION
 #include <cwchar>
@@ -707,52 +708,8 @@ eosio::result<void> to_json(const block_timestamp& obj, S& stream) {
 
 using eosio::symbol_code;
 using eosio::symbol;
-
-struct asset {
-    int64_t amount = 0;
-    symbol sym{};
-};
-
-EOSIO_REFLECT(asset, amount, sym);
-EOSIO_COMPARE(asset);
-
-inline eosio::result<void> from_string(asset& result, eosio::input_stream& stream) {
-    int64_t amount;
-    uint64_t sym;
-    if (!eosio::string_to_asset(amount, sym, stream.pos, stream.end, true))
-        return eosio::stream_error::invalid_asset_format;
-    result = asset{amount, symbol{sym}};
-    return eosio::outcome::success();
-}
-
-ABIEOS_NODISCARD inline bool string_to_asset(asset& result, const char*& s, const char* end,
-                                             bool expect_end) {
-    int64_t amount;
-    uint64_t sym;
-    if (!eosio::string_to_asset(amount, sym, s, end, expect_end))
-        return false;
-    result = asset{amount, symbol{sym}};
-    return true;
-}
-
-ABIEOS_NODISCARD inline bool string_to_asset(asset& result, const char* s, const char* end) {
-    return string_to_asset(result, s, end, true);
-}
-
-inline std::string asset_to_string(const asset& v) { return eosio::asset_to_string(v.amount, v.sym.value); }
-
-template<typename S>
-eosio::result<void> from_json(asset& obj, S& stream) {
-    OUTCOME_TRY(s, stream.get_string());
-    if (!string_to_asset(obj, s.data(), s.data() + s.size()))
-        return eosio::from_json_error::expected_asset;
-    return eosio::outcome::success();
-}
-
-template<typename S>
-eosio::result<void> to_json(const asset& obj, S& stream) {
-    return to_json(asset_to_string(obj), stream);
-}
+using eosio::asset;
+using eosio::extended_asset;
 
 ///////////////////////////////////////////////////////////////////////////////
 // abi types
