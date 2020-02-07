@@ -17,6 +17,7 @@
 #include <eosio/time.hpp>
 #include <eosio/fixed_bytes.hpp>
 #include <eosio/float.hpp>
+#include <eosio/varint.hpp>
 
 #ifdef EOSIO_CDT_COMPILATION
 #include <cwchar>
@@ -384,74 +385,8 @@ using eosio::private_key;
 using eosio::signature;
 using eosio::name;
 
-struct varuint32 {
-    uint32_t value = 0;
-
-    explicit operator std::string() const { return std::to_string(value); }
-};
-
-inline constexpr const char* get_type_name(varuint32*) { return "varuint32"; }
-inline constexpr bool operator==(const varuint32& lhs, const varuint32& rhs) { return lhs.value == rhs.value; }
-
-template<typename F>
-void convert(const varuint32& src, uint32_t& dst, F&& chooser) {
-   dst = src.value;
-}
-
-template <typename S>
-eosio::result<void> from_bin(varuint32& obj, S& stream) {
-    return varuint32_from_bin(obj.value, stream);
-}
-
-template <typename S>
-eosio::result<void> to_bin(const varuint32& obj, S& stream) {
-    return eosio::varuint32_to_bin(obj.value, stream);
-}
-
-template <typename S>
-eosio::result<void> from_json(varuint32& obj, S& stream) {
-    using eosio::from_json;
-    return from_json(obj.value, stream);
-}
-
-template <typename S>
-eosio::result<void> to_json(const varuint32& obj, S& stream) {
-    return to_json(obj.value, stream);
-}
-
-struct varint32 {
-    int32_t value = 0;
-
-    explicit operator std::string() const { return std::to_string(value); }
-};
-
-inline constexpr const char* get_type_name(varint32*) { return "varint32"; }
-inline constexpr bool operator==(const varint32& lhs, const varint32& rhs) { return lhs.value == rhs.value; }
-
-inline void push_varint32(std::vector<char>& bin, int32_t v) {
-    eosio::push_varuint32(bin, (uint32_t(v) << 1) ^ uint32_t(v >> 31));
-}
-
-template<typename S>
-eosio::result<void> from_bin(varint32& obj, S& stream) {
-    return varint32_from_bin(obj.value, stream);
-}
-
-template<typename S>
-eosio::result<void> to_bin(const varint32& obj, S& stream) {
-    return eosio::varuint32_to_bin((uint32_t(obj.value) << 1) ^ uint32_t(obj.value >> 31), stream);
-}
-
-template<typename S>
-eosio::result<void> from_json(varint32& obj, S& stream) {
-    using eosio::from_json;
-    return from_json(obj.value, stream);
-}
-
-template<typename S>
-eosio::result<void> to_json(const varint32& obj, S& stream) {
-    return to_json(obj.value, stream);
-}
+using eosio::varuint32;
+using eosio::varint32;
 
 using eosio::time_point;
 using eosio::time_point_sec;
