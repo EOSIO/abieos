@@ -2,7 +2,15 @@
 #include <eosio/from_json.hpp>
 #include <eosio/to_bin.hpp>
 #include <eosio/from_bin.hpp>
-#include "abieos.hpp"
+#include <eosio/bytes.hpp>
+#include <eosio/crypto.hpp>
+#include <eosio/symbol.hpp>
+#include <eosio/asset.hpp>
+#include <eosio/time.hpp>
+#include <eosio/fixed_bytes.hpp>
+#include <eosio/float.hpp>
+#include <eosio/varint.hpp>
+#include <eosio/abi.hpp>
 
 int error_count;
 
@@ -91,25 +99,25 @@ void test_int(eosio::abi& abi1, eosio::abi& abi2) {
    }
 }
 
-using abieos::int128;
-using abieos::uint128;
-using abieos::varint32;
-using abieos::varuint32;
-using abieos::float128;
+using int128 = __int128;
+using uint128 = unsigned __int128;
+using eosio::varint32;
+using eosio::varuint32;
+using eosio::float128;
 using eosio::microseconds;
-using abieos::time_point;
-using abieos::time_point_sec;
-using abieos::block_timestamp;
-using abieos::bytes;
-using abieos::checksum160;
-using abieos::checksum256;
-using abieos::checksum512;
-using abieos::public_key;
-using abieos::private_key;
-using abieos::signature;
-using abieos::symbol;
-using abieos::symbol_code;
-using abieos::asset;
+using eosio::time_point;
+using eosio::time_point_sec;
+using eosio::block_timestamp;
+using eosio::bytes;
+using eosio::checksum160;
+using eosio::checksum256;
+using eosio::checksum512;
+using eosio::public_key;
+using eosio::private_key;
+using eosio::signature;
+using eosio::symbol;
+using eosio::symbol_code;
+using eosio::asset;
 
 using vec_type = std::vector<int>;
 struct struct_type {
@@ -196,8 +204,8 @@ int main() {
       test(block_timestamp{i}, abi, new_abi);
    }
    test(block_timestamp{0xFFFFFFFFu}, abi, new_abi);
-   test(abieos::name("eosio"), abi, new_abi);
-   test(abieos::name(), abi, new_abi);
+   test(eosio::name("eosio"), abi, new_abi);
+   test(eosio::name(), abi, new_abi);
    test(bytes(), abi, new_abi);
    test(bytes{{0, 0, 0, 0}}, abi, new_abi);
    test(bytes{{'\xff', '\xff', '\xff', '\xff'}}, abi, new_abi);

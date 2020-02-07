@@ -3,6 +3,7 @@
 #include <eosio/eosio_outcome.hpp>
 #include <eosio/from_json.hpp>
 #include <eosio/to_json.hpp>
+#include <eosio/operators.hpp>
 #include <vector>
 
 namespace eosio {
