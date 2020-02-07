@@ -28,12 +28,10 @@ class fixed_bytes {
 template <std::size_t Size>
 EOSIO_COMPARE(fixed_bytes<Size>);
 
-using float128    = fixed_bytes<16>;
 using checksum160 = fixed_bytes<20>;
 using checksum256 = fixed_bytes<32>;
 using checksum512 = fixed_bytes<64>;
 
-EOSIO_REFLECT(float128, value);
 EOSIO_REFLECT(checksum160, value);
 EOSIO_REFLECT(checksum256, value);
 EOSIO_REFLECT(checksum512, value);

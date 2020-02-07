@@ -16,6 +16,7 @@
 #include <eosio/asset.hpp>
 #include <eosio/time.hpp>
 #include <eosio/fixed_bytes.hpp>
+#include <eosio/float.hpp>
 
 #ifdef EOSIO_CDT_COMPILATION
 #include <cwchar>

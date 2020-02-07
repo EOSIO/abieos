@@ -24,6 +24,10 @@ constexpr const char* get_type_name(std::string*) { return "string"; }
 constexpr const char* get_type_name(__int128*) { return "int128"; }
 constexpr const char* get_type_name(unsigned __int128*) { return "uint128"; }
 
+#ifdef EOSIO_CDT_COMPILATION
+constexpr const char* get_type_name(long double*) { return "float128"; }
+#endif
+
 template <std::size_t N, std::size_t M>
 constexpr std::array<char, N + M> array_cat(std::array<char, N> lhs, std::array<char, M> rhs) {
    std::array<char, N + M> result{};
