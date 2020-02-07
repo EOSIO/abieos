@@ -5,15 +5,15 @@
 namespace eosio { namespace operators {
 
 // Defines comparison operators for a reflected struct
-#define EOSIO_COMPARE(TYPE)                                                                                            \
+#define EOSIO_COMPARE(...)                                                                                             \
+   auto                      eosio_enable_comparison(const __VA_ARGS__&)->bool;                                        \
    using ::eosio::operators::operator==;                                                                               \
    using ::eosio::operators::operator!=;                                                                               \
    using ::eosio::operators::operator<;                                                                                \
    using ::eosio::operators::operator>;                                                                                \
    using ::eosio::operators::operator<=;                                                                               \
    using ::eosio::operators::operator>=;                                                                               \
-   using ::eosio::operators::eosio_compare;                                                                            \
-   auto eosio_enable_comparison(const TYPE&)->bool
+   using ::eosio::operators::eosio_compare
 
    template <typename T>
    auto operator==(const T& lhs, const T& rhs) -> decltype(eosio_enable_comparison(lhs)) {

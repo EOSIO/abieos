@@ -15,6 +15,7 @@
 #include <eosio/symbol.hpp>
 #include <eosio/asset.hpp>
 #include <eosio/time.hpp>
+#include <eosio/fixed_bytes.hpp>
 
 #ifdef EOSIO_CDT_COMPILATION
 #include <cwchar>
@@ -394,63 +395,10 @@ inline eosio::result<void> bin_to_json(bytes*, bin_to_json_state& state, bool, c
     return to_json_hex(data, size, state.writer);
 }
 
-template <unsigned size>
-struct fixed_binary {
-    std::array<uint8_t, size> value{{0}};
-
-    explicit operator std::string() const {
-        std::string result;
-        hex(value.begin(), value.end(), std::back_inserter(result));
-        return result;
-    }
-};
-
-template <unsigned size>
-bool operator==(const fixed_binary<size>& a, const fixed_binary<size>& b) {
-    return a.value == b.value;
-}
-
-template <unsigned size>
-bool operator!=(const fixed_binary<size>& a, const fixed_binary<size>& b) {
-    return a.value != b.value;
-}
-
-using float128 = fixed_binary<16>;
-using checksum160 = fixed_binary<20>;
-using checksum256 = fixed_binary<32>;
-using checksum512 = fixed_binary<64>;
-
-inline constexpr const char* get_type_name(float128*) { return "float128"; }
-inline constexpr const char* get_type_name(checksum160*) { return "checksum160"; }
-inline constexpr const char* get_type_name(checksum256*) { return "checksum256"; }
-inline constexpr const char* get_type_name(checksum512*) { return "checksum512"; }
-
-template <unsigned size, typename S>
-eosio::result<void> from_bin(fixed_binary<size>& obj, S& stream) {
-    return stream.read(obj.value.data(), size);
-}
-
-template <unsigned size, typename S>
-eosio::result<void> to_bin(const fixed_binary<size>& obj, S& stream) {
-    return stream.write(obj.value.data(), obj.value.size());
-}
-
-template <unsigned size, typename S>
-eosio::result<void> from_json(fixed_binary<size>& obj, S& stream) {
-    std::vector<char> v;
-    auto r = eosio::from_json_hex(v, stream);
-    if (!r)
-        return r;
-    if (v.size() != size)
-        return eosio::from_json_error::hex_string_incorrect_length;
-    memcpy(obj.value.data(), v.data(), size);
-    return eosio::outcome::success();
-}
-
-template<unsigned size, typename S>
-eosio::result<void> to_json(const fixed_binary<size>& obj, S& stream) {
-    return eosio::to_json_hex((const char*)obj.value.data(), obj.value.size(), stream);
-}
+using eosio::float128;
+using eosio::checksum160;
+using eosio::checksum256;
+using eosio::checksum512;
 
 using uint128 = unsigned __int128;
 using int128 = __int128;
