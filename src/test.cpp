@@ -320,8 +320,8 @@ void check_types() {
     check_context(context, abieos_set_abi_hex(context, testHexAbiName, testHexAbi));
 
     int next_id = 0;
-    auto write_corpus = [&](bool abi_is_bin, uint8_t operation, uint64_t contract, abieos::input_buffer abi,
-                            abieos::input_buffer type, abieos::input_buffer data) {
+    auto write_corpus = [&](bool abi_is_bin, uint8_t operation, uint64_t contract, eosio::input_stream abi,
+                            eosio::input_stream type, eosio::input_stream data) {
         fuzzer_header header;
         header.abi_is_bin = abi_is_bin;
         header.operation = operation;

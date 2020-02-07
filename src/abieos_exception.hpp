@@ -66,15 +66,6 @@ inline asset string_to_asset(const char* s) {
     return result;
 }
 
-template <typename T>
-T read_raw(input_buffer& bin) {
-    std::string error;
-    T x;
-    if (!read_raw(bin, error, x))
-        throw abieos::error(error);
-    return x;
-}
-
 inline void check_abi_version(const std::string& s) {
     std::string error;
     if (!check_abi_version(s, error))

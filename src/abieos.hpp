@@ -109,12 +109,6 @@ ABIEOS_NODISCARD bool unhex(std::string& error, SrcIt begin, SrcIt end, DestIt d
     return true;
 }
 
-// !!!
-struct input_buffer {
-    const char* pos = nullptr;
-    const char* end = nullptr;
-};
-
 ///////////////////////////////////////////////////////////////////////////////
 // stream events
 ///////////////////////////////////////////////////////////////////////////////
@@ -352,25 +346,6 @@ eosio::result<void> bin_to_json(pseudo_variant*, bin_to_json_state& state, bool 
 ///////////////////////////////////////////////////////////////////////////////
 // serializable types
 ///////////////////////////////////////////////////////////////////////////////
-
-template <typename S>
-eosio::result<void> from_bin(input_buffer& obj, S& stream) {
-    uint64_t size;
-    auto r = varuint64_from_bin(size, stream);
-    if (!r)
-        return r;
-    const char* buf;
-    r = stream.read_reuse_storage(buf, size);
-    if (!r)
-        return r;
-    obj = {buf, buf + size};
-    return eosio::outcome::success();
-}
-
-template <typename S>
-eosio::result<void> to_bin(const input_buffer& obj, S& stream) {
-    return to_bin(std::string_view{obj.pos, size_t(obj.end - obj.pos)}, stream);
-}
 
 using eosio::bytes;
 
