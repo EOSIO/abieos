@@ -77,6 +77,17 @@ result<void> to_bin_range(const T& obj, S& stream) {
    return outcome::success();
 }
 
+template <typename T, std::size_t N, typename S>
+result<void> to_bin(const T (&obj)[N], S& stream) {
+   OUTCOME_TRY(varuint32_to_bin(N, stream));
+   if constexpr (has_bitwise_serialization<T>()) {
+      OUTCOME_TRY(stream.write(reinterpret_cast<const char*>(&obj), N * sizeof(T)));
+   } else {
+      for (auto& x : obj) { OUTCOME_TRY(to_bin(x, stream)); }
+   }
+   return outcome::success();
+}
+
 template <typename T, typename S>
 result<void> to_bin(const std::vector<T>& obj, S& stream) {
    OUTCOME_TRY(varuint32_to_bin(obj.size(), stream));

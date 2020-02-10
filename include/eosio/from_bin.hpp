@@ -87,6 +87,20 @@ result<void> from_bin_sequence(T& v, S& stream) {
    return outcome::success();
 }
 
+template <typename T, std::size_t N, typename S>
+result<void> from_bin(T (&v)[N], S& stream) {
+   uint32_t size;
+   OUTCOME_TRY(varuint32_from_bin(size, stream));
+   if (size != N)
+      return stream_error::array_size_mismatch;
+   if constexpr (has_bitwise_serialization<T>()) {
+      return stream.read(reinterpret_cast<char*>(v), size * sizeof(T));
+   } else {
+      for (size_t i = 0; i < size; ++i) { OUTCOME_TRY(from_bin(v[i], stream)); }
+   }
+   return outcome::success();
+}
+
 template <typename T, typename S>
 result<void> from_bin(std::vector<T>& v, S& stream) {
    if constexpr (has_bitwise_serialization<T>()) {
