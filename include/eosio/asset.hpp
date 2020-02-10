@@ -328,6 +328,16 @@ struct asset {
 EOSIO_REFLECT(asset, amount, symbol);
 
 template <typename S>
+inline result<void> from_string(asset& result, S& stream) {
+   int64_t  amount;
+   uint64_t sym;
+   if (!eosio::string_to_asset(amount, sym, stream.pos, stream.end, true))
+      return eosio::stream_error::invalid_asset_format;
+   result = asset{ amount, symbol{ sym } };
+   return eosio::outcome::success();
+}
+
+template <typename S>
 result<void> to_json(const asset& obj, S& stream) {
    return to_json(asset_to_string(obj.amount, obj.symbol.value), stream);
 }
@@ -436,6 +446,7 @@ struct extended_asset {
       return a.quantity >= b.quantity;
    }
 
+   std::string to_string() const { return quantity.to_string() + "@" + contract.to_string(); }
    /// @endcond
 };
 

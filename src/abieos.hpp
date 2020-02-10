@@ -967,8 +967,4 @@ auto bin_to_json(T* t, bin_to_json_state& state, bool, const abi_type*, bool sta
     return to_json(v, state.writer);
 }
 
-inline namespace literals {
-inline constexpr name operator""_n(const char* s, size_t) { return name{s}; }
-} // namespace literals
-
 } // namespace abieos

@@ -1,12 +1,21 @@
 #pragma once
 
+#include <deque>
 #include <eosio/convert.hpp>
 #include <eosio/for_each_field.hpp>
 #include <eosio/stream.hpp>
+#include <list>
+#include <map>
 #include <optional>
+#include <set>
+#include <tuple>
 #include <variant>
+#include <vector>
 
 namespace eosio {
+
+template <typename T, typename S>
+result<void> from_bin(T& obj, S& stream);
 
 template <typename S>
 result<void> varuint32_from_bin(uint32_t& dest, S& stream) {
@@ -16,7 +25,7 @@ result<void> varuint32_from_bin(uint32_t& dest, S& stream) {
    do {
       if (shift >= 35)
          return stream_error::invalid_varuint_encoding;
-      auto r = stream.read_raw(b);
+      auto r = from_bin(b, stream);
       if (!r)
          return r;
       dest |= uint32_t(b & 0x7f) << shift;
@@ -33,7 +42,7 @@ result<void> varuint64_from_bin(uint64_t& dest, S& stream) {
    do {
       if (shift >= 70)
          return stream_error::invalid_varuint_encoding;
-      auto r = stream.read_raw(b);
+      auto r = from_bin(b, stream);
       if (!r)
          return r;
       dest |= uint64_t(b & 0x7f) << shift;
@@ -56,6 +65,29 @@ result<void> varint32_from_bin(int32_t& result, S& stream) {
 }
 
 template <typename T, typename S>
+result<void> from_bin_assoc(T& v, S& stream) {
+   uint32_t size;
+   OUTCOME_TRY(varuint32_from_bin(size, stream));
+   for (size_t i = 0; i < size; ++i) {
+      typename T::value_type elem;
+      OUTCOME_TRY(from_bin(elem, stream));
+      v.emplace(elem);
+   }
+   return outcome::success();
+}
+
+template <typename T, typename S>
+result<void> from_bin_sequence(T& v, S& stream) {
+   uint32_t size;
+   OUTCOME_TRY(varuint32_from_bin(size, stream));
+   for (size_t i = 0; i < size; ++i) {
+      v.emplace_back();
+      OUTCOME_TRY(from_bin(v.back(), stream));
+   }
+   return outcome::success();
+}
+
+template <typename T, typename S>
 result<void> from_bin(std::vector<T>& v, S& stream) {
    if constexpr (has_bitwise_serialization<T>()) {
       if constexpr (sizeof(size_t) >= 8) {
@@ -67,7 +99,7 @@ result<void> from_bin(std::vector<T>& v, S& stream) {
          if (!r)
             return r;
          v.resize(size);
-         return stream.read(v.data(), size * sizeof(T));
+         return stream.read(reinterpret_cast<char*>(v.data()), size * sizeof(T));
       } else {
          uint32_t size;
          auto     r = varuint32_from_bin(size, stream);
@@ -77,7 +109,7 @@ result<void> from_bin(std::vector<T>& v, S& stream) {
          if (!r)
             return r;
          v.resize(size);
-         return stream.read(v.data(), size * sizeof(T));
+         return stream.read(reinterpret_cast<char*>(v.data()), size * sizeof(T));
       }
    } else {
       uint32_t size;
@@ -92,6 +124,33 @@ result<void> from_bin(std::vector<T>& v, S& stream) {
       }
    }
    return outcome::success();
+}
+
+template <typename T, typename S>
+result<void> from_bin(std::set<T>& v, S& stream) {
+   return from_bin_assoc(v, stream);
+}
+
+template <typename T, typename U, typename S>
+result<void> from_bin(std::map<T, U>& v, S& stream) {
+   uint32_t size;
+   OUTCOME_TRY(varuint32_from_bin(size, stream));
+   for (size_t i = 0; i < size; ++i) {
+      std::pair<T, U> elem;
+      OUTCOME_TRY(from_bin(elem, stream));
+      v.emplace(elem);
+   }
+   return outcome::success();
+}
+
+template <typename T, typename S>
+result<void> from_bin(std::deque<T>& v, S& stream) {
+   return from_bin_sequence(v, stream);
+}
+
+template <typename T, typename S>
+result<void> from_bin(std::list<T>& v, S& stream) {
+   return from_bin_sequence(v, stream);
 }
 
 template <typename S>
@@ -185,10 +244,25 @@ result<void> from_bin(std::array<T, N>& obj, S& stream) {
    return outcome::success();
 }
 
+template <int N, typename T, typename S>
+result<void> from_bin_tuple(T& obj, S& stream) {
+   if constexpr (N < std::tuple_size_v<T>) {
+      OUTCOME_TRY(from_bin(std::get<N>(obj), stream));
+      return from_bin_tuple<N + 1>(obj, stream);
+   } else {
+      return outcome::success();
+   }
+}
+
+template <typename... T, typename S>
+result<void> from_bin(std::tuple<T...>& obj, S& stream) {
+   return from_bin_tuple<0>(obj, stream);
+}
+
 template <typename T, typename S>
 result<void> from_bin(T& obj, S& stream) {
    if constexpr (has_bitwise_serialization<T>()) {
-      return stream.read_raw(obj);
+      return stream.read(reinterpret_cast<char*>(&obj), sizeof(T));
    } else if constexpr (std::is_same_v<serialization_type<T>, void>) {
       result<void> r = outcome::success();
       for_each_field(obj, [&](auto& member) {

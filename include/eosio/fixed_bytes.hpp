@@ -7,16 +7,38 @@
 #include <eosio/operators.hpp>
 #include <eosio/reflection.hpp>
 #include <eosio/to_json.hpp>
+#include <type_traits>
 
 namespace eosio {
 
 template <std::size_t Size>
 class fixed_bytes {
+   template <typename T>
+   static constexpr void write_be(uint8_t*& ptr, T t) {
+      for (std::size_t i = 0; i < sizeof(t); ++i) {
+         ptr[sizeof(T) - i - 1] = (t & 0xFFu);
+         t >>= 8;
+      }
+   }
+
  public:
    constexpr fixed_bytes() = default;
    constexpr fixed_bytes(const std::array<std::uint8_t, Size>& arr) : value(arr) {}
    constexpr fixed_bytes(const std::uint8_t (&arr)[Size]) {
       for (std::size_t i = 0; i < Size; ++i) { value[i] = arr[i]; }
+   }
+   template <typename T, typename... Rest>
+   static constexpr fixed_bytes
+   make_from_word_sequence(std::enable_if_t<(std::is_unsigned_v<T> && (std::is_same_v<T, Rest> && ...) &&
+                                             (sizeof...(Rest) + 1) * sizeof(T) == Size),
+                                            T>
+                                 first_word,
+                           Rest... rest) {
+      uint8_t  bytes[Size];
+      uint8_t* ptr = bytes;
+      write_be(ptr, first_word);
+      (write_be(ptr, rest), ...);
+      return fixed_bytes(bytes);
    }
    constexpr auto                 data() { return value.data(); }
    constexpr auto                 data() const { return value.data(); }

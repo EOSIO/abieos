@@ -1,9 +1,14 @@
 #pragma once
 
+#include <deque>
 #include <eosio/for_each_field.hpp>
 #include <eosio/stream.hpp>
+#include <list>
+#include <map>
 #include <optional>
+#include <set>
 #include <variant>
+#include <vector>
 
 namespace eosio {
 
@@ -66,22 +71,41 @@ result<void> to_bin(const std::string& s, S& stream) {
 }
 
 template <typename T, typename S>
+result<void> to_bin_range(const T& obj, S& stream) {
+   OUTCOME_TRY(varuint32_to_bin(obj.size(), stream));
+   for (auto& x : obj) { OUTCOME_TRY(to_bin(x, stream)); }
+   return outcome::success();
+}
+
+template <typename T, typename S>
 result<void> to_bin(const std::vector<T>& obj, S& stream) {
-   auto r = varuint32_to_bin(obj.size(), stream);
-   if (!r)
-      return r.error();
+   OUTCOME_TRY(varuint32_to_bin(obj.size(), stream));
    if constexpr (has_bitwise_serialization<T>()) {
-      r = stream.write(obj.data(), obj.size() * sizeof(T));
-      if (!r)
-         return r.error();
+      OUTCOME_TRY(stream.write(reinterpret_cast<const char*>(obj.data()), obj.size() * sizeof(T)));
    } else {
-      for (auto& x : obj) {
-         r = to_bin(x, stream);
-         if (!r)
-            return r.error();
-      }
+      for (auto& x : obj) { OUTCOME_TRY(to_bin(x, stream)); }
    }
    return outcome::success();
+}
+
+template <typename T, typename S>
+result<void> to_bin(const std::list<T>& obj, S& stream) {
+   return to_bin_range(obj, stream);
+}
+
+template <typename T, typename S>
+result<void> to_bin(const std::deque<T>& obj, S& stream) {
+   return to_bin_range(obj, stream);
+}
+
+template <typename T, typename S>
+result<void> to_bin(const std::set<T>& obj, S& stream) {
+   return to_bin_range(obj, stream);
+}
+
+template <typename T, typename U, typename S>
+result<void> to_bin(const std::map<T, U>& obj, S& stream) {
+   return to_bin_range(obj, stream);
 }
 
 template <typename S>
@@ -93,6 +117,12 @@ result<void> to_bin(const input_stream& obj, S& stream) {
    if (!r)
       return r.error();
    return outcome::success();
+}
+
+template <typename First, typename Second, typename S>
+result<void> to_bin(const std::pair<First, Second>& obj, S& stream) {
+   OUTCOME_TRY(to_bin(obj.first, stream));
+   return to_bin(obj.second, stream);
 }
 
 template <typename T, typename S>
@@ -139,7 +169,7 @@ result<void> to_bin(const std::array<T, N>& obj, S& stream) {
 template <typename T, typename S>
 result<void> to_bin(const T& obj, S& stream) {
    if constexpr (has_bitwise_serialization<T>()) {
-      return stream.write_raw(obj);
+      return stream.write(reinterpret_cast<const char*>(&obj), sizeof(obj));
    } else {
       result<void> r = outcome::success();
       for_each_field(obj, [&](auto& member) {

@@ -16,20 +16,20 @@ namespace eosio { namespace operators {
    using ::eosio::operators::eosio_compare
 
    template <typename T>
-   auto operator==(const T& lhs, const T& rhs) -> decltype(eosio_enable_comparison(lhs)) {
+   constexpr auto operator==(const T& lhs, const T& rhs) -> decltype(eosio_enable_comparison(lhs)) {
       bool result = true;
       for_each_field<T>([&](const char*, auto&& member) { result = result && (member(&lhs) == member(&rhs)); });
       return result;
    }
    template <typename T>
-   auto operator!=(const T& lhs, const T& rhs) -> decltype(eosio_enable_comparison(lhs)) {
+   constexpr auto operator!=(const T& lhs, const T& rhs) -> decltype(eosio_enable_comparison(lhs)) {
       return !(lhs == rhs);
    }
 
    namespace internal_use_do_not_use {
       // This is a worse match than the user-visible overload
       template <typename T, typename U>
-      int eosio_compare(const T& lhs, const U& rhs) {
+      constexpr int eosio_compare(const T& lhs, const U& rhs) {
          if (lhs < rhs)
             return -1;
          else if (rhs < lhs)
@@ -40,7 +40,7 @@ namespace eosio { namespace operators {
    } // namespace internal_use_do_not_use
 
    template <typename T>
-   auto eosio_compare(const T& lhs, const T& rhs) -> decltype((eosio_enable_comparison(lhs), 0)) {
+   constexpr auto eosio_compare(const T& lhs, const T& rhs) -> decltype((eosio_enable_comparison(lhs), 0)) {
       int result = 0;
       for_each_field<T>([&](const char*, auto&& member) {
          if (!result) {
@@ -52,19 +52,19 @@ namespace eosio { namespace operators {
    }
 
    template <typename T>
-   auto operator<(const T& lhs, const T& rhs) -> decltype(eosio_enable_comparison(lhs)) {
+   constexpr auto operator<(const T& lhs, const T& rhs) -> decltype(eosio_enable_comparison(lhs)) {
       return eosio_compare(lhs, rhs) < 0;
    }
    template <typename T>
-   auto operator>(const T& lhs, const T& rhs) -> decltype(eosio_enable_comparison(lhs)) {
+   constexpr auto operator>(const T& lhs, const T& rhs) -> decltype(eosio_enable_comparison(lhs)) {
       return eosio_compare(lhs, rhs) > 0;
    }
    template <typename T>
-   auto operator<=(const T& lhs, const T& rhs) -> decltype(eosio_enable_comparison(lhs)) {
+   constexpr auto operator<=(const T& lhs, const T& rhs) -> decltype(eosio_enable_comparison(lhs)) {
       return eosio_compare(lhs, rhs) <= 0;
    }
    template <typename T>
-   auto operator>=(const T& lhs, const T& rhs) -> decltype(eosio_enable_comparison(lhs)) {
+   constexpr auto operator>=(const T& lhs, const T& rhs) -> decltype(eosio_enable_comparison(lhs)) {
       return eosio_compare(lhs, rhs) >= 0;
    }
 
