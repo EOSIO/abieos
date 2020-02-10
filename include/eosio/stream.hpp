@@ -17,6 +17,9 @@ enum class stream_error {
    bad_variant_index,
    invalid_asset_format,
    array_size_mismatch,
+   invalid_name_char,
+   invalid_name_char13,
+   name_too_long,
    json_writer_error, // !!!
 }; // stream_error
 } // namespace eosio
@@ -44,6 +47,9 @@ class stream_error_category_type : public std::error_category {
          case stream_error::bad_variant_index:        return "Bad variant index";
          case stream_error::invalid_asset_format:     return "Invalid asset format";
          case stream_error::array_size_mismatch:      return "T[] size and unpacked size don't match";
+         case stream_error::invalid_name_char:        return "character is not in allowed character set for names";
+         case stream_error::invalid_name_char13:      return "thirteenth character in name cannot be a letter that comes after j";
+         case stream_error::name_too_long:            return "string is too long to be a valid name";
          case stream_error::json_writer_error: return "Error writing json";
             // clang-format on
 

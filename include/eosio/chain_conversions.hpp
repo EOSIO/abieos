@@ -9,6 +9,17 @@
 
 namespace eosio {
 
+template<typename T>
+using cresult = outcome::basic_result<T, stream_error, outcome::policy::all_narrow>;
+
+template<typename T>
+constexpr T check(cresult<T> r) {
+   if(!r) {
+      check(std::error_code(r.error()));
+   }
+   return std::move(r.value());
+}
+
 inline constexpr uint64_t char_to_name_digit(char c) {
    if (c >= 'a' && c <= 'z')
       return (c - 'a') + 6;
@@ -36,41 +47,41 @@ inline constexpr uint64_t string_to_name(std::string_view str) { return string_t
 
 inline constexpr uint64_t string_to_name(const std::string& str) { return string_to_name(str.data(), str.size()); }
 
-[[nodiscard]] inline constexpr bool char_to_name_digit_strict(char c, uint64_t& result) {
+[[nodiscard]] inline constexpr cresult<void> char_to_name_digit_strict(char c, uint64_t& result) {
    if (c >= 'a' && c <= 'z') {
       result = (c - 'a') + 6;
-      return true;
+      return outcome::success();
    }
    if (c >= '1' && c <= '5') {
       result = (c - '1') + 1;
-      return true;
+      return outcome::success();
    }
    if (c == '.') {
       result = 0;
-      return true;
+      return outcome::success();
    }
-   return false;
+   return stream_error::invalid_name_char;
 }
 
-[[nodiscard]] inline constexpr bool string_to_name_strict(std::string_view str, uint64_t& name) {
-   name       = 0;
+[[nodiscard]] inline constexpr cresult<uint64_t> string_to_name_strict(std::string_view str) {
+   uint64_t name       = 0;
    unsigned i = 0;
    for (; i < str.size() && i < 12; ++i) {
       uint64_t x = 0;
-      if (!char_to_name_digit_strict(str[i], x))
-         return false;
+      OUTCOME_TRY(char_to_name_digit_strict(str[i], x));
       name |= (x & 0x1f) << (64 - 5 * (i + 1));
    }
    if (i < str.size() && i == 12) {
       uint64_t x = 0;
-      if (!char_to_name_digit_strict(str[i], x) || x != (x & 0xf))
-         return false;
+      OUTCOME_TRY(char_to_name_digit_strict(str[i], x));
+      if (x != (x & 0xf))
+         return stream_error::invalid_name_char13;
       name |= x;
       ++i;
    }
    if (i < str.size())
-      return false;
-   return true;
+      return stream_error::name_too_long;
+   return name;
 }
 
 inline std::string name_to_string(uint64_t name) {

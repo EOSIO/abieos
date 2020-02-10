@@ -15,10 +15,7 @@ struct name {
    constexpr name() = default;
    constexpr explicit name(uint64_t value) : value{ value } {}
    constexpr explicit name(name::raw value) : value{ static_cast<uint64_t>(value) } {}
-   // constexpr explicit name(const char* str) : value{ eosio::string_to_name(str) } {}
-   // FIXME: Use string_to_name_strict somehow
-   constexpr explicit name(std::string_view str) : value{ eosio::string_to_name(str) } {}
-   // constexpr explicit name(const std::string& str) : value{ eosio::string_to_name(str) } {}
+   constexpr explicit name(std::string_view str) : value{ check(string_to_name_strict(str)) } {}
    constexpr name(const name&) = default;
 
    constexpr   operator raw() const { return static_cast<raw>(value); }
@@ -114,7 +111,8 @@ EOSIO_COMPARE(name);
 template <typename S>
 result<void> from_json(name& obj, S& stream) {
    OUTCOME_TRY(r, stream.get_string());
-   obj = name(r);
+   OUTCOME_TRY(value, string_to_name_strict(r));
+   obj = name(value);
    return eosio::outcome::success();
 }
 
