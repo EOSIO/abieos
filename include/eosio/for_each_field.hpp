@@ -9,7 +9,7 @@
 
 namespace eosio {
 template <typename T, typename F>
-auto for_each_field(T&& t, F&& f) -> std::enable_if_t<!reflection::has_for_each_field_v<std::decay_t<T>>> {
+constexpr auto for_each_field(T&& t, F&& f) -> std::enable_if_t<!reflection::has_for_each_field_v<std::decay_t<T>>> {
    return boost::pfr::for_each_field(static_cast<T&&>(t), static_cast<F&&>(f));
 }
 } // namespace eosio
@@ -19,12 +19,12 @@ auto for_each_field(T&& t, F&& f) -> std::enable_if_t<!reflection::has_for_each_
 namespace eosio {
 
 template <typename T, typename F>
-auto for_each_field(T&& t, F&& f) -> std::enable_if_t<reflection::has_for_each_field_v<std::decay_t<T>>> {
+constexpr auto for_each_field(T&& t, F&& f) -> std::enable_if_t<reflection::has_for_each_field_v<std::decay_t<T>>> {
    eosio_for_each_field((std::decay_t<T>*)nullptr, [&](const char*, auto member) { f(member(&t)); });
 }
 
 template <typename T, typename F>
-void for_each_field(F&& f) {
+constexpr void for_each_field(F&& f) {
    eosio_for_each_field((T*)nullptr, f);
 }
 
