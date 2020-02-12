@@ -25,7 +25,7 @@ namespace eosio {
  *  @tparam Size - Size of the fixed_bytes object
  *  @tparam Word - Type to use for storage
  */
-template <std::size_t Size, typename Word = unsigned __int128>
+template <std::size_t Size, typename Word = std::uint64_t>
 class fixed_bytes {
  private:
    // Returns the minimum number of objects of type T required to hold at least Size bytes.
@@ -190,6 +190,13 @@ class fixed_bytes {
    constexpr const auto&                 get_array() const { return value; }
    std::array<Word, count_words<Word>()> value{};
 };
+
+// This is only needed to make eosio.cdt/tests/unit/fixed_bytes_tests.cpp pass.
+// Everything else should be using one of the typedefs below.
+template <std::size_t Size, typename Word, typename F>
+void eosio_for_each_field(fixed_bytes<Size, Word>*, F&& f) {
+   f("value", [](auto* p) -> decltype((p->value)) { return p->value; });
+}
 
 template <std::size_t Size, typename Word>
 EOSIO_COMPARE(fixed_bytes<Size, Word>);
