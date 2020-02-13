@@ -223,6 +223,11 @@ result<void> to_bin(const fixed_bytes<Size, T>& obj, S& stream) {
 }
 
 template <typename T, std::size_t Size, typename S>
+result<void> to_key(const fixed_bytes<Size, T>& obj, S& stream) {
+   return to_bin(obj.extract_as_byte_array(), stream);
+}
+
+template <typename T, std::size_t Size, typename S>
 result<void> from_json(fixed_bytes<Size, T>& obj, S& stream) {
    std::vector<char> v;
    OUTCOME_TRY(eosio::from_json_hex(v, stream));
