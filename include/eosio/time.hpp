@@ -15,7 +15,9 @@ namespace eosio {
 
 class microseconds {
  public:
-   explicit microseconds(int64_t c = 0) : _count(c) {}
+   microseconds() = default;
+
+   explicit microseconds(int64_t c) : _count(c) {}
 
    /// @cond INTERNAL
    static microseconds maximum() { return microseconds(0x7fffffffffffffffll); }
@@ -37,7 +39,7 @@ class microseconds {
    int64_t count() const { return _count; }
    int64_t to_seconds() const { return _count / 1000000; }
 
-   int64_t _count;
+   int64_t _count = 0;
    /// @endcond
 };
 
@@ -57,7 +59,8 @@ inline microseconds days(int64_t d) { return hours(24 * d); }
  */
 class time_point {
  public:
-   explicit time_point(microseconds e = microseconds()) : elapsed(e) {}
+   time_point() = default;
+   explicit time_point(microseconds e) : elapsed(e) {}
    const microseconds& time_since_epoch() const { return elapsed; }
    uint32_t            sec_since_epoch() const { return uint32_t(elapsed.count() / 1000000); }
 
@@ -184,7 +187,9 @@ result<void> to_json(const time_point_sec& obj, S& stream) {
  **/
 class block_timestamp {
  public:
-   explicit block_timestamp(uint32_t s = 0) : slot(s) {}
+   block_timestamp() = default;
+
+   explicit block_timestamp(uint32_t s) : slot(s) {}
 
    block_timestamp(const time_point& t) { set_time_point(t); }
 
@@ -217,7 +222,7 @@ class block_timestamp {
    bool                     operator<=(const block_timestamp& t) const { return slot <= t.slot; }
    bool                     operator==(const block_timestamp& t) const { return slot == t.slot; }
    bool                     operator!=(const block_timestamp& t) const { return slot != t.slot; }
-   uint32_t                 slot;
+   uint32_t                 slot                  = 0;
    static constexpr int32_t block_interval_ms     = 500;
    static constexpr int64_t block_timestamp_epoch = 946684800000ll; // epoch is year 2000
                                                                     /// @endcond
