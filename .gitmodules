@@ -7,3 +7,6 @@
 [submodule "external/eosjs_"]
 	path = external/eosjs
 	url = https://github.com/EOSIO/eosjs.git
+[submodule "external/outcome"]
+	path = external/outcome
+	url = https://github.com/ned14/outcome.git
