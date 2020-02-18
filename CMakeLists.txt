@@ -34,6 +34,9 @@ endif()
 add_library(abieos MODULE src/abieos.cpp src/abi.cpp src/crypto.cpp include/eosio/fpconv.c)
 target_include_directories(abieos PRIVATE include external/outcome/single-header external/rapidjson/include external/date/include)
 
+add_library(abieos_headers INTERFACE)
+target_include_directories(abieos_headers INTERFACE include external/date/include external/rapidjson/include)
+
 add_executable(test src/test.cpp src/abieos.cpp src/abi.cpp src/crypto.cpp include/eosio/fpconv.c)
 target_include_directories(test PRIVATE include external/outcome/single-header external/rapidjson/include external/date/include)
 
