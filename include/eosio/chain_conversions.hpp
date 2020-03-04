@@ -45,7 +45,7 @@ inline constexpr uint64_t string_to_name(const char* str) {
 
 inline constexpr uint64_t string_to_name(std::string_view str) { return string_to_name(str.data(), str.size()); }
 
-inline constexpr uint64_t string_to_name(const std::string& str) { return string_to_name(str.data(), str.size()); }
+inline uint64_t string_to_name(const std::string& str) { return string_to_name(str.data(), str.size()); }
 
 [[nodiscard]] inline constexpr cresult<void> char_to_name_digit_strict(char c, uint64_t& result) {
    if (c >= 'a' && c <= 'z') {
