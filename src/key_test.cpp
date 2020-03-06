@@ -20,6 +20,7 @@ using abieos::float128;
 using abieos::time_point;
 using abieos::time_point_sec;
 using abieos::block_timestamp;
+using eosio::name;
 using abieos::bytes;
 using abieos::checksum160;
 using abieos::checksum256;
@@ -40,6 +41,7 @@ struct struct_type {
 EOSIO_REFLECT(struct_type, v, o, va);
 EOSIO_COMPARE(struct_type);
 
+// Verifies that the ordering of keys is the same as the ordering of the original objects
 template<typename T>
 void test_key(const T& x, const T& y) {
    auto keyx = eosio::convert_to_key(x).value();
@@ -75,6 +77,28 @@ void test_compare() {
    test_key(-std::numeric_limits<double>::infinity(), 0.);
    test_key(std::numeric_limits<double>::infinity(), 0.);
    test_key(-std::numeric_limits<double>::infinity(), std::numeric_limits<double>::infinity());
+   using namespace eosio::literals;
+   test_key("a"_n, "a"_n);
+   test_key(name(), name());
+   test_key("a"_n, "b"_n);
+   test_key("ab"_n, "a"_n);
+
+   using namespace std::literals;
+   test_key(""s, ""s);
+   test_key(""s, "a"s);
+   test_key("a"s, "b"s);
+   test_key("aaaaa"s, "aaaaa"s);
+   test_key("\0"s, ""s);
+   test_key("\0\0\0"s, "\0\0"s);
+
+   test_key(std::vector<int>{}, std::vector<int>{});
+   test_key(std::vector<int>{}, std::vector<int>{0});
+   test_key(std::vector<int>{0}, std::vector<int>{1});
+
+   test_key(struct_type{{}, {}, {0}}, struct_type{{}, {}, {0}});
+   test_key(struct_type{{0, 1, 2}, {}, {0}}, struct_type{{}, {}, {0.0}});
+   test_key(struct_type{{0, 1, 2}, {}, {0}}, struct_type{{0, 1, 2}, 0, {0}});
+   test_key(struct_type{{0, 1, 2}, 0, {0}}, struct_type{{0, 1, 2}, 0, {0.0}});
 }
 
 int main() {

@@ -1,6 +1,10 @@
 #pragma once
 
+#include <eosio/for_each_field.hpp>
 #include <eosio/stream.hpp>
+#include <optional>
+#include <variant>
+#include <vector>
 
 namespace eosio {
 
@@ -24,6 +28,49 @@ result<void> to_key_tuple(const T& obj, S& stream) {
 template <typename... Ts, typename S>
 result<void> to_key(const std::tuple<Ts...>& obj, S& stream) {
    return to_key_tuple<0>(obj, stream);
+}
+
+template <typename T, typename S>
+result<void> to_key(const std::vector<T>& obj, S& stream) {
+   for (const T& elem : obj) {
+      OUTCOME_TRY(stream.write('\1'));
+      OUTCOME_TRY(to_key(elem, stream));
+   }
+   return stream.write('\0');
+}
+
+// This is somewhat wasteful for small types.
+template <typename T, typename S>
+result<void> to_key(const std::optional<T>& obj, S& stream) {
+   if (obj) {
+      OUTCOME_TRY(stream.write('\1'));
+      return to_key(*obj, stream);
+   } else {
+      return stream.write('\0');
+   }
+}
+
+// Do we always need a 32-bit index?
+template <typename... Ts, typename S>
+result<void> to_key(const std::variant<Ts...>& obj, S& stream) {
+   OUTCOME_TRY(to_key(static_cast<uint32_t>(obj.index()), stream));
+   return std::visit([&](const auto& item) { return to_key(item, stream); }, obj);
+}
+
+template <typename S>
+result<void> to_key(std::string_view obj, S& stream) {
+   for (char ch : obj) {
+      OUTCOME_TRY(stream.write(ch));
+      if (ch == '\0') {
+         OUTCOME_TRY(stream.write('\1'));
+      }
+   }
+   return stream.write("\0", 2);
+}
+
+template <typename S>
+result<void> to_key(const std::string& obj, S& stream) {
+   return to_key(std::string_view(obj), stream);
 }
 
 template <typename S>
@@ -61,7 +108,7 @@ result<void> to_key(const T& obj, S& stream) {
       return stream.write_raw(v);
    } else {
       result<void> r = outcome::success();
-      for_each_field(obj, [&](const auto& member) {
+      eosio::for_each_field(obj, [&](const auto& member) {
          if (r)
             r = to_key(member, stream);
       });
