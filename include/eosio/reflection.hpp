@@ -35,7 +35,7 @@ namespace eosio { namespace reflection {
      eosio_for_each_field((EOSIO_REFLECT_STRIP_BASE ## BASE*)nullptr, f);
 
 #define EOSIO_REFLECT_SIGNATURE(STRUCT, ...)                                                                           \
-   inline const char* get_type_name(STRUCT*) { return #STRUCT; }                                                       \
+   [[maybe_unused]] inline const char* get_type_name(STRUCT*) { return #STRUCT; }                                      \
    template <typename F>                                                                                               \
    constexpr void eosio_for_each_field(STRUCT*, F f)
 
