@@ -50,6 +50,28 @@ void test_key(const T& x, const T& y) {
    CHECK(std::lexicographical_compare(keyy.begin(), keyy.end(), keyx.begin(), keyx.end(), std::less<unsigned char>()) == (y < x));
 }
 
+enum class enum_u8 : unsigned char {
+   v0,
+   v1,
+   v2 = 255,
+};
+enum class enum_s8 : signed char {
+   v0,
+   v1,
+   v2 = -1,
+};
+
+enum class enum_u16 : std::uint16_t {
+   v0,
+   v1,
+   v2 = 65535,
+};
+enum class enum_s16 : std::int16_t {
+   v0,
+   v1,
+   v2 = -1,
+};
+
 void test_compare() {
    test_key(true, true);
    test_key(false, false);
@@ -98,12 +120,48 @@ void test_compare() {
    test_key(""s, "a"s);
    test_key("a"s, "b"s);
    test_key("aaaaa"s, "aaaaa"s);
+   test_key("\0"s, "\xFF"s);
    test_key("\0"s, ""s);
    test_key("\0\0\0"s, "\0\0"s);
 
    test_key(std::vector<int>{}, std::vector<int>{});
    test_key(std::vector<int>{}, std::vector<int>{0});
    test_key(std::vector<int>{0}, std::vector<int>{1});
+
+   test_key(std::vector<char>{}, std::vector<char>{'\0'});
+   test_key(std::vector<char>{'\0'}, std::vector<char>{'\xFF'});
+   test_key(std::vector<char>{'\1'}, std::vector<char>{'\xFF'});
+   test_key(std::vector<char>{'b'}, std::vector<char>{'a'});
+
+   test_key(std::vector<signed char>{}, std::vector<signed char>{'\0'});
+   test_key(std::vector<signed char>{'\0'}, std::vector<signed char>{'\xFF'});
+   test_key(std::vector<signed char>{'\1'}, std::vector<signed char>{'\xFF'});
+   test_key(std::vector<signed char>{'b'}, std::vector<signed char>{'a'});
+
+   test_key(std::vector<unsigned char>{}, std::vector<unsigned char>{'\0'});
+   test_key(std::vector<unsigned char>{'\0'}, std::vector<unsigned char>{255});
+   test_key(std::vector<unsigned char>{'\1'}, std::vector<unsigned char>{255});
+   test_key(std::vector<unsigned char>{'b'}, std::vector<unsigned char>{'a'});
+
+   test_key(std::vector<bool>{}, std::vector<bool>{true});
+   test_key(std::vector<bool>{false}, std::vector<bool>{true});
+   test_key(std::vector<bool>{false}, std::vector<bool>{false, true});
+
+   test_key(enum_u8::v0, enum_u8::v1);
+   test_key(enum_u8::v0, enum_u8::v2);
+   test_key(enum_u8::v1, enum_u8::v2);
+
+   test_key(enum_s8::v0, enum_s8::v1);
+   test_key(enum_s8::v0, enum_s8::v2);
+   test_key(enum_s8::v1, enum_s8::v2);
+
+   test_key(enum_u16::v0, enum_u16::v1);
+   test_key(enum_u16::v0, enum_u16::v2);
+   test_key(enum_u16::v1, enum_u16::v2);
+
+   test_key(enum_s16::v0, enum_s16::v1);
+   test_key(enum_s16::v0, enum_s16::v2);
+   test_key(enum_s16::v1, enum_s16::v2);
 
    test_key(struct_type{{}, {}, {0}}, struct_type{{}, {}, {0}});
    test_key(struct_type{{0, 1, 2}, {}, {0}}, struct_type{{}, {}, {0.0}});

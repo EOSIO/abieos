@@ -11,6 +11,27 @@ namespace eosio {
 template <typename... Ts, typename S>
 result<void> to_key(const std::tuple<Ts...>& obj, S& stream);
 
+// to_key defines a conversion from a type to a sequence of bytes whose lexicograpical
+// ordering is the same as the ordering of the original type.
+//
+// For any two objects of type T, a and b:
+//
+// - key(a) < key(b) iff a < b
+// - key(a) is not a prefix of key(b)
+//
+// Overloads of to_key for user-defined types can be found by Koenig lookup.
+//
+// Abieos provides specializations of to_key for the following types
+// - std::string and std::string_view
+// - std::vector, std::list, std::deque
+// - std::tuple
+// - std::array
+// - std::optional
+// - std::variant
+// - Arithmetic types
+// - Scoped enumeration types
+// - Reflected structs
+// - All smart-contract related types defined by abieos
 template <typename T, typename S>
 result<void> to_key(const T& obj, S& stream);
 
@@ -35,23 +56,49 @@ result<void> to_key(const std::array<T, N>& obj, S& stream) {
 }
 
 template <typename T, typename S>
-result<void> to_key(const std::vector<T>& obj, S& stream) {
-   for (const T& elem : obj) {
-      OUTCOME_TRY(stream.write('\1'));
-      OUTCOME_TRY(to_key(elem, stream));
-   }
-   return stream.write('\0');
+result<void> to_key_optional(const bool* obj, S& stream) {
+   if (obj == nullptr)
+      return stream.write('\0');
+   else if (!*obj)
+      return stream.write('\1');
+   else
+      return stream.write('\2');
 }
 
-// This is somewhat wasteful for small types.
+template <typename T, typename S>
+result<void> to_key_optional(const T* obj, S& stream) {
+   if constexpr (has_bitwise_serialization<T>() && sizeof(T) == 1) {
+      if (obj == nullptr)
+         return stream.write("\0", 2);
+      else {
+         char             buf[1];
+         fixed_buf_stream tmp_stream(buf, 1);
+         OUTCOME_TRY(to_key(*obj, tmp_stream));
+         OUTCOME_TRY(stream.write(buf[0]));
+         if (buf[0] == '\0')
+            return stream.write('\1');
+         else
+            return outcome::success();
+      }
+   } else {
+      if (obj) {
+         OUTCOME_TRY(stream.write('\1'));
+         return to_key(*obj, stream);
+      } else {
+         return stream.write('\0');
+      }
+   }
+}
+
+template <typename T, typename S>
+result<void> to_key(const std::vector<T>& obj, S& stream) {
+   for (const T& elem : obj) { OUTCOME_TRY(to_key_optional(&elem, stream)); }
+   return to_key_optional((const T*)nullptr, stream);
+}
+
 template <typename T, typename S>
 result<void> to_key(const std::optional<T>& obj, S& stream) {
-   if (obj) {
-      OUTCOME_TRY(stream.write('\1'));
-      return to_key(*obj, stream);
-   } else {
-      return stream.write('\0');
-   }
+   return to_key_optional(obj ? &*obj : nullptr, stream);
 }
 
 // Do we always need a 32-bit index?
