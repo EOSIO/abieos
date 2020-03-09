@@ -17,9 +17,7 @@ result<void> to_key(const T& obj, S& stream);
 template <int i, typename T, typename S>
 result<void> to_key_tuple(const T& obj, S& stream) {
    if constexpr (i < std::tuple_size_v<T>) {
-      auto r = to_key(std::get<i>(obj), stream);
-      if (!r)
-         return r.error();
+      OUTCOME_TRY(to_key(std::get<i>(obj), stream));
       return to_key_tuple<i + 1>(obj, stream);
    }
    return outcome::success();
@@ -28,6 +26,12 @@ result<void> to_key_tuple(const T& obj, S& stream) {
 template <typename... Ts, typename S>
 result<void> to_key(const std::tuple<Ts...>& obj, S& stream) {
    return to_key_tuple<0>(obj, stream);
+}
+
+template <typename T, std::size_t N, typename S>
+result<void> to_key(const std::array<T, N>& obj, S& stream) {
+   for (const T& elem : obj) { OUTCOME_TRY(to_key(elem, stream)); }
+   return outcome::success();
 }
 
 template <typename T, typename S>
@@ -106,6 +110,9 @@ result<void> to_key(const T& obj, S& stream) {
       v -= static_cast<std::make_unsigned_t<T>>(std::numeric_limits<T>::min());
       std::reverse(reinterpret_cast<char*>(&v), reinterpret_cast<char*>(&v + 1));
       return stream.write_raw(v);
+   } else if constexpr (std::is_enum_v<T>) {
+      static_assert(!std::is_convertible_v<T, std::underlying_type_t<T>>, "Serializing unscoped enum");
+      return to_key(static_cast<std::underlying_type_t<T>>(obj), stream);
    } else {
       result<void> r = outcome::success();
       eosio::for_each_field(obj, [&](const auto& member) {

@@ -82,6 +82,16 @@ void test_compare() {
    test_key(name(), name());
    test_key("a"_n, "b"_n);
    test_key("ab"_n, "a"_n);
+   test_key(checksum256(), checksum256());
+   test_key(checksum256(), checksum256{std::array{0xffffffffffffffffull, 0xffffffffffffffffull, 0xffffffffffffffffull, 0xffffffffffffffffull}});
+   test_key(checksum256(std::array{0x00ffffffffffffffull, 0xffffffffffffffffull, 0xffffffffffffffffull, 0xffffffffffffffffull}),
+            checksum256(std::array{0xffffffffffffffffull, 0xffffffffffffffffull, 0xffffffffffffffffull, 0xffffffffffffff00ull}));
+   test_key(checksum256(std::array{0xffffffffffffffffull, 0xffffffffffffff00ull, 0xffffffffffffffffull, 0xffffffffffffffffull}),
+            checksum256(std::array{0xffffffffffffffffull, 0x00ffffffffffffffull, 0xffffffffffffffffull, 0xffffffffffffffffull}));
+   test_key(public_key(), public_key());
+   test_key(public_key(std::in_place_index<0>, eosio::ecc_public_key{1}), public_key(std::in_place_index<1>));
+   test_key(public_key(eosio::webauthn_public_key{{}, eosio::webauthn_public_key::user_presence_t::USER_PRESENCE_NONE, "b"}),
+            public_key(eosio::webauthn_public_key{{}, eosio::webauthn_public_key::user_presence_t::USER_PRESENCE_PRESENT, "a"}));
 
    using namespace std::literals;
    test_key(""s, ""s);
