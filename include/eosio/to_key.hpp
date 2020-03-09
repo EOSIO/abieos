@@ -1,8 +1,14 @@
 #pragma once
 
+#include <deque>
 #include <eosio/for_each_field.hpp>
 #include <eosio/stream.hpp>
+#include <list>
+#include <map>
 #include <optional>
+#include <set>
+#include <tuple>
+#include <utility>
 #include <variant>
 #include <vector>
 
@@ -90,10 +96,42 @@ result<void> to_key_optional(const T* obj, S& stream) {
    }
 }
 
+template <typename T, typename U, typename S>
+result<void> to_key(const std::pair<T, U>& obj, S& stream) {
+   OUTCOME_TRY(to_key(obj.first, stream));
+   return to_key(obj.second, stream);
+}
+
+template <typename T, typename S>
+result<void> to_key_range(const T& obj, S& stream) {
+   for (const auto& elem : obj) { OUTCOME_TRY(to_key_optional(&elem, stream)); }
+   return to_key_optional((decltype(&*std::begin(obj))) nullptr, stream);
+}
+
 template <typename T, typename S>
 result<void> to_key(const std::vector<T>& obj, S& stream) {
    for (const T& elem : obj) { OUTCOME_TRY(to_key_optional(&elem, stream)); }
    return to_key_optional((const T*)nullptr, stream);
+}
+
+template <typename T, typename S>
+result<void> to_key(const std::list<T>& obj, S& stream) {
+   return to_key_range(obj, stream);
+}
+
+template <typename T, typename S>
+result<void> to_key(const std::deque<T>& obj, S& stream) {
+   return to_key_range(obj, stream);
+}
+
+template <typename T, typename S>
+result<void> to_key(const std::set<T>& obj, S& stream) {
+   return to_key_range(obj, stream);
+}
+
+template <typename T, typename U, typename S>
+result<void> to_key(const std::map<T, U>& obj, S& stream) {
+   return to_key_range(obj, stream);
 }
 
 template <typename T, typename S>

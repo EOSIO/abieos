@@ -147,6 +147,15 @@ void test_compare() {
    test_key(std::vector<bool>{false}, std::vector<bool>{true});
    test_key(std::vector<bool>{false}, std::vector<bool>{false, true});
 
+   test_key(std::list<int>{}, std::list<int>{1});
+   test_key(std::list<int>{0}, std::list<int>{1});
+   test_key(std::deque<int>{}, std::deque<int>{1});
+   test_key(std::deque<int>{0}, std::deque<int>{1});
+   test_key(std::set<int>{}, std::set<int>{1});
+   test_key(std::set<int>{0}, std::set<int>{1});
+   test_key(std::map<int, int>{}, std::map<int, int>{{1, 0}});
+   test_key(std::map<int, int>{{0, 0}}, std::map<int, int>{{1, 0}});
+
    test_key(enum_u8::v0, enum_u8::v1);
    test_key(enum_u8::v0, enum_u8::v2);
    test_key(enum_u8::v1, enum_u8::v2);
