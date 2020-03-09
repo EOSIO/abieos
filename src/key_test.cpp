@@ -72,6 +72,13 @@ enum class enum_s16 : std::int16_t {
    v2 = -1,
 };
 
+template<typename T>
+std::size_t key_size(const T& obj) {
+   eosio::size_stream ss;
+   eosio::check_discard(to_key(obj, ss));
+   return ss.size;
+}
+
 void test_compare() {
    test_key(true, true);
    test_key(false, false);
@@ -171,6 +178,27 @@ void test_compare() {
    test_key(enum_s16::v0, enum_s16::v1);
    test_key(enum_s16::v0, enum_s16::v2);
    test_key(enum_s16::v1, enum_s16::v2);
+
+   test_key(varuint32(0), varuint32(0));
+   test_key(varuint32(0), varuint32(1));
+   test_key(varuint32(1), varuint32(0xFF));
+   test_key(varuint32(1), varuint32(0xFFFF));
+   test_key(varuint32(1), varuint32(0xFFFFFF));
+   test_key(varuint32(1), varuint32(0x7FFFFFFF));
+   CHECK(key_size(varuint32(0)) == 1);
+   CHECK(key_size(varuint32(0xFF)) == 2);
+
+   test_key(varint32(0), varint32(0));
+   test_key(varint32(0), varint32(1));
+   test_key(varint32(1), varint32(0xFF));
+   test_key(varint32(1), varint32(0xFFFF));
+   test_key(varint32(1), varint32(0xFFFFFF));
+   test_key(varint32(1), varint32(-1));
+   test_key(varint32(1), varint32(0x7FFFFFFF));
+   test_key(varint32(-0x7FFFF), varint32(-0x7FFFFFFF));
+   CHECK(key_size(varint32(-1)) == 1);
+   CHECK(key_size(varint32(0)) == 1);
+   CHECK(key_size(varint32(0xFF)) == 2);
 
    test_key(struct_type{{}, {}, {0}}, struct_type{{}, {}, {0}});
    test_key(struct_type{{0, 1, 2}, {}, {0}}, struct_type{{}, {}, {0.0}});

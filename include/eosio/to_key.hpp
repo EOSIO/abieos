@@ -139,10 +139,57 @@ result<void> to_key(const std::optional<T>& obj, S& stream) {
    return to_key_optional(obj ? &*obj : nullptr, stream);
 }
 
-// Do we always need a 32-bit index?
+template <typename S>
+result<void> to_key_varuint32(std::uint32_t obj, S& stream) {
+   int num_bytes;
+   if (obj < 0x80u) {
+      num_bytes = 1;
+   } else if (obj < 0x4000u) {
+      num_bytes = 2;
+   } else if (obj < 0x200000u) {
+      num_bytes = 3;
+   } else if (obj < 0x10000000u) {
+      num_bytes = 4;
+   } else {
+      num_bytes = 5;
+   }
+
+   OUTCOME_TRY(stream.write(static_cast<char>(~(0xFFu >> (num_bytes - 1)) | (obj >> ((num_bytes - 1) * 8)))));
+   for (int i = num_bytes - 2; i >= 0; --i) { OUTCOME_TRY(stream.write(static_cast<char>((obj >> i * 8) & 0xFFu))); }
+   return outcome::success();
+}
+
+template <typename S>
+result<void> to_key_varint32(std::int32_t obj, S& stream) {
+   int  num_bytes;
+   bool sign = (obj < 0);
+   if (obj < 0x20 && obj >= -0x20) {
+      num_bytes = 1;
+   } else if (obj < 0x1000 && obj >= -0x1000) {
+      num_bytes = 2;
+   } else if (obj < 0x080000 && obj >= -0x080000) {
+      num_bytes = 3;
+   } else if (obj < 0x04000000 && obj >= -0x04000000) {
+      num_bytes = 4;
+   } else {
+      num_bytes = 5;
+   }
+
+   obj += static_cast<int32_t>(0x20) << std::min((num_bytes - 1) * 7, 26);
+   unsigned char width_field = (~(0xFFu >> (num_bytes)) & 0x7Fu);
+   if (sign) {
+      width_field = 0x80u >> num_bytes;
+   } else {
+      width_field = 0x80u | ~(0xFFu >> num_bytes);
+   }
+   OUTCOME_TRY(stream.write(width_field | (obj >> ((num_bytes - 1) * 8))));
+   for (int i = num_bytes - 2; i >= 0; --i) { OUTCOME_TRY(stream.write(static_cast<char>((obj >> i * 8) & 0xFFu))); }
+   return outcome::success();
+}
+
 template <typename... Ts, typename S>
 result<void> to_key(const std::variant<Ts...>& obj, S& stream) {
-   OUTCOME_TRY(to_key(static_cast<uint32_t>(obj.index()), stream));
+   OUTCOME_TRY(to_key_varuint32(static_cast<uint32_t>(obj.index()), stream));
    return std::visit([&](const auto& item) { return to_key(item, stream); }, obj);
 }
 
