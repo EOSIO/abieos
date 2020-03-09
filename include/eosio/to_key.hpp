@@ -175,8 +175,8 @@ result<void> to_key_varint32(std::int32_t obj, S& stream) {
       num_bytes = 5;
    }
 
-   obj += static_cast<int32_t>(0x20) << std::min((num_bytes - 1) * 7, 26);
-   unsigned char width_field = (~(0xFFu >> (num_bytes)) & 0x7Fu);
+   obj = static_cast<uint32_t>(obj) + (static_cast<uint32_t>(0x20) << std::min((num_bytes - 1) * 7, 26));
+   unsigned char width_field;
    if (sign) {
       width_field = 0x80u >> num_bytes;
    } else {
