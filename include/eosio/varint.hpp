@@ -229,6 +229,11 @@ result<void> to_json(const varuint32& obj, S& stream) {
    return to_json(obj.value, stream);
 }
 
+template <typename S>
+result<void> to_key(const varuint32& obj, S& stream) {
+   return to_key_varuint32(obj.value, stream);
+}
+
 /**
  *  Variable Length Signed Integer. This provides more efficient serialization of 32-bit signed int.
  *  It serializes a 32-bit signed integer in as few bytes as possible.
@@ -437,6 +442,11 @@ result<void> from_json(varint32& obj, S& stream) {
 template <typename S>
 result<void> to_json(const varint32& obj, S& stream) {
    return to_json(obj.value, stream);
+}
+
+template <typename S>
+result<void> to_key(const varint32& obj, S& stream) {
+   return to_key_varint32(obj.value, stream);
 }
 
 } // namespace eosio

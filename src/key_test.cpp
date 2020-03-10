@@ -20,6 +20,7 @@ using abieos::float128;
 using abieos::time_point;
 using abieos::time_point_sec;
 using abieos::block_timestamp;
+using eosio::name;
 using abieos::bytes;
 using abieos::checksum160;
 using abieos::checksum256;
@@ -40,12 +41,42 @@ struct struct_type {
 EOSIO_REFLECT(struct_type, v, o, va);
 EOSIO_COMPARE(struct_type);
 
+// Verifies that the ordering of keys is the same as the ordering of the original objects
 template<typename T>
 void test_key(const T& x, const T& y) {
    auto keyx = eosio::convert_to_key(x).value();
    auto keyy = eosio::convert_to_key(y).value();
    CHECK(std::lexicographical_compare(keyx.begin(), keyx.end(), keyy.begin(), keyy.end(), std::less<unsigned char>()) == (x < y));
    CHECK(std::lexicographical_compare(keyy.begin(), keyy.end(), keyx.begin(), keyx.end(), std::less<unsigned char>()) == (y < x));
+}
+
+enum class enum_u8 : unsigned char {
+   v0,
+   v1,
+   v2 = 255,
+};
+enum class enum_s8 : signed char {
+   v0,
+   v1,
+   v2 = -1,
+};
+
+enum class enum_u16 : std::uint16_t {
+   v0,
+   v1,
+   v2 = 65535,
+};
+enum class enum_s16 : std::int16_t {
+   v0,
+   v1,
+   v2 = -1,
+};
+
+template<typename T>
+std::size_t key_size(const T& obj) {
+   eosio::size_stream ss;
+   eosio::check_discard(to_key(obj, ss));
+   return ss.size;
 }
 
 void test_compare() {
@@ -75,6 +106,104 @@ void test_compare() {
    test_key(-std::numeric_limits<double>::infinity(), 0.);
    test_key(std::numeric_limits<double>::infinity(), 0.);
    test_key(-std::numeric_limits<double>::infinity(), std::numeric_limits<double>::infinity());
+   using namespace eosio::literals;
+   test_key("a"_n, "a"_n);
+   test_key(name(), name());
+   test_key("a"_n, "b"_n);
+   test_key("ab"_n, "a"_n);
+   test_key(checksum256(), checksum256());
+   test_key(checksum256(), checksum256{std::array{0xffffffffffffffffull, 0xffffffffffffffffull, 0xffffffffffffffffull, 0xffffffffffffffffull}});
+   test_key(checksum256(std::array{0x00ffffffffffffffull, 0xffffffffffffffffull, 0xffffffffffffffffull, 0xffffffffffffffffull}),
+            checksum256(std::array{0xffffffffffffffffull, 0xffffffffffffffffull, 0xffffffffffffffffull, 0xffffffffffffff00ull}));
+   test_key(checksum256(std::array{0xffffffffffffffffull, 0xffffffffffffff00ull, 0xffffffffffffffffull, 0xffffffffffffffffull}),
+            checksum256(std::array{0xffffffffffffffffull, 0x00ffffffffffffffull, 0xffffffffffffffffull, 0xffffffffffffffffull}));
+   test_key(public_key(), public_key());
+   test_key(public_key(std::in_place_index<0>, eosio::ecc_public_key{1}), public_key(std::in_place_index<1>));
+   test_key(public_key(eosio::webauthn_public_key{{}, eosio::webauthn_public_key::user_presence_t::USER_PRESENCE_NONE, "b"}),
+            public_key(eosio::webauthn_public_key{{}, eosio::webauthn_public_key::user_presence_t::USER_PRESENCE_PRESENT, "a"}));
+
+   using namespace std::literals;
+   test_key(""s, ""s);
+   test_key(""s, "a"s);
+   test_key("a"s, "b"s);
+   test_key("aaaaa"s, "aaaaa"s);
+   test_key("\0"s, "\xFF"s);
+   test_key("\0"s, ""s);
+   test_key("\0\0\0"s, "\0\0"s);
+
+   test_key(std::vector<int>{}, std::vector<int>{});
+   test_key(std::vector<int>{}, std::vector<int>{0});
+   test_key(std::vector<int>{0}, std::vector<int>{1});
+
+   test_key(std::vector<char>{}, std::vector<char>{'\0'});
+   test_key(std::vector<char>{'\0'}, std::vector<char>{'\xFF'});
+   test_key(std::vector<char>{'\1'}, std::vector<char>{'\xFF'});
+   test_key(std::vector<char>{'b'}, std::vector<char>{'a'});
+
+   test_key(std::vector<signed char>{}, std::vector<signed char>{'\0'});
+   test_key(std::vector<signed char>{'\0'}, std::vector<signed char>{'\xFF'});
+   test_key(std::vector<signed char>{'\1'}, std::vector<signed char>{'\xFF'});
+   test_key(std::vector<signed char>{'b'}, std::vector<signed char>{'a'});
+
+   test_key(std::vector<unsigned char>{}, std::vector<unsigned char>{'\0'});
+   test_key(std::vector<unsigned char>{'\0'}, std::vector<unsigned char>{255});
+   test_key(std::vector<unsigned char>{'\1'}, std::vector<unsigned char>{255});
+   test_key(std::vector<unsigned char>{'b'}, std::vector<unsigned char>{'a'});
+
+   test_key(std::vector<bool>{}, std::vector<bool>{true});
+   test_key(std::vector<bool>{false}, std::vector<bool>{true});
+   test_key(std::vector<bool>{false}, std::vector<bool>{false, true});
+
+   test_key(std::list<int>{}, std::list<int>{1});
+   test_key(std::list<int>{0}, std::list<int>{1});
+   test_key(std::deque<int>{}, std::deque<int>{1});
+   test_key(std::deque<int>{0}, std::deque<int>{1});
+   test_key(std::set<int>{}, std::set<int>{1});
+   test_key(std::set<int>{0}, std::set<int>{1});
+   test_key(std::map<int, int>{}, std::map<int, int>{{1, 0}});
+   test_key(std::map<int, int>{{0, 0}}, std::map<int, int>{{1, 0}});
+
+   test_key(enum_u8::v0, enum_u8::v1);
+   test_key(enum_u8::v0, enum_u8::v2);
+   test_key(enum_u8::v1, enum_u8::v2);
+
+   test_key(enum_s8::v0, enum_s8::v1);
+   test_key(enum_s8::v0, enum_s8::v2);
+   test_key(enum_s8::v1, enum_s8::v2);
+
+   test_key(enum_u16::v0, enum_u16::v1);
+   test_key(enum_u16::v0, enum_u16::v2);
+   test_key(enum_u16::v1, enum_u16::v2);
+
+   test_key(enum_s16::v0, enum_s16::v1);
+   test_key(enum_s16::v0, enum_s16::v2);
+   test_key(enum_s16::v1, enum_s16::v2);
+
+   test_key(varuint32(0), varuint32(0));
+   test_key(varuint32(0), varuint32(1));
+   test_key(varuint32(1), varuint32(0xFF));
+   test_key(varuint32(1), varuint32(0xFFFF));
+   test_key(varuint32(1), varuint32(0xFFFFFF));
+   test_key(varuint32(1), varuint32(0x7FFFFFFF));
+   CHECK(key_size(varuint32(0)) == 1);
+   CHECK(key_size(varuint32(0xFF)) == 2);
+
+   test_key(varint32(0), varint32(0));
+   test_key(varint32(0), varint32(1));
+   test_key(varint32(1), varint32(0xFF));
+   test_key(varint32(1), varint32(0xFFFF));
+   test_key(varint32(1), varint32(0xFFFFFF));
+   test_key(varint32(1), varint32(-1));
+   test_key(varint32(1), varint32(0x7FFFFFFF));
+   test_key(varint32(-0x7FFFF), varint32(-0x7FFFFFFF));
+   CHECK(key_size(varint32(-1)) == 1);
+   CHECK(key_size(varint32(0)) == 1);
+   CHECK(key_size(varint32(0xFF)) == 2);
+
+   test_key(struct_type{{}, {}, {0}}, struct_type{{}, {}, {0}});
+   test_key(struct_type{{0, 1, 2}, {}, {0}}, struct_type{{}, {}, {0.0}});
+   test_key(struct_type{{0, 1, 2}, {}, {0}}, struct_type{{0, 1, 2}, 0, {0}});
+   test_key(struct_type{{0, 1, 2}, 0, {0}}, struct_type{{0, 1, 2}, 0, {0.0}});
 }
 
 int main() {
