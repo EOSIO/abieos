@@ -1,6 +1,6 @@
 #pragma once
 
-#if defined(EOSIO_NATIVE) || defined(EOSIO_CDT_COMPILATION)
+#if defined(__eosio_cdt__)
 #   define OUTCOME_DISABLE_EXECINFO
 #   include <eosio/check.hpp>
 #else
@@ -16,7 +16,7 @@ namespace outcome = OUTCOME_V2_NAMESPACE;
 template <typename T>
 using result = outcome::basic_result<T, std::error_code, outcome::policy::all_narrow>;
 
-#if defined(EOSIO_NATIVE) || defined(EOSIO_CDT_COMPILATION)
+#if defined(__eosio_cdt__)
 [[noreturn]] inline void check(std::error_code ec) {
    check(false, ec.message());
    __builtin_unreachable();
