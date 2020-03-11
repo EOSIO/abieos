@@ -188,6 +188,7 @@ result<void> to_key_varuint32(std::uint32_t obj, S& stream) {
 //   the argument will be sign-extended.
 template <typename S>
 result<void> to_key_varint32(std::int32_t obj, S& stream) {
+   static_assert(std::is_same_v<S, void>, "to_key for varint32 has been temporarily disabled");
    int  num_bytes;
    bool sign = (obj < 0);
    if (obj < 0x40 && obj >= -0x40) {
