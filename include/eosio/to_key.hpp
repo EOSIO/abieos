@@ -139,6 +139,15 @@ result<void> to_key(const std::optional<T>& obj, S& stream) {
    return to_key_optional(obj ? &*obj : nullptr, stream);
 }
 
+// The first byte holds:
+// 0-4 1's (number of additional bytes) 0 (terminator) bits
+//
+// The number is represented as big-endian using the low order
+// bits of the first byte and all of the remaining bytes.
+//
+// Notes:
+// - values must be encoded using the minimum number of bytes,
+//   as non-canonical representations will break the sort order.
 template <typename S>
 result<void> to_key_varuint32(std::uint32_t obj, S& stream) {
    int num_bytes;
@@ -154,36 +163,57 @@ result<void> to_key_varuint32(std::uint32_t obj, S& stream) {
       num_bytes = 5;
    }
 
-   OUTCOME_TRY(stream.write(static_cast<char>(~(0xFFu >> (num_bytes - 1)) | (obj >> ((num_bytes - 1) * 8)))));
+   OUTCOME_TRY(stream.write(
+         static_cast<char>(~(0xFFu >> (num_bytes - 1)) | (num_bytes == 5 ? 0 : (obj >> ((num_bytes - 1) * 8))))));
    for (int i = num_bytes - 2; i >= 0; --i) { OUTCOME_TRY(stream.write(static_cast<char>((obj >> i * 8) & 0xFFu))); }
    return outcome::success();
 }
 
+// for non-negative values
+//  The first byte holds:
+//   1 (signbit) 0-4 1's (number of additional bytes) 0 (terminator) bits
+//  The value is represented as big endian
+// for negative values
+//  The first byte holds:
+//   0 (signbit) 0-4 0's (number of additional bytes) 1 (terminator) bits
+//   The value is adjusted to be positive based on the range that can
+//   be represented with this number of bytes and then encoded as big endian.
+//
+// Notes:
+// - negative values must sort before positive values
+// - For negative value, numbers that need more bytes are smaller, hence
+//   the encoding of the width must be opposite the encoding used for
+//   non-negative values.
+// - A 5-byte varint can represent values in $[-2^34, 2^34)$.  In this case,
+//   the argument will be sign-extended.
 template <typename S>
 result<void> to_key_varint32(std::int32_t obj, S& stream) {
+   static_assert(std::is_same_v<S, void>, "to_key for varint32 has been temporarily disabled");
    int  num_bytes;
    bool sign = (obj < 0);
-   if (obj < 0x20 && obj >= -0x20) {
+   if (obj < 0x40 && obj >= -0x40) {
       num_bytes = 1;
-   } else if (obj < 0x1000 && obj >= -0x1000) {
+   } else if (obj < 0x2000 && obj >= -0x2000) {
       num_bytes = 2;
-   } else if (obj < 0x080000 && obj >= -0x080000) {
+   } else if (obj < 0x100000 && obj >= -0x100000) {
       num_bytes = 3;
-   } else if (obj < 0x04000000 && obj >= -0x04000000) {
+   } else if (obj < 0x08000000 && obj >= -0x08000000) {
       num_bytes = 4;
    } else {
       num_bytes = 5;
    }
 
-   obj = static_cast<uint32_t>(obj) + (static_cast<uint32_t>(0x20) << std::min((num_bytes - 1) * 7, 26));
    unsigned char width_field;
    if (sign) {
       width_field = 0x80u >> num_bytes;
    } else {
       width_field = 0x80u | ~(0xFFu >> num_bytes);
    }
-   OUTCOME_TRY(stream.write(width_field | (obj >> ((num_bytes - 1) * 8))));
-   for (int i = num_bytes - 2; i >= 0; --i) { OUTCOME_TRY(stream.write(static_cast<char>((obj >> i * 8) & 0xFFu))); }
+   auto          uobj       = static_cast<std::uint32_t>(obj);
+   unsigned char value_mask = (0xFFu >> (num_bytes + 1));
+   unsigned char high_byte  = (num_bytes == 5 ? (sign ? 0xFF : 0) : (uobj >> ((num_bytes - 1) * 8)));
+   OUTCOME_TRY(stream.write(width_field | (high_byte & value_mask)));
+   for (int i = num_bytes - 2; i >= 0; --i) { OUTCOME_TRY(stream.write(static_cast<char>((uobj >> i * 8) & 0xFFu))); }
    return outcome::success();
 }
 
