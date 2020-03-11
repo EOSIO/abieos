@@ -184,6 +184,8 @@ result<void> to_key_varuint32(std::uint32_t obj, S& stream) {
 // - For negative value, numbers that need more bytes are smaller, hence
 //   the encoding of the width must be opposite the encoding used for
 //   non-negative values.
+// - A 5-byte varint can represent values in $[-2^34, 2^34)$.  In this case,
+//   the argument will be sign-extended.
 template <typename S>
 result<void> to_key_varint32(std::int32_t obj, S& stream) {
    int  num_bytes;
@@ -203,12 +205,14 @@ result<void> to_key_varint32(std::int32_t obj, S& stream) {
    unsigned char width_field;
    if (sign) {
       width_field = 0x80u >> num_bytes;
-      obj         = static_cast<uint32_t>(obj) + (static_cast<uint32_t>(0x40) << std::min((num_bytes - 1) * 7, 25));
    } else {
       width_field = 0x80u | ~(0xFFu >> num_bytes);
    }
-   OUTCOME_TRY(stream.write(width_field | (num_bytes == 5 ? 0 : (obj >> ((num_bytes - 1) * 8)))));
-   for (int i = num_bytes - 2; i >= 0; --i) { OUTCOME_TRY(stream.write(static_cast<char>((obj >> i * 8) & 0xFFu))); }
+   auto          uobj       = static_cast<std::uint32_t>(obj);
+   unsigned char value_mask = (0xFFu >> (num_bytes + 1));
+   unsigned char high_byte  = (num_bytes == 5 ? (sign ? 0xFF : 0) : (uobj >> ((num_bytes - 1) * 8)));
+   OUTCOME_TRY(stream.write(width_field | (high_byte & value_mask)));
+   for (int i = num_bytes - 2; i >= 0; --i) { OUTCOME_TRY(stream.write(static_cast<char>((uobj >> i * 8) & 0xFFu))); }
    return outcome::success();
 }
 
