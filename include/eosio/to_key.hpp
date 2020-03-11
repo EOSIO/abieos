@@ -163,7 +163,8 @@ result<void> to_key_varuint32(std::uint32_t obj, S& stream) {
       num_bytes = 5;
    }
 
-   OUTCOME_TRY(stream.write(static_cast<char>(~(0xFFu >> (num_bytes - 1)) | (obj >> ((num_bytes - 1) * 8)))));
+   OUTCOME_TRY(stream.write(
+         static_cast<char>(~(0xFFu >> (num_bytes - 1)) | (num_bytes == 5 ? 0 : (obj >> ((num_bytes - 1) * 8))))));
    for (int i = num_bytes - 2; i >= 0; --i) { OUTCOME_TRY(stream.write(static_cast<char>((obj >> i * 8) & 0xFFu))); }
    return outcome::success();
 }
@@ -206,7 +207,7 @@ result<void> to_key_varint32(std::int32_t obj, S& stream) {
    } else {
       width_field = 0x80u | ~(0xFFu >> num_bytes);
    }
-   OUTCOME_TRY(stream.write(width_field | (obj >> ((num_bytes - 1) * 8))));
+   OUTCOME_TRY(stream.write(width_field | (num_bytes == 5 ? 0 : (obj >> ((num_bytes - 1) * 8)))));
    for (int i = num_bytes - 2; i >= 0; --i) { OUTCOME_TRY(stream.write(static_cast<char>((obj >> i * 8) & 0xFFu))); }
    return outcome::success();
 }
