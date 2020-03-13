@@ -50,6 +50,12 @@ void test_key(const T& x, const T& y) {
    CHECK(std::lexicographical_compare(keyy.begin(), keyy.end(), keyx.begin(), keyx.end(), std::less<unsigned char>()) == (y < x));
 }
 
+#define CHECK_EQUAL_KEY(x, y) CHECK(eosio::convert_to_key((x)).value() == eosio::convert_to_key((y)).value())
+
+std::vector<unsigned char> s2v(std::string_view s) {
+   return std::vector<unsigned char>(s.begin(), s.end());
+}
+
 enum class enum_u8 : unsigned char {
    v0,
    v1,
@@ -127,9 +133,14 @@ void test_compare() {
    test_key(""s, "a"s);
    test_key("a"s, "b"s);
    test_key("aaaaa"s, "aaaaa"s);
-   test_key("\0"s, "\xFF"s);
-   test_key("\0"s, ""s);
-   test_key("\0\0\0"s, "\0\0"s);
+   test_key("a"s, "\xFF"s);
+   for(int i = 0; i < 257; ++i) {
+      test_key(std::string(i, '\0'), std::string(i + 1, '\0'));
+   }
+   test_key(std::string(256, '\0'), std::string(256, '\0') + "a"s);
+   for(int i = 257; i > 0; --i) {
+      test_key(std::string(i, '\0') + "a", std::string(i - 1, '\0') + "a");
+   }
 
    test_key(std::vector<int>{}, std::vector<int>{});
    test_key(std::vector<int>{}, std::vector<int>{0});
@@ -149,6 +160,17 @@ void test_compare() {
    test_key(std::vector<unsigned char>{'\0'}, std::vector<unsigned char>{255});
    test_key(std::vector<unsigned char>{'\1'}, std::vector<unsigned char>{255});
    test_key(std::vector<unsigned char>{'b'}, std::vector<unsigned char>{'a'});
+   CHECK_EQUAL_KEY(std::vector<unsigned char>(), std::string());
+   CHECK_EQUAL_KEY(std::vector<unsigned char>(1, '\0'), std::string(1, '\0'));
+   CHECK_EQUAL_KEY(std::vector<unsigned char>(2, '\0'), std::string(2, '\0'));
+   CHECK_EQUAL_KEY(std::vector<unsigned char>(127, '\0'), std::string(127, '\0'));
+   CHECK_EQUAL_KEY(std::vector<unsigned char>(128, '\0'), std::string(128, '\0'));
+   CHECK_EQUAL_KEY(std::vector<unsigned char>(257, '\0'), std::string(257, '\0'));
+   CHECK_EQUAL_KEY(s2v(std::string(1, '\0') + "a"), std::string(1, '\0') + "a");
+   CHECK_EQUAL_KEY(s2v(std::string(2, '\0') + "a"), std::string(2, '\0') + "a");
+   CHECK_EQUAL_KEY(s2v(std::string(127, '\0') + "a"), std::string(127, '\0') + "a");
+   CHECK_EQUAL_KEY(s2v(std::string(128, '\0') + "a"), std::string(128, '\0') + "a");
+   CHECK_EQUAL_KEY(s2v(std::string(257, '\0') + "a"), std::string(257, '\0') + "a");
 
    test_key(std::vector<bool>{}, std::vector<bool>{true});
    test_key(std::vector<bool>{false}, std::vector<bool>{true});

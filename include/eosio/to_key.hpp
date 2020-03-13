@@ -71,6 +71,46 @@ result<void> to_key_optional(const bool* obj, S& stream) {
       return stream.write('\2');
 }
 
+template <typename T>
+result<char> to_key_byte(const T& obj) {
+   static_assert(has_bitwise_serialization<T>() && sizeof(T) == 1, "Only works for single byte types");
+   char             buf[1];
+   fixed_buf_stream tmp_stream(buf, 1);
+   OUTCOME_TRY(to_key(obj, tmp_stream));
+   if (tmp_stream.pos == tmp_stream.end)
+      return buf[0];
+   else
+      return stream_error::overrun; // Just to be safe.  This should never happen.
+}
+
+template <typename T, typename S>
+result<void> to_key_byte_range(const T& obj, S& stream) {
+   static_assert(has_bitwise_serialization<typename T::value_type>() && sizeof(typename T::value_type) == 1,
+                 "Only works for containers of single byte types");
+   constexpr std::ptrdiff_t max_run_length = 127;
+   char                     pending_run    = 0;
+   for (typename T::value_type item : obj) {
+      OUTCOME_TRY(ch, to_key_byte(item));
+      if (pending_run) {
+         if (pending_run == max_run_length || ch != '\0') {
+            OUTCOME_TRY(stream.write('\0'));
+            OUTCOME_TRY(stream.write(-pending_run));
+            pending_run = 0;
+         } else {
+            ++pending_run;
+            continue;
+         }
+      }
+      if (ch == '\0') {
+         pending_run = 1;
+      } else {
+         OUTCOME_TRY(stream.write(ch));
+      }
+   }
+   OUTCOME_TRY(stream.write('\0'));
+   return stream.write(pending_run);
+}
+
 template <typename T, typename S>
 result<void> to_key_optional(const T* obj, S& stream) {
    if constexpr (has_bitwise_serialization<T>() && sizeof(T) == 1) {
@@ -104,14 +144,17 @@ result<void> to_key(const std::pair<T, U>& obj, S& stream) {
 
 template <typename T, typename S>
 result<void> to_key_range(const T& obj, S& stream) {
-   for (const auto& elem : obj) { OUTCOME_TRY(to_key_optional(&elem, stream)); }
-   return to_key_optional((decltype(&*std::begin(obj))) nullptr, stream);
+   if constexpr (has_bitwise_serialization<typename T::value_type>() && sizeof(typename T::value_type) == 1) {
+      return to_key_byte_range(obj, stream);
+   } else {
+      for (const typename T::value_type& elem : obj) { OUTCOME_TRY(to_key_optional(&elem, stream)); }
+      return to_key_optional((const typename T::value_type*)nullptr, stream);
+   }
 }
 
 template <typename T, typename S>
 result<void> to_key(const std::vector<T>& obj, S& stream) {
-   for (const T& elem : obj) { OUTCOME_TRY(to_key_optional(&elem, stream)); }
-   return to_key_optional((const T*)nullptr, stream);
+   return to_key_range(obj, stream);
 }
 
 template <typename T, typename S>
@@ -225,10 +268,20 @@ result<void> to_key(const std::variant<Ts...>& obj, S& stream) {
 
 template <typename S>
 result<void> to_key(std::string_view obj, S& stream) {
-   for (char ch : obj) {
+   constexpr std::ptrdiff_t max_run_length = 127;
+   for (auto iter = obj.begin(), end = obj.end(); iter != end; ++iter) {
+      char ch = *iter;
       OUTCOME_TRY(stream.write(ch));
       if (ch == '\0') {
-         OUTCOME_TRY(stream.write('\1'));
+         auto run_end =
+               std::find_if(iter + 1, iter + std::min(end - iter, max_run_length), [](char ch) { return ch != '\0'; });
+         unsigned char run_length = (run_end - iter);
+         if (run_end == end) {
+            return stream.write(run_length);
+         } else {
+            OUTCOME_TRY(stream.write(-run_length));
+         }
+         iter = run_end - 1; // will be incremented immediately
       }
    }
    return stream.write("\0", 2);
