@@ -175,6 +175,7 @@ void test_compare() {
    test_key(std::vector<bool>{}, std::vector<bool>{true});
    test_key(std::vector<bool>{false}, std::vector<bool>{true});
    test_key(std::vector<bool>{false}, std::vector<bool>{false, true});
+   test_key(std::vector<bool>{false, false, false, true, false}, std::vector<bool>{false, false, false, true, false, false});
 
    test_key(std::list<int>{}, std::list<int>{1});
    test_key(std::list<int>{0}, std::list<int>{1});

@@ -144,7 +144,22 @@ result<void> to_key(const std::pair<T, U>& obj, S& stream) {
 
 template <typename T, typename S>
 result<void> to_key_range(const T& obj, S& stream) {
-   if constexpr (has_bitwise_serialization<typename T::value_type>() && sizeof(typename T::value_type) == 1) {
+   if constexpr (std::is_same_v<typename T::value_type, bool>) {
+      // pack 5 boolean values into each byte
+      int           offset = 0;
+      unsigned char val    = 0;
+      for (bool item : obj) {
+         val *= 3;
+         val += item + 1;
+         if (++offset == 5) {
+            OUTCOME_TRY(stream.write(val));
+            val    = 0;
+            offset = 0;
+         }
+      }
+      while (++offset < 5) val *= 3;
+      return stream.write(val);
+   } else if constexpr (has_bitwise_serialization<typename T::value_type>() && sizeof(typename T::value_type) == 1) {
       return to_key_byte_range(obj, stream);
    } else {
       for (const typename T::value_type& elem : obj) { OUTCOME_TRY(to_key_optional(&elem, stream)); }
