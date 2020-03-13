@@ -83,6 +83,15 @@ result<char> to_key_byte(const T& obj) {
       return stream_error::overrun; // Just to be safe.  This should never happen.
 }
 
+// After encoding each element of the range individually, applies the following transform:
+// - Runs of 1-127 0's before the end of the range become two bytes: {0, -count}
+// - Runs of 0-127 0's at the end of the range become two bytes: {0, count}
+//
+// Notes:
+// - The second rule above will be applied exactly once
+// - The byte sequence {0, 0x80} is unused
+// - Runs are found greedily from the beginning of the input
+// - For an input sequence of length N, the maximum output size is 1.5N + 2
 template <typename T, typename S>
 result<void> to_key_byte_range(const T& obj, S& stream) {
    static_assert(has_bitwise_serialization<typename T::value_type>() && sizeof(typename T::value_type) == 1,
