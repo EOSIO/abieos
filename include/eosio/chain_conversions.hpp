@@ -68,12 +68,17 @@ inline uint64_t string_to_name(const std::string& str) { return string_to_name(s
    unsigned i = 0;
    for (; i < str.size() && i < 12; ++i) {
       uint64_t x = 0;
-      OUTCOME_TRY(char_to_name_digit_strict(str[i], x));
+      // - this is not safe in const expression OUTCOME_TRY(char_to_name_digit_strict(str[i], x));
+      auto r = char_to_name_digit_strict(str[i], x);
+      if( !r ) return stream_error::invalid_name_char;
       name |= (x & 0x1f) << (64 - 5 * (i + 1));
    }
    if (i < str.size() && i == 12) {
       uint64_t x = 0;
-      OUTCOME_TRY(char_to_name_digit_strict(str[i], x));
+      // - this is not safe in const expression OUTCOME_TRY(char_to_name_digit_strict(str[i], x));
+      auto r = char_to_name_digit_strict(str[i], x);
+      if( !r ) return stream_error::invalid_name_char;
+
       if (x != (x & 0xf))
          return stream_error::invalid_name_char13;
       name |= x;
