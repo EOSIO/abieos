@@ -135,8 +135,8 @@ result<void> fp_to_json(double value, S& stream) {
    } else if (std::isnan(value)) {
       return stream.write("\"NaN\"", 5);
    }
-   small_buffer<std::numeric_limits<double>::digits10 + 2> b;
-   int                                                     n = fpconv_dtoa(value, b.pos);
+   small_buffer<24> b; // fpconv_dtoa generates at most 24 characters
+   int              n = fpconv_dtoa(value, b.pos);
    if (n <= 0)
       return stream_error::float_error;
    b.pos += n;
