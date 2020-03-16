@@ -11,6 +11,7 @@
 #include <tuple>
 #include <variant>
 #include <vector>
+#include <string_view>
 
 namespace eosio {
 
@@ -213,6 +214,16 @@ inline result<void> from_bin(std::string& obj, S& stream) {
       return r;
    obj.resize(size);
    return stream.read(obj.data(), obj.size());
+}
+
+template <typename S>
+inline result<void> from_bin(std::string_view& obj, S& stream) {
+   uint32_t size;
+   auto     r = varuint32_from_bin(size, stream);
+   if (!r)
+      return r;
+   obj = std::string_view(stream.get_pos(),size);
+   return stream.skip(size);
 }
 
 template <typename T, typename S>

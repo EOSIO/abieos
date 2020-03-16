@@ -4,6 +4,7 @@
 #include <eosio/check.hpp>
 #include <eosio/operators.hpp>
 #include <eosio/reflection.hpp>
+#include <eosio/murmur.hpp>
 #include <string>
 
 namespace eosio {
@@ -15,7 +16,9 @@ struct name {
    constexpr name() = default;
    constexpr explicit name(uint64_t value) : value{ value } {}
    constexpr explicit name(name::raw value) : value{ static_cast<uint64_t>(value) } {}
-   constexpr explicit name(std::string_view str) : value{ check(string_to_name_strict(str)) } {}
+   constexpr explicit name(std::string_view str) : value{ check(string_to_name_strict(str)) } { }
+
+
    constexpr name(const name&) = default;
 
    constexpr   operator raw() const { return static_cast<raw>(value); }
@@ -137,14 +140,20 @@ struct name {
    }
 };
 
+inline constexpr uint64_t hash_name( std::string_view str ) {
+   auto r = string_to_name_strict(str);
+   if( r ) return r.value();
+   return  murmur64( str.data(), str.size() );
+}
+
 EOSIO_REFLECT(name, value);
 EOSIO_COMPARE(name);
 
 template <typename S>
 result<void> from_json(name& obj, S& stream) {
    OUTCOME_TRY(r, stream.get_string());
-   OUTCOME_TRY(value, string_to_name_strict(r));
-   obj = name(value);
+   //OUTCOME_TRY(value, string_to_name_strict(r));
+   obj = name(hash_name(r)); 
    return eosio::outcome::success();
 }
 
@@ -154,7 +163,8 @@ result<void> to_json(const name& obj, S& stream) {
 }
 
 inline namespace literals {
-   inline constexpr name operator""_n(const char* s, size_t) { return name{ s }; }
+   inline constexpr name operator""_n(const char* s, size_t) { return name( check(string_to_name_strict(s)) ); }
+   inline constexpr name operator""_h(const char* s, size_t) { return name( hash_name(s) ); }
 } // namespace literals
 
 } // namespace eosio

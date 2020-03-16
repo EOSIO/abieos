@@ -187,6 +187,8 @@ struct input_stream {
       return outcome::success();
    }
 
+   auto get_pos()const { return pos; }
+
    result<void> read(void* dest, size_t size) {
       if (size > size_t(end - pos))
          return stream_error::overrun;
