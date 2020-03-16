@@ -154,19 +154,41 @@ result<void> to_key(const std::pair<T, U>& obj, S& stream) {
 template <typename T, typename S>
 result<void> to_key_range(const T& obj, S& stream) {
    if constexpr (std::is_same_v<typename T::value_type, bool>) {
-      // pack 5 boolean values into each byte
-      int           offset = 0;
+      // pack 7 boolean values into each byte
+      // There are $\sum_{i=0}^7 2^i = 2^8-1 = 255$ sequences
+      // of bool of length 7 or less.  Therefore it is possible
+      // to represent any such sequence in one byte.
+      //
+      // Every bit in a group of 7, is assigned a position, k, starting
+      // with the highest bit. 6543210.
+      //
+      // If the bit in position k is 0, add 1, if it is 1 add 2^{k+1}
+      //
+      // Proof:
+      // Base case: The empty sequence is represented by 0.
+      //
+      // Given any sequence of bits of size 7 or less, the lexicographically next
+      // such sequence can be found as follows:
+      //
+      // - If the sequence has fewer than 7 bits, append a 0: xxx -> xxx0
+      //   Since we add 1 to the result for each 0, this increments the encoding by 1.
+      //
+      // - If the sequence has 7 bits, then remove all trailing 1's then
+      //   change the last 0 to a 1: xxx01... -> xxx1
+      //   The difference in the encoded value is:
+      //   2^{k+1} - (1 + 2^{k} + ... + 2) = 2^{k+1} - (2^{k+1} - 1) = 1
+      //
+      // - If the sequence is 1111111, it is the maximum and has no next sequence.
+      int           offset = 7;
       unsigned char val    = 0;
       for (bool item : obj) {
-         val *= 3;
-         val += item + 1;
-         if (++offset == 5) {
+         val += 1 << (item * offset);
+         if (--offset == 0) {
             OUTCOME_TRY(stream.write(val));
             val    = 0;
-            offset = 0;
+            offset = 7;
          }
       }
-      while (++offset < 5) val *= 3;
       return stream.write(val);
    } else if constexpr (has_bitwise_serialization<typename T::value_type>() && sizeof(typename T::value_type) == 1) {
       return to_key_byte_range(obj, stream);
