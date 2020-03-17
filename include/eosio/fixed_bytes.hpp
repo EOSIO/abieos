@@ -195,7 +195,8 @@ class fixed_bytes {
 // Everything else should be using one of the typedefs below.
 template <std::size_t Size, typename Word, typename F>
 void eosio_for_each_field(fixed_bytes<Size, Word>*, F&& f) {
-   f("value", [](auto* p) -> decltype((p->value)) { return p->value; });
+   f("value",
+     [](auto* p) -> decltype(&std::decay_t<decltype(*p)>::value) { return &std::decay_t<decltype(*p)>::value; });
 }
 
 template <std::size_t Size, typename Word>
