@@ -26,7 +26,8 @@ namespace eosio { namespace reflection {
    template <typename T>
    inline constexpr bool has_for_each_field_v = has_for_each_field<T>::value;
 
-#define EOSIO_REFLECT_MEMBER(STRUCT, FIELD) f(#FIELD, [](auto p) -> decltype((p->FIELD)) { return (p->FIELD); });
+#define EOSIO_REFLECT_MEMBER(STRUCT, FIELD)                                                                            \
+   f(#FIELD, [](auto p) -> decltype(&std::decay_t<decltype(*p)>::FIELD) { return &std::decay_t<decltype(*p)>::FIELD; });
 
 #define EOSIO_REFLECT_STRIP_BASEbase
 #define EOSIO_REFLECT_BASE(STRUCT, BASE)                                                                               \
