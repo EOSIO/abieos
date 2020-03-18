@@ -74,11 +74,6 @@ namespace eosio { namespace ship_protocol {
    }
 
    template <typename S>
-   eosio::result<void> from_bin(transaction_status& obj, S& stream) {
-      return stream.read_raw(obj);
-   }
-
-   template <typename S>
    eosio::result<void> to_json(const transaction_status& status, S& stream) {
       // todo: switch to new serializer string support.
       return eosio::to_json(to_string(status), stream);
@@ -235,7 +230,7 @@ namespace eosio { namespace ship_protocol {
       std::vector<account_delta>         account_disk_deltas    = {};
       std::optional<std::string>         except                 = {};
       std::optional<uint64_t>            error_code             = {};
-      std::optional<eosio::input_stream> return_value           = {};
+      eosio::input_stream                return_value           = {};
    };
 
    EOSIO_REFLECT(action_trace_v1, action_ordinal, creator_action_ordinal, receipt, receiver, act, context_free, elapsed,
