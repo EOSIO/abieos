@@ -200,6 +200,14 @@ result<void> to_json(const std::variant<T...>& obj, S& stream) {
    return stream.write(']');
 }
 
+   template<typename>
+   struct is_std_optional : std::false_type {};
+
+   template<typename T>
+   struct is_std_optional<std::optional<T>> : std::true_type {
+      using value_type = T;
+   };
+
 template <typename T, typename S>
 result<void> to_json(const T& t, S& stream) {
    result<void> ok    = outcome::success();
@@ -207,29 +215,40 @@ result<void> to_json(const T& t, S& stream) {
    OUTCOME_TRY(stream.write('{'));
    eosio::for_each_field<T>([&](const char* name, auto&& member) {
       if (ok) {
-         if (first) {
-            first = false;
-         } else {
-            auto r = stream.write(',');
+          auto addfield = [&]() {
+            if (first) {
+               first = false;
+            } else {
+               auto r = stream.write(',');
+               if (!r) {
+                  ok = r;
+                  return;
+               }
+            }
+            auto r = to_json(name, stream);
             if (!r) {
                ok = r;
                return;
             }
-         }
-         auto r = to_json(name, stream);
-         if (!r) {
-            ok = r;
-            return;
-         }
-         r = stream.write(':');
-         if (!r) {
-            ok = r;
-            return;
-         }
-         r = to_json(member(&t), stream);
-         if (!r) {
-            ok = r;
-            return;
+            r = stream.write(':');
+            if (!r) {
+               ok = r;
+               return;
+            }
+            r = to_json(member(&t), stream);
+            if (!r) {
+               ok = r;
+               return;
+            }
+         };
+
+         auto m = member(&t);
+         using member_type = std::decay_t<decltype(m)>;
+         if constexpr ( not is_std_optional<member_type>::value ) {
+            addfield();
+         } else {
+            if( !!m ) 
+               addfield();
          }
       }
    });
