@@ -166,6 +166,58 @@ struct size_stream {
    }
 };
 
+template <typename S>
+result<void> increase_indent(S&) {
+   return outcome::success();
+}
+
+template <typename S>
+result<void> decrease_indent(S&) {
+   return outcome::success();
+}
+
+template <typename S>
+result<void> write_colon(S& s) {
+   return s.write(':');
+}
+
+template <typename S>
+result<void> write_newline(S&) {
+   return outcome::success();
+}
+
+template <typename Base>
+struct pretty_stream : Base {
+   using Base::Base;
+   int               indent_size = 4;
+   std::vector<char> current_indent;
+};
+
+template <typename S>
+result<void> increase_indent(pretty_stream<S>& s) {
+   s.current_indent.resize(s.current_indent.size() + s.indent_size, ' ');
+   return outcome::success();
+}
+
+template <typename S>
+result<void> decrease_indent(pretty_stream<S>& s) {
+   if (s.current_indent.size() < s.indent_size)
+      return stream_error::overrun;
+   s.current_indent.resize(s.current_indent.size() - s.indent_size);
+   return outcome::success();
+}
+
+template <typename S>
+result<void> write_colon(pretty_stream<S>& s) {
+   return s.write(": ", 2);
+}
+
+template <typename S>
+result<void> write_newline(pretty_stream<S>& s) {
+   OUTCOME_TRY(s.write('\n'));
+   return s.write(s.current_indent.data(), s.current_indent.size());
+}
+
 struct input_stream {
    const char* pos;
    const char* end;

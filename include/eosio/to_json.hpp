@@ -160,24 +160,23 @@ template <typename S> result<void> to_json(float value, S& stream)     { return 
 
 template <typename T, typename S>
 result<void> to_json(const std::vector<T>& obj, S& stream) {
-   auto r = stream.write('[');
-   if (!r)
-      return r.error();
+   OUTCOME_TRY(stream.write('['));
    bool first = true;
    for (auto& v : obj) {
-      if (!first) {
-         r = stream.write(',');
-         if (!r)
-            return r.error();
+      if (first) {
+         OUTCOME_TRY(increase_indent(stream));
+      } else {
+         OUTCOME_TRY(stream.write(','));
       }
+      OUTCOME_TRY(write_newline(stream));
       first = false;
-      r     = to_json(v, stream);
-      if (!r)
-         return r.error();
+      OUTCOME_TRY(to_json(v, stream));
    }
-   r = stream.write(']');
-   if (!r)
-      return r.error();
+   if (!first) {
+      OUTCOME_TRY(decrease_indent(stream));
+      OUTCOME_TRY(write_newline(stream));
+   }
+   OUTCOME_TRY(stream.write(']'));
    return outcome::success();
 }
 
@@ -193,10 +192,15 @@ result<void> to_json(const std::optional<T>& obj, S& stream) {
 template <typename... T, typename S>
 result<void> to_json(const std::variant<T...>& obj, S& stream) {
    OUTCOME_TRY(stream.write('['));
+   OUTCOME_TRY(increase_indent(stream));
+   OUTCOME_TRY(write_newline(stream));
    OUTCOME_TRY(std::visit(
          [&](const auto& t) { return to_json(get_type_name((std::decay_t<decltype(t)>*)nullptr), stream); }, obj));
    OUTCOME_TRY(stream.write(','));
+   OUTCOME_TRY(write_newline(stream));
    OUTCOME_TRY(std::visit([&](auto& x) { return to_json(x, stream); }, obj));
+   OUTCOME_TRY(decrease_indent(stream));
+   OUTCOME_TRY(write_newline(stream));
    return stream.write(']');
 }
 
@@ -217,6 +221,11 @@ result<void> to_json(const T& t, S& stream) {
       if (ok) {
           auto addfield = [&]() {
             if (first) {
+               auto r = increase_indent(stream);
+               if (!r) {
+                  ok = r;
+                  return;
+               }
                first = false;
             } else {
                auto r = stream.write(',');
@@ -225,12 +234,17 @@ result<void> to_json(const T& t, S& stream) {
                   return;
                }
             }
-            auto r = to_json(name, stream);
+            auto r = write_newline(stream);
             if (!r) {
                ok = r;
                return;
             }
-            r = stream.write(':');
+            r = to_json(name, stream);
+            if (!r) {
+               ok = r;
+               return;
+            }
+            r = write_colon(stream);
             if (!r) {
                ok = r;
                return;
@@ -253,6 +267,10 @@ result<void> to_json(const T& t, S& stream) {
       }
    });
    OUTCOME_TRY(ok);
+   if (!first) {
+      OUTCOME_TRY(decrease_indent(stream));
+      OUTCOME_TRY(write_newline(stream));
+   }
    return stream.write('}');
 }
 
@@ -284,6 +302,23 @@ result<std::string> convert_to_json(const T& t) {
       return r.error();
    std::string      result(ss.size, 0);
    fixed_buf_stream fbs(result.data(), result.size());
+   r = to_json(t, fbs);
+   if (!r)
+      return r.error();
+   if (fbs.pos == fbs.end)
+      return std::move(result);
+   else
+      return stream_error::underrun;
+}
+
+template <typename T>
+result<std::string> format_json(const T& t) {
+   pretty_stream<size_stream> ss;
+   auto                       r = to_json(t, ss);
+   if (!r)
+      return r.error();
+   std::string                     result(ss.size, 0);
+   pretty_stream<fixed_buf_stream> fbs(result.data(), result.size());
    r = to_json(t, fbs);
    if (!r)
       return r.error();
