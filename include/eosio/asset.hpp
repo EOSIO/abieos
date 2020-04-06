@@ -32,7 +32,7 @@ struct asset {
    /**
     * The symbol name of the asset
     */
-   symbol symbol;
+   eosio::symbol symbol;
 
    /**
     * Maximum amount possible for this asset. It's capped to 2^62 - 1

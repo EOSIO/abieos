@@ -6,6 +6,7 @@
 #include <vector>
 #include <type_traits>
 #include <string.h>
+#include <algorithm>
 
 namespace eosio {
 enum class stream_error {
