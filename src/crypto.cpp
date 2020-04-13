@@ -96,6 +96,7 @@ result<std::array<unsigned char, 20>> digest_suffix_ripemd160(const Container&..
     return digest;
 }
 
+
 template <typename Key>
 result<Key> string_to_key(std::string_view s, key_type type, std::string_view suffix) {
     std::vector<char> whole;
@@ -193,4 +194,10 @@ result<signature> eosio::signature_from_string(std::string_view s) {
         return string_to_key<signature>(s.substr(7), key_type::wa, "WA");
     else
         return eosio::from_json_error::expected_signature;
+}
+
+namespace eosio {
+    std::string to_base58(const char* d, size_t s ) { 
+        return binary_to_base58( std::string_view(d,s) );
+    }
 }

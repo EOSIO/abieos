@@ -152,4 +152,7 @@ result<void> from_json(signature& obj, S& stream) {
    obj = std::move(result);
    return outcome::success();
 }
+
+ std::string to_base58(const char* d, size_t s );
+
 } // namespace eosio

@@ -135,8 +135,8 @@ result<void> fp_to_json(double value, S& stream) {
    } else if (std::isnan(value)) {
       return stream.write("\"NaN\"", 5);
    }
-   small_buffer<std::numeric_limits<double>::digits10 + 20> b;
-   int                                                     n = fpconv_dtoa(value, b.pos);
+   small_buffer<24> b; // fpconv_dtoa generates at most 24 characters
+   int              n = fpconv_dtoa(value, b.pos);
    if (n <= 0)
       return stream_error::float_error;
    b.pos += n;
@@ -160,24 +160,23 @@ template <typename S> result<void> to_json(float value, S& stream)     { return 
 
 template <typename T, typename S>
 result<void> to_json(const std::vector<T>& obj, S& stream) {
-   auto r = stream.write('[');
-   if (!r)
-      return r.error();
+   OUTCOME_TRY(stream.write('['));
    bool first = true;
    for (auto& v : obj) {
-      if (!first) {
-         r = stream.write(',');
-         if (!r)
-            return r.error();
+      if (first) {
+         OUTCOME_TRY(increase_indent(stream));
+      } else {
+         OUTCOME_TRY(stream.write(','));
       }
+      OUTCOME_TRY(write_newline(stream));
       first = false;
-      r     = to_json(v, stream);
-      if (!r)
-         return r.error();
+      OUTCOME_TRY(to_json(v, stream));
    }
-   r = stream.write(']');
-   if (!r)
-      return r.error();
+   if (!first) {
+      OUTCOME_TRY(decrease_indent(stream));
+      OUTCOME_TRY(write_newline(stream));
+   }
+   OUTCOME_TRY(stream.write(']'));
    return outcome::success();
 }
 
@@ -193,12 +192,25 @@ result<void> to_json(const std::optional<T>& obj, S& stream) {
 template <typename... T, typename S>
 result<void> to_json(const std::variant<T...>& obj, S& stream) {
    OUTCOME_TRY(stream.write('['));
+   OUTCOME_TRY(increase_indent(stream));
+   OUTCOME_TRY(write_newline(stream));
    OUTCOME_TRY(std::visit(
          [&](const auto& t) { return to_json(get_type_name((std::decay_t<decltype(t)>*)nullptr), stream); }, obj));
    OUTCOME_TRY(stream.write(','));
+   OUTCOME_TRY(write_newline(stream));
    OUTCOME_TRY(std::visit([&](auto& x) { return to_json(x, stream); }, obj));
+   OUTCOME_TRY(decrease_indent(stream));
+   OUTCOME_TRY(write_newline(stream));
    return stream.write(']');
 }
+
+   template<typename>
+   struct is_std_optional : std::false_type {};
+
+   template<typename T>
+   struct is_std_optional<std::optional<T>> : std::true_type {
+      using value_type = T;
+   };
 
 template <typename T, typename S>
 result<void> to_json(const T& t, S& stream) {
@@ -207,33 +219,58 @@ result<void> to_json(const T& t, S& stream) {
    OUTCOME_TRY(stream.write('{'));
    eosio::for_each_field<T>([&](const char* name, auto&& member) {
       if (ok) {
-         if (first) {
-            first = false;
-         } else {
-            auto r = stream.write(',');
+          auto addfield = [&]() {
+            if (first) {
+               auto r = increase_indent(stream);
+               if (!r) {
+                  ok = r;
+                  return;
+               }
+               first = false;
+            } else {
+               auto r = stream.write(',');
+               if (!r) {
+                  ok = r;
+                  return;
+               }
+            }
+            auto r = write_newline(stream);
             if (!r) {
                ok = r;
                return;
             }
-         }
-         auto r = to_json(name, stream);
-         if (!r) {
-            ok = r;
-            return;
-         }
-         r = stream.write(':');
-         if (!r) {
-            ok = r;
-            return;
-         }
-         r = to_json(member(&t), stream);
-         if (!r) {
-            ok = r;
-            return;
+            r = to_json(name, stream);
+            if (!r) {
+               ok = r;
+               return;
+            }
+            r = write_colon(stream);
+            if (!r) {
+               ok = r;
+               return;
+            }
+            r = to_json(member(&t), stream);
+            if (!r) {
+               ok = r;
+               return;
+            }
+         };
+
+         auto m = member(&t);
+         using member_type = std::decay_t<decltype(m)>;
+         if constexpr ( not is_std_optional<member_type>::value ) {
+            addfield();
+         } else {
+            if( !!m ) 
+               addfield();
          }
       }
    });
    OUTCOME_TRY(ok);
+   if (!first) {
+      OUTCOME_TRY(decrease_indent(stream));
+      OUTCOME_TRY(write_newline(stream));
+   }
    return stream.write('}');
 }
 
@@ -265,6 +302,23 @@ result<std::string> convert_to_json(const T& t) {
       return r.error();
    std::string      result(ss.size, 0);
    fixed_buf_stream fbs(result.data(), result.size());
+   r = to_json(t, fbs);
+   if (!r)
+      return r.error();
+   if (fbs.pos == fbs.end)
+      return std::move(result);
+   else
+      return stream_error::underrun;
+}
+
+template <typename T>
+result<std::string> format_json(const T& t) {
+   pretty_stream<size_stream> ss;
+   auto                       r = to_json(t, ss);
+   if (!r)
+      return r.error();
+   std::string                     result(ss.size, 0);
+   pretty_stream<fixed_buf_stream> fbs(result.data(), result.size());
    r = to_json(t, fbs);
    if (!r)
       return r.error();

@@ -63,6 +63,8 @@ class time_point {
    explicit time_point(microseconds e) : elapsed(e) {}
    const microseconds& time_since_epoch() const { return elapsed; }
    uint32_t            sec_since_epoch() const { return uint32_t(elapsed.count() / 1000000); }
+   
+   static time_point max() { return time_point( microseconds::maximum() ); }
 
    /// @cond INTERNAL
    time_point& operator+=(const microseconds& m) {
