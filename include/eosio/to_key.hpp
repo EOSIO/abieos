@@ -72,6 +72,55 @@ result<void> to_key_optional(const bool* obj, S& stream) {
       return stream.write('\2');
 }
 
+template <typename T>
+result<char> to_key_byte(const T& obj) {
+   static_assert(has_bitwise_serialization<T>() && sizeof(T) == 1, "Only works for single byte types");
+   char             buf[1];
+   fixed_buf_stream tmp_stream(buf, 1);
+   OUTCOME_TRY(to_key(obj, tmp_stream));
+   if (tmp_stream.pos == tmp_stream.end)
+      return buf[0];
+   else
+      return stream_error::overrun; // Just to be safe.  This should never happen.
+}
+
+// After encoding each element of the range individually, applies the following transform:
+// - Runs of 1-127 0's before the end of the range become two bytes: {0, -count}
+// - Runs of 0-127 0's at the end of the range become two bytes: {0, count}
+//
+// Notes:
+// - The second rule above will be applied exactly once
+// - The byte sequence {0, 0x80} is unused
+// - Runs are found greedily from the beginning of the input
+// - For an input sequence of length N, the maximum output size is 1.5N + 2
+template <typename T, typename S>
+result<void> to_key_byte_range(const T& obj, S& stream) {
+   static_assert(has_bitwise_serialization<typename T::value_type>() && sizeof(typename T::value_type) == 1,
+                 "Only works for containers of single byte types");
+   constexpr std::ptrdiff_t max_run_length = 127;
+   char                     pending_run    = 0;
+   for (typename T::value_type item : obj) {
+      OUTCOME_TRY(ch, to_key_byte(item));
+      if (pending_run) {
+         if (pending_run == max_run_length || ch != '\0') {
+            OUTCOME_TRY(stream.write('\0'));
+            OUTCOME_TRY(stream.write(-pending_run));
+            pending_run = 0;
+         } else {
+            ++pending_run;
+            continue;
+         }
+      }
+      if (ch == '\0') {
+         pending_run = 1;
+      } else {
+         OUTCOME_TRY(stream.write(ch));
+      }
+   }
+   OUTCOME_TRY(stream.write('\0'));
+   return stream.write(pending_run);
+}
+
 template <typename T, typename S>
 result<void> to_key_optional(const T* obj, S& stream) {
    if constexpr (has_bitwise_serialization<T>() && sizeof(T) == 1) {
@@ -105,14 +154,54 @@ result<void> to_key(const std::pair<T, U>& obj, S& stream) {
 
 template <typename T, typename S>
 result<void> to_key_range(const T& obj, S& stream) {
-   for (const auto& elem : obj) { OUTCOME_TRY(to_key_optional(&elem, stream)); }
-   return to_key_optional((decltype(&*std::begin(obj))) nullptr, stream);
+   if constexpr (std::is_same_v<typename T::value_type, bool>) {
+      // pack 7 boolean values into each byte
+      // There are $\sum_{i=0}^7 2^i = 2^8-1 = 255$ sequences
+      // of bool of length 7 or less.  Therefore it is possible
+      // to represent any such sequence in one byte.
+      //
+      // Every bit in a group of 7, is assigned a position, k, starting
+      // with the highest bit. 6543210.
+      //
+      // If the bit in position k is 0, add 1, if it is 1 add 2^{k+1}
+      //
+      // Proof:
+      // Base case: The empty sequence is represented by 0.
+      //
+      // Given any sequence of bits of size 7 or less, the lexicographically next
+      // such sequence can be found as follows:
+      //
+      // - If the sequence has fewer than 7 bits, append a 0: xxx -> xxx0
+      //   Since we add 1 to the result for each 0, this increments the encoding by 1.
+      //
+      // - If the sequence has 7 bits, then remove all trailing 1's then
+      //   change the last 0 to a 1: xxx01... -> xxx1
+      //   The difference in the encoded value is:
+      //   2^{k+1} - (1 + 2^{k} + ... + 2) = 2^{k+1} - (2^{k+1} - 1) = 1
+      //
+      // - If the sequence is 1111111, it is the maximum and has no next sequence.
+      int           offset = 7;
+      unsigned char val    = 0;
+      for (bool item : obj) {
+         val += 1 << (item * offset);
+         if (--offset == 0) {
+            OUTCOME_TRY(stream.write(val));
+            val    = 0;
+            offset = 7;
+         }
+      }
+      return stream.write(val);
+   } else if constexpr (has_bitwise_serialization<typename T::value_type>() && sizeof(typename T::value_type) == 1) {
+      return to_key_byte_range(obj, stream);
+   } else {
+      for (const typename T::value_type& elem : obj) { OUTCOME_TRY(to_key_optional(&elem, stream)); }
+      return to_key_optional((const typename T::value_type*)nullptr, stream);
+   }
 }
 
 template <typename T, typename S>
 result<void> to_key(const std::vector<T>& obj, S& stream) {
-   for (const T& elem : obj) { OUTCOME_TRY(to_key_optional(&elem, stream)); }
-   return to_key_optional((const T*)nullptr, stream);
+   return to_key_range(obj, stream);
 }
 
 template <typename T, typename S>
@@ -226,10 +315,20 @@ result<void> to_key(const std::variant<Ts...>& obj, S& stream) {
 
 template <typename S>
 result<void> to_key(std::string_view obj, S& stream) {
-   for (char ch : obj) {
+   constexpr std::ptrdiff_t max_run_length = 127;
+   for (auto iter = obj.begin(), end = obj.end(); iter != end; ++iter) {
+      char ch = *iter;
       OUTCOME_TRY(stream.write(ch));
       if (ch == '\0') {
-         OUTCOME_TRY(stream.write('\1'));
+         auto run_end =
+               std::find_if(iter + 1, iter + std::min(end - iter, max_run_length), [](char ch) { return ch != '\0'; });
+         unsigned char run_length = (run_end - iter);
+         if (run_end == end) {
+            return stream.write(run_length);
+         } else {
+            OUTCOME_TRY(stream.write(-run_length));
+         }
+         iter = run_end - 1; // will be incremented immediately
       }
    }
    return stream.write("\0", 2);
