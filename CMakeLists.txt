@@ -51,7 +51,8 @@ target_link_libraries(key_test abieos)
 add_executable(reflect_test src/reflect_test.cpp)
 target_include_directories(reflect_test PRIVATE include)
 
-add_executable(test-sanitize src/test.cpp src/abieos.cpp)
+add_executable(test-sanitize src/test.cpp src/abieos.cpp src/abi.cpp src/crypto.cpp include/eosio/fpconv.c)
+
 target_include_directories(test-sanitize PRIVATE include external/outcome/single-header external/rapidjson/include external/date/include)
 target_link_libraries(test-sanitize abieos -fno-omit-frame-pointer -fsanitize=address,undefined)
 target_compile_options(test-sanitize PUBLIC -fno-omit-frame-pointer -fsanitize=address,undefined)
