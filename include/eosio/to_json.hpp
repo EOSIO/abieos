@@ -38,16 +38,14 @@ result<void> to_json(std::string_view sv, S& stream) {
    while (begin != end) {
       auto pos = begin;
       while (pos != end && *pos != '"' && *pos != '\\' && (unsigned char)(*pos) >= 32 && *pos != 127) ++pos;
-      if (begin != pos) {
-         while (begin != end) {
-            stream_adaptor s2(begin, static_cast<std::size_t>(pos - begin));
-            if (rapidjson::UTF8<>::Validate(s2, s2)) {
-               OUTCOME_TRY(stream.write(begin, s2.idx));
-               begin += s2.idx;
-            } else {
-               ++begin;
-               OUTCOME_TRY(stream.write('?'));
-            }
+      while (begin != pos) {
+         stream_adaptor s2(begin, static_cast<std::size_t>(pos - begin));
+         if (rapidjson::UTF8<>::Validate(s2, s2)) {
+            OUTCOME_TRY(stream.write(begin, s2.idx));
+            begin += s2.idx;
+         } else {
+            ++begin;
+            OUTCOME_TRY(stream.write('?'));
          }
       }
       if (begin != end) {

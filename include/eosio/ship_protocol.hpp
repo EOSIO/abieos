@@ -283,6 +283,11 @@ namespace eosio { namespace ship_protocol {
    };
 
    template <typename S>
+   eosio::result<void> to_bin(const recurse_transaction_trace& obj, S& stream) {
+      return to_bin(obj.recurse, stream);
+   }
+
+   template <typename S>
    eosio::result<void> from_bin(recurse_transaction_trace& obj, S& stream) {
       return from_bin(obj.recurse, stream);
    }
