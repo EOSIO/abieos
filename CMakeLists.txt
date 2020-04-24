@@ -39,23 +39,29 @@ add_library(abieos_module MODULE src/abieos.cpp)
 target_link_libraries(abieos_module abieos)
 set_target_properties(abieos_module PROPERTIES OUTPUT_NAME "abieos")
 
-add_executable(test1 src/test.cpp src/abieos.cpp)
-target_link_libraries(test1 abieos)
+enable_testing()
 
-add_executable(template_test src/template_test.cpp src/abieos.cpp)
-target_link_libraries(template_test abieos)
+add_executable(test_abieos src/test.cpp src/abieos.cpp)
+target_link_libraries(test_abieos abieos)
+add_test(NAME test_abieos COMMAND test_abieos)
 
-add_executable(key_test src/key_test.cpp src/abieos.cpp)
-target_link_libraries(key_test abieos)
+add_executable(test_abieos_template src/template_test.cpp src/abieos.cpp)
+target_link_libraries(test_abieos_template abieos)
+#add_test(NAME test_abieos_template COMMAND test_abieos_template)   TODO: fix tests
 
-add_executable(reflect_test src/reflect_test.cpp)
-target_include_directories(reflect_test PRIVATE include)
+add_executable(test_abieos_key src/key_test.cpp src/abieos.cpp)
+target_link_libraries(test_abieos_key abieos)
+add_test(NAME test_abieos_key COMMAND test_abieos_key)
 
-add_executable(test-sanitize src/test.cpp src/abieos.cpp src/abi.cpp src/crypto.cpp include/eosio/fpconv.c)
+add_executable(test_abieos_reflect src/reflect_test.cpp)
+target_include_directories(test_abieos_reflect PRIVATE include)
+add_test(NAME test_abieos_reflect COMMAND test_abieos_reflect)
 
-target_include_directories(test-sanitize PRIVATE include external/outcome/single-header external/rapidjson/include external/date/include)
-target_link_libraries(test-sanitize abieos -fno-omit-frame-pointer -fsanitize=address,undefined)
-target_compile_options(test-sanitize PUBLIC -fno-omit-frame-pointer -fsanitize=address,undefined)
+add_executable(test_abieos_sanitize src/test.cpp src/abieos.cpp src/abi.cpp src/crypto.cpp include/eosio/fpconv.c)
+target_include_directories(test_abieos_sanitize PRIVATE include external/outcome/single-header external/rapidjson/include external/date/include)
+target_link_libraries(test_abieos_sanitize abieos -fno-omit-frame-pointer -fsanitize=address,undefined)
+target_compile_options(test_abieos_sanitize PUBLIC -fno-omit-frame-pointer -fsanitize=address,undefined)
+add_test(NAME test_abieos_sanitize COMMAND test_abieos_sanitize)
 
 # add_executable(fuzzer src/fuzzer.cpp src/abieos.cpp)
 # target_include_directories(fuzzer PRIVATE external/outcome/single-header external/rapidjson/include external/date/include)
@@ -64,7 +70,7 @@ target_compile_options(test-sanitize PUBLIC -fno-omit-frame-pointer -fsanitize=a
 
 if (CMAKE_CXX_COMPILER_ID MATCHES Clang|AppleClang)
     target_compile_options(abieos PRIVATE -Wall -Wextra -Wno-unused-parameter -fcolor-diagnostics)
-    target_compile_options(test1 PRIVATE -Wall -Wextra -Wno-unused-parameter -fcolor-diagnostics)
+    target_compile_options(test_abieos PRIVATE -Wall -Wextra -Wno-unused-parameter -fcolor-diagnostics)
 endif()
 
 add_subdirectory(tools)
