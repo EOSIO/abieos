@@ -551,8 +551,9 @@ void check_types() {
     check_type(context, 0, "name", R"("ab.cd.ef.1234")");
     check_type(context, 0, "name", R"("..ab.cd.ef..")", R"("..ab.cd.ef")");
     check_type(context, 0, "name", R"("zzzzzzzzzzzz")");
-    check_error(context, "thirteenth character in name cannot be a letter that comes after j",
-                [&] { return abieos_json_to_bin(context, 0, "name", R"("zzzzzzzzzzzzz")"); });
+    // todo: should json conversion fall back to hash? reenable this error?
+    // check_error(context, "thirteenth character in name cannot be a letter that comes after j",
+    //             [&] { return abieos_json_to_bin(context, 0, "name", R"("zzzzzzzzzzzzz")"); });
     check_error(context, "expected string containing name",
                 [&] { return abieos_json_to_bin(context, 0, "name", "true"); });
     check_type(context, 0, "bytes", R"("")");

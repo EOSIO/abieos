@@ -39,8 +39,8 @@ add_library(abieos_module MODULE src/abieos.cpp)
 target_link_libraries(abieos_module abieos)
 set_target_properties(abieos_module PROPERTIES OUTPUT_NAME "abieos")
 
-add_executable(test src/test.cpp src/abieos.cpp)
-target_link_libraries(test abieos)
+add_executable(test1 src/test.cpp src/abieos.cpp)
+target_link_libraries(test1 abieos)
 
 add_executable(template_test src/template_test.cpp src/abieos.cpp)
 target_link_libraries(template_test abieos)
@@ -64,7 +64,7 @@ target_compile_options(test-sanitize PUBLIC -fno-omit-frame-pointer -fsanitize=a
 
 if (CMAKE_CXX_COMPILER_ID MATCHES Clang|AppleClang)
     target_compile_options(abieos PRIVATE -Wall -Wextra -Wno-unused-parameter -fcolor-diagnostics)
-    target_compile_options(test PRIVATE -Wall -Wextra -Wno-unused-parameter -fcolor-diagnostics)
+    target_compile_options(test1 PRIVATE -Wall -Wextra -Wno-unused-parameter -fcolor-diagnostics)
 endif()
 
 add_subdirectory(tools)
