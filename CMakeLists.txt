@@ -35,9 +35,19 @@ add_library(abieos STATIC src/abi.cpp src/crypto.cpp include/eosio/fpconv.c)
 target_include_directories(abieos PUBLIC include external/outcome/single-header external/rapidjson/include external/date/include)
 set_target_properties(abieos PROPERTIES POSITION_INDEPENDENT_CODE ON)
 
+add_library(abieos_static STATIC src/abi.cpp src/abieos.cpp src/crypto.cpp include/eosio/fpconv.c)
+target_include_directories(abieos_static PUBLIC include external/outcome/single-header external/rapidjson/include external/date/include)
+set_target_properties(abieos_static PROPERTIES POSITION_INDEPENDENT_CODE ON)
+
 add_library(abieos_module MODULE src/abieos.cpp)
 target_link_libraries(abieos_module abieos)
 set_target_properties(abieos_module PROPERTIES OUTPUT_NAME "abieos")
+
+if (APPLE)
+  add_library(abieos_shared SHARED src/abieos.cpp)
+  target_link_libraries(abieos_shared abieos)
+  set_target_properties(abieos_shared PROPERTIES OUTPUT_NAME "abieos")
+endif()
 
 add_executable(test1 src/test.cpp src/abieos.cpp)
 target_link_libraries(test1 abieos)
