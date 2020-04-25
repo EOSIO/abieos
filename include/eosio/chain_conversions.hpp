@@ -32,7 +32,7 @@ struct month {
    uint32_t m;
 };
 struct month_day {
-   inline month_day( month m, day d ) : m(m), d(d) {}
+   inline month_day( eosio::month m, eosio::day d ) : m(m), d(d) {}
    inline auto month() const { return m; }
    inline auto day() const { return d; }
    struct month m;
