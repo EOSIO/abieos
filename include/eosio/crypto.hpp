@@ -109,12 +109,12 @@ constexpr const char* get_type_name(public_key*) { return "public_key"; }
 constexpr const char* get_type_name(private_key*) { return "private_key"; }
 constexpr const char* get_type_name(signature*) { return "signature"; }
 
-result<std::string> public_key_to_string(const public_key& obj);
-result<public_key>  public_key_from_string(std::string_view s);
-result<std::string> private_key_to_string(const private_key& obj);
-result<private_key> private_key_from_string(std::string_view s);
-result<std::string> signature_to_string(const signature& obj);
-result<signature>   signature_from_string(std::string_view s);
+std::optional<std::string> public_key_to_string(const public_key& obj, std::string_view& err);
+std::optional<public_key>  public_key_from_string(std::string_view s, std::string_view& err);
+std::optional<std::string> private_key_to_string(const private_key& obj, std::string_view& err);
+std::optional<private_key> private_key_from_string(std::string_view s, std::string_view& err);
+std::optional<std::string> signature_to_string(const signature& obj, std::string_view& err);
+std::optional<signature>   signature_from_string(std::string_view s, std::string_view& err);
 
 template <typename S>
 bool to_json(const public_key& obj, S& stream, std::string_view& err) {

@@ -91,16 +91,23 @@ struct year_month_day {
 };
 }
 
-template<typename T>
-using cresult = outcome::basic_result<T, stream_error, outcome::policy::all_narrow>;
+//template<typename T>
+//using cresult = outcome::basic_result<T, stream_error, outcome::policy::all_narrow>;
+//
+//template<typename T>
+//constexpr T check(cresult<T> r) {
+//   if(!r) {
+//      check(std::error_code(r.error()));
+//   }
+//   return std::move(r.value());
+//}
 
-template<typename T>
-constexpr T check(cresult<T> r) {
-   if(!r) {
-      check(std::error_code(r.error()));
-   }
-   return std::move(r.value());
-}
+//template <typename T>
+//constexpr T check(std::optional<T> r) {
+//   if (!r)
+//      throw std::runtime_error("check failed");
+//   return std::move(*r);
+//}
 
 inline constexpr uint64_t char_to_name_digit(char c) {
    if (c >= 'a' && c <= 'z')
@@ -129,45 +136,107 @@ inline constexpr uint64_t string_to_name(std::string_view str) { return string_t
 
 inline uint64_t string_to_name(const std::string& str) { return string_to_name(str.data(), str.size()); }
 
-[[nodiscard]] inline constexpr cresult<void> char_to_name_digit_strict(char c, uint64_t& result) {
+[[nodiscard]] inline constexpr bool char_to_name_digit_strict(char c, uint64_t& result) {
    if (c >= 'a' && c <= 'z') {
       result = (c - 'a') + 6;
-      return outcome::success();
+      return true;
    }
    if (c >= '1' && c <= '5') {
       result = (c - '1') + 1;
-      return outcome::success();
+      return true;
    }
    if (c == '.') {
       result = 0;
-      return outcome::success();
+      return true;
    }
-   return stream_error::invalid_name_char;
+   else {
+      return false;
+   }
 }
 
-[[nodiscard]] inline constexpr cresult<uint64_t> string_to_name_strict(std::string_view str) {
+[[nodiscard]] inline constexpr bool char_to_name_digit_strict(char c, uint64_t& result, std::string_view& err) {
+   if (c >= 'a' && c <= 'z') {
+      result = (c - 'a') + 6;
+      return true;
+   }
+   if (c >= '1' && c <= '5') {
+      result = (c - '1') + 1;
+      return true;
+   }
+   if (c == '.') {
+      result = 0;
+      return true;
+   }
+   else {
+      err = convert_stream_error(stream_error::invalid_name_char);
+      return false;
+   }
+}
+[[nodiscard]] inline constexpr std::optional<uint64_t> string_to_name_strict(std::string_view str) {
+   std::string_view err;
    uint64_t name       = 0;
    unsigned i = 0;
    for (; i < str.size() && i < 12; ++i) {
       uint64_t x = 0;
       // - this is not safe in const expression OUTCOME_TRY(char_to_name_digit_strict(str[i], x));
-      auto r = char_to_name_digit_strict(str[i], x);
-      if( !r ) return stream_error::invalid_name_char;
+      auto r = char_to_name_digit_strict(str[i], x, err);
+      if( !r ) {
+         return {};
+      }
       name |= (x & 0x1f) << (64 - 5 * (i + 1));
    }
    if (i < str.size() && i == 12) {
       uint64_t x = 0;
       // - this is not safe in const expression OUTCOME_TRY(char_to_name_digit_strict(str[i], x));
-      auto r = char_to_name_digit_strict(str[i], x);
-      if( !r ) return stream_error::invalid_name_char;
+      auto r = char_to_name_digit_strict(str[i], x, err);
+      if( !r ) {
+         return {};
+      }
 
-      if (x != (x & 0xf))
-         return stream_error::invalid_name_char13;
+      if (x != (x & 0xf)) {
+         return {};
+      }
       name |= x;
       ++i;
    }
-   if (i < str.size())
-      return stream_error::name_too_long;
+   if (i < str.size()) {
+      return {};
+   }
+   return name;
+}
+[[nodiscard]] inline constexpr std::optional<uint64_t> string_to_name_strict(std::string_view str, std::string_view& err) {
+   uint64_t name       = 0;
+   unsigned i = 0;
+   for (; i < str.size() && i < 12; ++i) {
+      uint64_t x = 0;
+      // - this is not safe in const expression OUTCOME_TRY(char_to_name_digit_strict(str[i], x));
+      auto r = char_to_name_digit_strict(str[i], x, err);
+      if( !r ) {
+         err = convert_stream_error(stream_error::invalid_name_char);
+         return {};
+      }
+      name |= (x & 0x1f) << (64 - 5 * (i + 1));
+   }
+   if (i < str.size() && i == 12) {
+      uint64_t x = 0;
+      // - this is not safe in const expression OUTCOME_TRY(char_to_name_digit_strict(str[i], x));
+      auto r = char_to_name_digit_strict(str[i], x, err);
+      if( !r ) {
+         err = convert_stream_error(stream_error::invalid_name_char);
+         return {};
+      }
+
+      if (x != (x & 0xf)) {
+         err = convert_stream_error(stream_error::invalid_name_char13);
+         return {};
+      }
+      name |= x;
+      ++i;
+   }
+   if (i < str.size()) {
+      err = convert_stream_error(stream_error::name_too_long);
+      return {};
+   }
    return name;
 }
 

@@ -211,39 +211,42 @@ EOSIO_REFLECT(checksum256, value);
 EOSIO_REFLECT(checksum512, value);
 
 template <typename T, std::size_t Size, typename S>
-result<void> from_bin(fixed_bytes<Size, T>& obj, S& stream) {
+bool from_bin(fixed_bytes<Size, T>& obj, S& stream, std::string_view& err) {
    std::array<std::uint8_t, Size> bytes;
-   OUTCOME_TRY(from_bin(bytes, stream));
+   if (!from_bin(bytes, stream))
+      return false;
    obj = fixed_bytes<Size, T>(bytes);
-   return outcome::success();
+   return true;
 }
 
 template <typename T, std::size_t Size, typename S>
-result<void> to_bin(const fixed_bytes<Size, T>& obj, S& stream) {
-   return to_bin(obj.extract_as_byte_array(), stream);
+bool to_bin(const fixed_bytes<Size, T>& obj, S& stream, std::string_view& err) {
+   return to_bin(obj.extract_as_byte_array(), stream, err);
 }
 
 template <typename T, std::size_t Size, typename S>
-result<void> to_key(const fixed_bytes<Size, T>& obj, S& stream) {
-   return to_bin(obj.extract_as_byte_array(), stream);
+bool to_key(const fixed_bytes<Size, T>& obj, S& stream, std::string_view& err) {
+   return to_bin(obj.extract_as_byte_array(), stream, err);
 }
 
 template <typename T, std::size_t Size, typename S>
-result<void> from_json(fixed_bytes<Size, T>& obj, S& stream) {
+bool from_json(fixed_bytes<Size, T>& obj, S& stream, std::string_view& err) {
    std::vector<char> v;
-   OUTCOME_TRY(eosio::from_json_hex(v, stream));
-   if (v.size() != Size)
-      return eosio::from_json_error::hex_string_incorrect_length;
+   if (!eosio::from_json_hex(v, stream, err));
+   if (v.size() != Size) {
+      err = convert_json_error(eosio::from_json_error::hex_string_incorrect_length);
+      return false;
+   }
    std::array<uint8_t, Size> bytes;
    std::memcpy(bytes.data(), v.data(), Size);
    obj = fixed_bytes<Size, T>(bytes);
-   return outcome::success();
+   return true;
 }
 
 template <typename T, std::size_t Size, typename S>
-result<void> to_json(const fixed_bytes<Size, T>& obj, S& stream) {
+bool to_json(const fixed_bytes<Size, T>& obj, S& stream, std::string_view& err) {
    auto bytes = obj.extract_as_byte_array();
-   return eosio::to_json_hex((const char*)bytes.data(), bytes.size(), stream);
+   return eosio::to_json_hex((const char*)bytes.data(), bytes.size(), stream, err);
 }
 
 } // namespace eosio
