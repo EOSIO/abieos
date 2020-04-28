@@ -19,6 +19,8 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS ON)
 
+option(ABIEOS_ASSERT_ERRORS "instead of allow EOSIO_TRY to return an error and propagate through, it will through an exception or an eosio_assert in the case of using EOSIO.CDT" OFF)
+
 if(NOT DEFINED SKIP_SUBMODULE_CHECK)
   execute_process(COMMAND git submodule status --recursive
                   COMMAND grep -c "^[+\-]"
@@ -34,6 +36,10 @@ endif()
 add_library(abieos STATIC src/abi.cpp src/crypto.cpp include/eosio/fpconv.c)
 target_include_directories(abieos PUBLIC include external/outcome/single-header external/rapidjson/include external/date/include)
 set_target_properties(abieos PROPERTIES POSITION_INDEPENDENT_CODE ON)
+
+if(ABIEOS_ASSERT_ERRORS)
+   target_compile_definitions(abieos STATIC -DABIEOS_ASSERT_ERRORS)
+endif()
 
 add_library(abieos_module MODULE src/abieos.cpp)
 target_link_libraries(abieos_module abieos)
