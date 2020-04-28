@@ -1,7 +1,7 @@
 #pragma once
 
 #include <cstdint>
-#include <eosio/eosio_outcome.hpp>
+//#include <eosio/eosio_outcome.hpp>
 #include <eosio/operators.hpp>
 #include <eosio/reflection.hpp>
 #include <string>
@@ -117,40 +117,58 @@ result<std::string> signature_to_string(const signature& obj);
 result<signature>   signature_from_string(std::string_view s);
 
 template <typename S>
-result<void> to_json(const public_key& obj, S& stream) {
-   OUTCOME_TRY(s, public_key_to_string(obj));
-   return to_json(s, stream);
+bool to_json(const public_key& obj, S& stream, std::string_view& err) {
+   auto s = public_key_to_string(obj, err);
+   if (!s)
+      return false;
+   return to_json(*s, stream, err);
 }
 template <typename S>
-result<void> from_json(public_key& obj, S& stream) {
-   OUTCOME_TRY(s, stream.get_string());
-   OUTCOME_TRY(result, public_key_from_string(s));
-   obj = std::move(result);
-   return outcome::success();
+bool from_json(public_key& obj, S& stream, std::string_view& err) {
+   auto s = stream.get_string(err);
+   if (!s)
+      return false;
+   auto result = public_key_from_string(*s);
+   if (!result)
+      return false;
+   obj = std::move(*result);
+   return true;
 }
 template <typename S>
-result<void> to_json(const private_key& obj, S& stream) {
-   OUTCOME_TRY(s, private_key_to_string(obj));
-   return to_json(s, stream);
+bool to_json(const private_key& obj, S& stream, std::string_view& err) {
+   auto s = private_key_to_string(obj, err);
+   if (!s)
+      return false;
+   return to_json(*s, stream, err);
 }
 template <typename S>
-result<void> from_json(private_key& obj, S& stream) {
-   OUTCOME_TRY(s, stream.get_string());
-   OUTCOME_TRY(result, private_key_from_string(s));
-   obj = std::move(result);
-   return outcome::success();
+bool from_json(private_key& obj, S& stream, std::string_view& err) {
+   auto s = stream.get_string(err);
+   if (!s)
+      return false;
+   auto result = private_key_from_string(*s);
+   if (!result)
+      return false;
+   obj = std::move(*result);
+   return true;
 }
 template <typename S>
-result<void> to_json(const signature& obj, S& stream) {
-   OUTCOME_TRY(s, signature_to_string(obj));
-   return to_json(s, stream);
+bool to_json(const signature& obj, S& stream, std::string_view& err) {
+   auto s = signature_to_string(obj, err);
+   if (!s)
+      return false;
+   return to_json(*s, stream, err);
 }
 template <typename S>
-result<void> from_json(signature& obj, S& stream) {
-   OUTCOME_TRY(s, stream.get_string());
-   OUTCOME_TRY(result, signature_from_string(s));
-   obj = std::move(result);
-   return outcome::success();
+bool from_json(signature& obj, S& stream, std::string_view& err) {
+   auto s = stream.get_string(err);
+   if (!s)
+      return false;
+   auto result = signature_from_string(s, err);
+   if (!result)
+      return false;
+   obj = std::move(*result);
+   return true;
 }
 
  std::string to_base58(const char* d, size_t s );

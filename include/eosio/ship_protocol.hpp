@@ -2,7 +2,7 @@
 
 #include <eosio/check.hpp>
 #include <eosio/crypto.hpp>
-#include <eosio/eosio_outcome.hpp>
+//#include <eosio/eosio_outcome.hpp>
 #include <eosio/fixed_bytes.hpp>
 #include <eosio/float.hpp>
 #include <eosio/name.hpp>
@@ -13,8 +13,8 @@
 // todo: move
 namespace eosio {
 template <typename S>
-result<void> to_json(const input_stream& data, S& stream) {
-   return to_json_hex(data.pos, data.end - data.pos, stream);
+bool to_json(const input_stream& data, S& stream, std::string_view& err) {
+   return to_json_hex(data.pos, data.end - data.pos, stream, err);
 }
 } // namespace eosio
 
@@ -74,9 +74,9 @@ namespace eosio { namespace ship_protocol {
    }
 
    template <typename S>
-   eosio::result<void> to_json(const transaction_status& status, S& stream) {
+   bool to_json(const transaction_status& status, S& stream, std::string_view& err) {
       // todo: switch to new serializer string support.
-      return eosio::to_json(to_string(status), stream);
+      return eosio::to_json(to_string(status), stream, err);
    }
 
    struct get_status_request_v0 {};
@@ -283,18 +283,18 @@ namespace eosio { namespace ship_protocol {
    };
 
    template <typename S>
-   eosio::result<void> to_bin(const recurse_transaction_trace& obj, S& stream) {
-      return to_bin(obj.recurse, stream);
+   bool to_bin(const recurse_transaction_trace& obj, S& stream, std::string_view& err) {
+      return to_bin(obj.recurse, stream, err);
    }
 
    template <typename S>
-   eosio::result<void> from_bin(recurse_transaction_trace& obj, S& stream) {
-      return from_bin(obj.recurse, stream);
+   bool from_bin(recurse_transaction_trace& obj, S& stream, std::string_view& err) {
+      return from_bin(obj.recurse, stream, err);
    }
 
    template <typename S>
-   eosio::result<void> to_json(const recurse_transaction_trace& obj, S& stream) {
-      return to_json(obj.recurse, stream);
+   bool to_json(const recurse_transaction_trace& obj, S& stream, std::string_view& err) {
+      return to_json(obj.recurse, stream, err);
    }
 
    struct producer_key {

@@ -1,7 +1,7 @@
 #pragma once
 
 #include <cstdlib>
-#include <eosio/eosio_outcome.hpp>
+//#include <eosio/eosio_outcome.hpp>
 #include <eosio/for_each_field.hpp>
 #include <functional>
 #include <optional>

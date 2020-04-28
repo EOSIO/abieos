@@ -1,6 +1,6 @@
 #pragma once
 
-#include <eosio/eosio_outcome.hpp>
+//#include <eosio/eosio_outcome.hpp>
 #include <string>
 #include <string_view>
 #include <vector>
