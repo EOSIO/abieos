@@ -29,10 +29,10 @@ struct stream_adaptor {
 
 // Replaces any invalid utf-8 bytes with ?
 template <typename S>
-result<void> to_json(std::string_view sv, S& stream) {
-   auto r = stream.write('"');
+bool to_json(std::string_view sv, S& stream, std::string_view& err) {
+   auto r = stream.write('"', err);
    if (!r)
-      return r.error();
+      return false;
    auto begin = sv.begin();
    auto end   = sv.end();
    while (begin != end) {
@@ -41,50 +41,52 @@ result<void> to_json(std::string_view sv, S& stream) {
       while (begin != pos) {
          stream_adaptor s2(begin, static_cast<std::size_t>(pos - begin));
          if (rapidjson::UTF8<>::Validate(s2, s2)) {
-            OUTCOME_TRY(stream.write(begin, s2.idx));
+            if (!stream.write(begin, s2.idx, err))
+               return false;
             begin += s2.idx;
          } else {
             ++begin;
-            OUTCOME_TRY(stream.write('?'));
+            if (!stream.write('?', err))
+               return false;
          }
       }
       if (begin != end) {
          if (*begin == '"') {
-            r = stream.write("\\\"", 2);
+            r = stream.write("\\\"", 2, err);
             if (!r)
-               return r.error();
+               return false;
          } else if (*begin == '\\') {
-            r = stream.write("\\\\", 2);
+            r = stream.write("\\\\", 2, err);
             if (!r)
-               return r.error();
+               return false;
          } else {
-            r = stream.write("\\u00", 4);
+            r = stream.write("\\u00", 4, err);
             if (!r)
-               return r.error();
-            r = stream.write(hex_digits[(unsigned char)(*begin) >> 4]);
+               return false;
+            r = stream.write(hex_digits[(unsigned char)(*begin) >> 4], err);
             if (!r)
-               return r.error();
-            r = stream.write(hex_digits[(unsigned char)(*begin) & 15]);
+               return false;
+            r = stream.write(hex_digits[(unsigned char)(*begin) & 15], err);
             if (!r)
-               return r.error();
+               return false;
          }
          ++begin;
       }
    }
-   r = stream.write('"');
+   r = stream.write('"', err);
    if (!r)
-      return r.error();
-   return outcome::success();
+      return false;
+   return true;
 }
 
 template <typename S>
-result<void> to_json(const std::string& s, S& stream) {
-   return to_json(std::string_view{ s }, stream);
+bool to_json(const std::string& s, S& stream, std::string_view& err) {
+   return to_json(std::string_view{ s }, stream, err);
 }
 
 template <typename S>
-result<void> to_json(const char* s, S& stream) {
-   return to_json(std::string_view{ s }, stream);
+bool to_json(const char* s, S& stream, std::string_view& err) {
+   return to_json(std::string_view{ s }, stream, err);
 }
 
 /*
@@ -95,15 +97,15 @@ result<void> to_json(const shared_memory<std::string_view>& s, S& stream) {
 */
 
 template <typename S>
-result<void> to_json(bool value, S& stream) {
+bool to_json(bool value, S& stream, std::string_view& err) {
    if (value)
-      return stream.write("true", 4);
+      return stream.write("true", 4, err);
    else
-      return stream.write("false", 5);
+      return stream.write("false", 5, err);
 }
 
 template <typename T, typename S>
-result<void> int_to_json(T value, S& stream) {
+bool int_to_json(T value, S& stream, std::string_view& err) {
    auto                                               uvalue = std::make_unsigned_t<T>(value);
    small_buffer<std::numeric_limits<T>::digits10 + 4> b;
    bool                                               neg = value < 0;
@@ -120,86 +122,100 @@ result<void> int_to_json(T value, S& stream) {
    if (sizeof(T) > 4)
       *b.pos++ = '"';
    b.reverse();
-   return stream.write(b.data, b.pos - b.data);
+   return stream.write(b.data, b.pos - b.data, err);
 }
 
 template <typename S>
-result<void> fp_to_json(double value, S& stream) {
+bool fp_to_json(double value, S& stream, std::string_view& err) {
    // fpconv is not quite consistent with javascript for nans and infinities
    if (value == std::numeric_limits<double>::infinity()) {
-      return stream.write("\"Infinity\"", 10);
+      return stream.write("\"Infinity\"", 10, err);
    } else if (value == -std::numeric_limits<double>::infinity()) {
-      return stream.write("\"-Infinity\"", 11);
+      return stream.write("\"-Infinity\"", 11, err);
    } else if (std::isnan(value)) {
-      return stream.write("\"NaN\"", 5);
+      return stream.write("\"NaN\"", 5, err);
    }
    small_buffer<24> b; // fpconv_dtoa generates at most 24 characters
    int              n = fpconv_dtoa(value, b.pos);
-   if (n <= 0)
-      return stream_error::float_error;
+   if (n <= 0) {
+      err = convert_stream_error(stream_error::float_error);
+      return false;
+   }
    b.pos += n;
-   return stream.write(b.data, b.pos - b.data);
+   return stream.write(b.data, b.pos - b.data, err);
 }
 
 // clang-format off
-template <typename S> result<void> to_json(uint8_t value, S& stream)   { return int_to_json(value, stream); }
-template <typename S> result<void> to_json(uint16_t value, S& stream)  { return int_to_json(value, stream); }
-template <typename S> result<void> to_json(uint32_t value, S& stream)  { return int_to_json(value, stream); }
-template <typename S> result<void> to_json(uint64_t value, S& stream)  { return int_to_json(value, stream); }
-template <typename S> result<void> to_json(unsigned __int128 value, S& stream)   { return int_to_json(value, stream); }
-template <typename S> result<void> to_json(int8_t value, S& stream)    { return int_to_json(value, stream); }
-template <typename S> result<void> to_json(int16_t value, S& stream)   { return int_to_json(value, stream); }
-template <typename S> result<void> to_json(int32_t value, S& stream)   { return int_to_json(value, stream); }
-template <typename S> result<void> to_json(int64_t value, S& stream)   { return int_to_json(value, stream); }
-template <typename S> result<void> to_json(__int128 value, S& stream)   { return int_to_json(value, stream); }
-template <typename S> result<void> to_json(double value, S& stream)    { return fp_to_json(value, stream); }
-template <typename S> result<void> to_json(float value, S& stream)     { return fp_to_json(value, stream); }
+template <typename S> bool to_json(uint8_t value, S& stream, std::string_view& err)   { return int_to_json(value, stream, err); }
+template <typename S> bool to_json(uint16_t value, S& stream, std::string_view& err)  { return int_to_json(value, stream, err); }
+template <typename S> bool to_json(uint32_t value, S& stream, std::string_view& err)  { return int_to_json(value, stream, err); }
+template <typename S> bool to_json(uint64_t value, S& stream, std::string_view& err)  { return int_to_json(value, stream, err); }
+template <typename S> bool to_json(unsigned __int128 value, S& stream, std::string_view& err)   { return int_to_json(value, stream, err); }
+template <typename S> bool to_json(int8_t value, S& stream, std::string_view& err)    { return int_to_json(value, stream, err); }
+template <typename S> bool to_json(int16_t value, S& stream, std::string_view& err)   { return int_to_json(value, stream, err); }
+template <typename S> bool to_json(int32_t value, S& stream, std::string_view& err)   { return int_to_json(value, stream, err); }
+template <typename S> bool to_json(int64_t value, S& stream, std::string_view& err)   { return int_to_json(value, stream, err); }
+template <typename S> bool to_json(__int128 value, S& stream, std::string_view& err)   { return int_to_json(value, stream, err); }
+template <typename S> bool to_json(double value, S& stream, std::string_view& err)    { return fp_to_json(value, stream, err); }
+template <typename S> bool to_json(float value, S& stream, std::string_view& err)     { return fp_to_json(value, stream, err); }
 // clang-format on
 
 template <typename T, typename S>
-result<void> to_json(const std::vector<T>& obj, S& stream) {
-   OUTCOME_TRY(stream.write('['));
+bool to_json(const std::vector<T>& obj, S& stream, std::string_view& err) {
+   if (!stream.write('['))
+      return false;
    bool first = true;
    for (auto& v : obj) {
       if (first) {
-         OUTCOME_TRY(increase_indent(stream));
+         if (!increase_indent(stream, err))
+            return false;
       } else {
-         OUTCOME_TRY(stream.write(','));
+         if (!stream.write(',', err))
+            return false;
       }
-      OUTCOME_TRY(write_newline(stream));
+      if (!write_newline(stream, err));
       first = false;
-      OUTCOME_TRY(to_json(v, stream));
+      if (!to_json(v, stream, err));
    }
    if (!first) {
-      OUTCOME_TRY(decrease_indent(stream));
-      OUTCOME_TRY(write_newline(stream));
+      if (!decrease_indent(stream, err));
+      if (!write_newline(stream, err));
    }
-   OUTCOME_TRY(stream.write(']'));
-   return outcome::success();
+   if (!stream.write(']', err));
+   return true;
 }
 
 template <typename T, typename S>
-result<void> to_json(const std::optional<T>& obj, S& stream) {
+bool to_json(const std::optional<T>& obj, S& stream, std::string_view& err) {
    if (obj) {
-      return to_json(*obj, stream);
+      return to_json(*obj, stream, err);
    } else {
-      return stream.write("null", 4);
+      return stream.write("null", 4, err);
    }
 }
 
 template <typename... T, typename S>
-result<void> to_json(const std::variant<T...>& obj, S& stream) {
-   OUTCOME_TRY(stream.write('['));
-   OUTCOME_TRY(increase_indent(stream));
-   OUTCOME_TRY(write_newline(stream));
-   OUTCOME_TRY(std::visit(
-         [&](const auto& t) { return to_json(get_type_name((std::decay_t<decltype(t)>*)nullptr), stream); }, obj));
-   OUTCOME_TRY(stream.write(','));
-   OUTCOME_TRY(write_newline(stream));
-   OUTCOME_TRY(std::visit([&](auto& x) { return to_json(x, stream); }, obj));
-   OUTCOME_TRY(decrease_indent(stream));
-   OUTCOME_TRY(write_newline(stream));
-   return stream.write(']');
+bool to_json(const std::variant<T...>& obj, S& stream, std::string_view& err) {
+   if (!stream.write('[', err))
+      return false;
+   if (!increase_indent(stream, err))
+      return false;
+   if (!write_newline(stream, err))
+      return false;
+   if (!std::visit(
+         [&](const auto& t) { return to_json(get_type_name((std::decay_t<decltype(t)>*)nullptr), stream, err); }, obj))
+      return false;
+   if (!stream.write(',', err))
+      return false;
+   if (!write_newline(stream, err))
+      return false;
+   if (!std::visit([&](auto& x) { return to_json(x, stream, err); }, obj))
+      return false;
+   if (!decrease_indent(stream, err))
+      return false;
+   if (!write_newline(stream, err))
+      return false;
+   return stream.write(']', err);
 }
 
    template<typename>
@@ -211,10 +227,10 @@ result<void> to_json(const std::variant<T...>& obj, S& stream) {
    };
 
 template <typename T, typename S>
-result<void> to_json(const T& t, S& stream) {
-   result<void> ok    = outcome::success();
+bool to_json(const T& t, S& stream, std::string_view& err) {
+   bool ok    = true;
    bool         first = true;
-   OUTCOME_TRY(stream.write('{'));
+   if (!stream.write('{', err));
    eosio::for_each_field<T>([&](const char* name, auto&& member) {
       if (ok) {
           auto addfield = [&]() {
@@ -226,28 +242,28 @@ result<void> to_json(const T& t, S& stream) {
                }
                first = false;
             } else {
-               auto r = stream.write(',');
+               auto r = stream.write(',', err);
                if (!r) {
                   ok = r;
                   return;
                }
             }
-            auto r = write_newline(stream);
+            auto r = write_newline(stream, err);
             if (!r) {
                ok = r;
                return;
             }
-            r = to_json(name, stream);
+            r = to_json(name, stream, err);
             if (!r) {
                ok = r;
                return;
             }
-            r = write_colon(stream);
+            r = write_colon(stream, err);
             if (!r) {
                ok = r;
                return;
             }
-            r = to_json(member(&t), stream);
+            r = to_json(member(&t), stream, err);
             if (!r) {
                ok = r;
                return;
@@ -259,71 +275,78 @@ result<void> to_json(const T& t, S& stream) {
          if constexpr ( not is_std_optional<member_type>::value ) {
             addfield();
          } else {
-            if( !!m ) 
+            if( !!m )
                addfield();
          }
       }
    });
-   OUTCOME_TRY(ok);
+   if (!ok)
+      return false;
    if (!first) {
-      OUTCOME_TRY(decrease_indent(stream));
-      OUTCOME_TRY(write_newline(stream));
+      if (!decrease_indent(stream), err)
+         return false;
+      if (!write_newline(stream), err)
+         return false;
    }
-   return stream.write('}');
+   return stream.write('}', err);
 }
 
 template <typename S>
-result<void> to_json_hex(const char* data, size_t size, S& stream) {
-   auto r = stream.write('"');
+bool to_json_hex(const char* data, size_t size, S& stream, std::string_view& err) {
+   auto r = stream.write('"', err);
    if (!r)
-      return r.error();
+      return false;
    for (size_t i = 0; i < size; ++i) {
       unsigned char byte = data[i];
-      r                  = stream.write(hex_digits[byte >> 4]);
+      r                  = stream.write(hex_digits[byte >> 4], err);
       if (!r)
-         return r.error();
-      r = stream.write(hex_digits[byte & 15]);
+         return false;
+      r = stream.write(hex_digits[byte & 15], err);
       if (!r)
-         return r.error();
+         return false;
    }
-   r = stream.write('"');
+   r = stream.write('"', err);
    if (!r)
-      return r.error();
-   return outcome::success();
+      return false;
+   return true;
 }
 
 template <typename T>
-result<std::string> convert_to_json(const T& t) {
+std::optional<std::string> convert_to_json(const T& t, std::string_view& err) {
    size_stream ss;
-   auto        r = to_json(t, ss);
+   auto        r = to_json(t, ss, err);
    if (!r)
-      return r.error();
+      return {};
    std::string      result(ss.size, 0);
    fixed_buf_stream fbs(result.data(), result.size());
-   r = to_json(t, fbs);
+   r = to_json(t, fbs, err);
    if (!r)
-      return r.error();
+      return {};
    if (fbs.pos == fbs.end)
       return std::move(result);
-   else
-      return stream_error::underrun;
+   else {
+      err = convert_stream_error(stream_error::underrun);
+      return {};
+   }
 }
 
 template <typename T>
-result<std::string> format_json(const T& t) {
+std::optional<std::string> format_json(const T& t, std::string_view& err) {
    pretty_stream<size_stream> ss;
-   auto                       r = to_json(t, ss);
+   auto                       r = to_json(t, ss, err);
    if (!r)
-      return r.error();
+      return {};
    std::string                     result(ss.size, 0);
    pretty_stream<fixed_buf_stream> fbs(result.data(), result.size());
-   r = to_json(t, fbs);
+   r = to_json(t, fbs, err);
    if (!r)
-      return r.error();
+      return {};
    if (fbs.pos == fbs.end)
       return std::move(result);
-   else
-      return stream_error::underrun;
+   else {
+      err = convert_stream_error(stream_error::underrun);
+      return {};
+   }
 }
 
 } // namespace eosio
