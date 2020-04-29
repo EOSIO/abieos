@@ -31,26 +31,28 @@ Please run the command 'git submodule update --init --recursive'.")
   endif()
 endif()
 
+find_package(Threads)
+
 add_library(abieos STATIC src/abi.cpp src/crypto.cpp include/eosio/fpconv.c)
 target_include_directories(abieos PUBLIC include external/outcome/single-header external/rapidjson/include external/date/include)
 set_target_properties(abieos PROPERTIES POSITION_INDEPENDENT_CODE ON)
 
 add_library(abieos_module MODULE src/abieos.cpp)
-target_link_libraries(abieos_module abieos)
+target_link_libraries(abieos_module abieos ${CMAKE_THREAD_LIBS_INIT})
 set_target_properties(abieos_module PROPERTIES OUTPUT_NAME "abieos")
 
 enable_testing()
 
 add_executable(test_abieos src/test.cpp src/abieos.cpp)
-target_link_libraries(test_abieos abieos)
+target_link_libraries(test_abieos abieos ${CMAKE_THREAD_LIBS_INIT})
 add_test(NAME test_abieos COMMAND test_abieos)
 
 add_executable(test_abieos_template src/template_test.cpp src/abieos.cpp)
-target_link_libraries(test_abieos_template abieos)
+target_link_libraries(test_abieos_template abieos ${CMAKE_THREAD_LIBS_INIT})
 #add_test(NAME test_abieos_template COMMAND test_abieos_template)   TODO: fix tests
 
 add_executable(test_abieos_key src/key_test.cpp src/abieos.cpp)
-target_link_libraries(test_abieos_key abieos)
+target_link_libraries(test_abieos_key abieos ${CMAKE_THREAD_LIBS_INIT})
 add_test(NAME test_abieos_key COMMAND test_abieos_key)
 
 add_executable(test_abieos_reflect src/reflect_test.cpp)
@@ -60,13 +62,13 @@ add_test(NAME test_abieos_reflect COMMAND test_abieos_reflect)
 # Causes build issues on some platforms
 # add_executable(test_abieos_sanitize src/test.cpp src/abieos.cpp src/abi.cpp src/crypto.cpp include/eosio/fpconv.c)
 # target_include_directories(test_abieos_sanitize PRIVATE include external/outcome/single-header external/rapidjson/include external/date/include)
-# target_link_libraries(test_abieos_sanitize abieos -fno-omit-frame-pointer -fsanitize=address,undefined)
+# target_link_libraries(test_abieos_sanitize abieos -fno-omit-frame-pointer -fsanitize=address,undefined ${CMAKE_THREAD_LIBS_INIT})
 # target_compile_options(test_abieos_sanitize PUBLIC -fno-omit-frame-pointer -fsanitize=address,undefined)
 # add_test(NAME test_abieos_sanitize COMMAND test_abieos_sanitize)
 
 # add_executable(fuzzer src/fuzzer.cpp src/abieos.cpp)
 # target_include_directories(fuzzer PRIVATE external/outcome/single-header external/rapidjson/include external/date/include)
-# target_link_libraries(fuzzer -fsanitize=fuzzer,address,undefined,signed-integer-overflow -fstandalone-debug)
+# target_link_libraries(fuzzer -fsanitize=fuzzer,address,undefined,signed-integer-overflow -fstandalone-debug ${CMAKE_THREAD_LIBS_INIT})
 # target_compile_options(fuzzer PRIVATE -fsanitize=fuzzer,address,undefined,signed-integer-overflow -fstandalone-debug)
 
 if (CMAKE_CXX_COMPILER_ID MATCHES Clang|AppleClang)
