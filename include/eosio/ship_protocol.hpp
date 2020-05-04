@@ -13,8 +13,8 @@
 // todo: move
 namespace eosio {
 template <typename S>
-bool to_json(const input_stream& data, S& stream, std::string_view& err) {
-   return to_json_hex(data.pos, data.end - data.pos, stream, err);
+void to_json(const input_stream& data, S& stream) {
+   return to_json_hex(data.pos, data.end - data.pos, stream);
 }
 } // namespace eosio
 
@@ -74,9 +74,9 @@ namespace eosio { namespace ship_protocol {
    }
 
    template <typename S>
-   bool to_json(const transaction_status& status, S& stream, std::string_view& err) {
+   void to_json(const transaction_status& status, S& stream) {
       // todo: switch to new serializer string support.
-      return eosio::to_json(to_string(status), stream, err);
+      return eosio::to_json(to_string(status), stream);
    }
 
    struct get_status_request_v0 {};
@@ -283,18 +283,18 @@ namespace eosio { namespace ship_protocol {
    };
 
    template <typename S>
-   bool to_bin(const recurse_transaction_trace& obj, S& stream, std::string_view& err) {
-      return to_bin(obj.recurse, stream, err);
+   void to_bin(const recurse_transaction_trace& obj, S& stream) {
+      return to_bin(obj.recurse, stream);
    }
 
    template <typename S>
-   bool from_bin(recurse_transaction_trace& obj, S& stream, std::string_view& err) {
-      return from_bin(obj.recurse, stream, err);
+   void from_bin(recurse_transaction_trace& obj, S& stream) {
+      return from_bin(obj.recurse, stream);
    }
 
    template <typename S>
-   bool to_json(const recurse_transaction_trace& obj, S& stream, std::string_view& err) {
-      return to_json(obj.recurse, stream, err);
+   void to_json(const recurse_transaction_trace& obj, S& stream) {
+      return to_json(obj.recurse, stream);
    }
 
    struct producer_key {
