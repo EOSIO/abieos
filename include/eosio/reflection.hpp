@@ -1,6 +1,6 @@
 #pragma once
 
-#include <eosio/map_macro.h>
+#include "map_macro.h"
 #include <type_traits>
 
 namespace eosio { namespace reflection {

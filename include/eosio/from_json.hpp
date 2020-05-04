@@ -1,13 +1,14 @@
 #pragma once
 
 #include <cstdlib>
-//#include <eosio/eosio_outcome.hpp>
-#include <eosio/for_each_field.hpp>
+#include "for_each_field.hpp"
+#include "check.hpp"
 #include <functional>
 #include <optional>
 #include <rapidjson/reader.h>
 #include <vector>
 #include <variant>
+#include <errno.h>
 
 namespace eosio {
 enum class from_json_error {
@@ -62,78 +63,6 @@ enum class from_json_error {
    terminated,
    unspecific_syntax_error,
 }; // from_json_error
-} // namespace eosio
-
-//namespace std {
-//template <>
-//struct is_error_code_enum<eosio::from_json_error> : true_type {};
-//} // namespace std
-
-namespace eosio {
-
-// TODO uncomment after OUTCOME replacement
-//class from_json_error_category_type : public std::error_category {
-// public:
-//   const char* name() const noexcept override final { return "ConversionError"; }
-//
-//   std::string message(int c) const override final {
-//      switch (static_cast<from_json_error>(c)) {
-//            // clang-format off
-//               case from_json_error::no_error:                            return "No error";
-//
-//               case from_json_error::expected_end:                        return "Expected end of json";
-//               case from_json_error::expected_null:                       return "Expected null";
-//               case from_json_error::expected_bool:                       return "Expected true or false";
-//               case from_json_error::expected_string:                     return "Expected string";
-//               case from_json_error::expected_hex_string:                 return "Expected string containing hex";
-//               case from_json_error::hex_string_incorrect_length:         return "Hex string has incorrect length";
-//               case from_json_error::invalid_signature:                   return "Invalid signature format";
-//               case from_json_error::invalid_name:                        return "Invalid name";
-//               case from_json_error::expected_start_object:               return "Expected {";
-//               case from_json_error::expected_key:                        return "Expected key";
-//               case from_json_error::expected_end_object:                 return "Expected }";
-//               case from_json_error::expected_start_array:                return "Expected [";
-//               case from_json_error::expected_end_array:                  return "Expected ]";
-//               case from_json_error::expected_positive_uint:              return "Expected positive integer";
-//               case from_json_error::expected_field:                      return "Expected field";
-//               case from_json_error::expected_variant:                    return R"(Expected variant: ["type", value])";
-//               case from_json_error::expected_public_key:                 return "Expected public key";
-//               case from_json_error::expected_private_key:                return "Expected private key";
-//               case from_json_error::expected_signature:                  return "Expected signature";
-//               case from_json_error::expected_number:                     return "Expected number or boolean";
-//               case from_json_error::expected_int:                        return "Expected integer";
-//               case from_json_error::expected_time_point:                 return "Expected time point";
-//               case from_json_error::expected_symbol_code:                return "Expected symbol code";
-//               case from_json_error::expected_symbol:                     return "Expected symbol";
-//               case from_json_error::expected_asset:                      return "Expected asset";
-//               case from_json_error::invalid_type_for_variant:            return "Invalid type for variant";
-//               case from_json_error::unexpected_field:                    return "Unexpected field";
-//               case from_json_error::number_out_of_range:                 return "number is out of range";
-//               case from_json_error::from_json_no_pair:                   return "from_json does not support std::pair";
-//
-//               case from_json_error::document_empty:                      return "The document is empty";
-//               case from_json_error::document_root_not_singular:          return "The document root must not follow by other values";
-//               case from_json_error::value_invalid:                       return "Invalid value";
-//               case from_json_error::object_miss_name:                    return "Missing a name for object member";
-//               case from_json_error::object_miss_colon:                   return "Missing a colon after a name of object member";
-//               case from_json_error::object_miss_comma_or_curly_bracket:  return "Missing a comma or '}' after an object member";
-//               case from_json_error::array_miss_comma_or_square_bracket:  return "Missing a comma or ']' after an array element";
-//               case from_json_error::string_unicode_escape_invalid_hex:   return "Incorrect hex digit after \\u escape in string";
-//               case from_json_error::string_unicode_surrogate_invalid:    return "The surrogate pair in string is invalid";
-//               case from_json_error::string_escape_invalid:               return "Invalid escape character in string";
-//               case from_json_error::string_miss_quotation_mark:          return "Missing a closing quotation mark in string";
-//               case from_json_error::string_invalid_encoding:             return "Invalid encoding in string";
-//               case from_json_error::number_too_big:                      return "Number too big to be stored in double";
-//               case from_json_error::number_miss_fraction:                return "Miss fraction part in number";
-//               case from_json_error::number_miss_exponent:                return "Miss exponent in number";
-//               case from_json_error::terminated:                          return "Parsing was terminated";
-//               case from_json_error::unspecific_syntax_error:             return "Unspecific syntax error";
-//            // clang-format on
-//
-//         default: return "unknown";
-//      }
-//   }
-//}; // from_json_error_category_type
 
 constexpr inline std::string_view convert_json_error(from_json_error e) {
    switch (e) {
@@ -196,14 +125,6 @@ constexpr inline std::string_view convert_json_error(from_json_error e) {
 constexpr inline std::string_view convert_json_error(int e) {
    return convert_json_error(static_cast<from_json_error>(e));
 }
-//inline const from_json_error_category_type& from_json_error_category() {
-//   static from_json_error_category_type c;
-//   return c;
-//}
-
-//inline std::error_code make_error_code(from_json_error e) {
-//   return { static_cast<int>(e), from_json_error_category() };
-//}
 
 inline from_json_error convert_error(rapidjson::ParseErrorCode err) {
    switch (err) {
@@ -269,123 +190,102 @@ class json_token_stream : public rapidjson::BaseReaderHandler<rapidjson::UTF8<>,
 
    bool complete() { return reader.IterativeParseComplete(); }
 
-   std::optional<std::reference_wrapper<const json_token>> peek_token(std::string_view& err) {
+   std::reference_wrapper<const json_token> peek_token() {
       if (current_token.type != json_token_type::type_unread)
          return current_token;
-      else if (reader.IterativeParseNext<rapidjson::kParseInsituFlag | rapidjson::kParseValidateEncodingFlag |
-                                         rapidjson::kParseIterativeFlag | rapidjson::kParseNumbersAsStringsFlag>(ss,
-                                                                                                                 *this))
-         return current_token;
-      else {
-         err = convert_error_to_string_view(reader.GetParseErrorCode());
-         return {};
-      }
+      check( reader.IterativeParseNext<rapidjson::kParseInsituFlag | rapidjson::kParseValidateEncodingFlag |
+                                         rapidjson::kParseIterativeFlag | rapidjson::kParseNumbersAsStringsFlag>(ss, *this),
+            convert_error_to_string_view(reader.GetParseErrorCode()) );
+      return current_token;
    }
 
    void eat_token() { current_token.type = json_token_type::type_unread; }
 
-   bool get_end(std::string_view& err) {
-      if (current_token.type != json_token_type::type_unread || !complete()) {
-         err = convert_json_error(from_json_error::expected_end);
-         return false;
-      }
-      return true;
+   void get_end() {
+      check( current_token.type == json_token_type::type_unread && complete(),
+            convert_json_error(from_json_error::expected_end) );
    }
-
-   bool get_null(std::string_view& err) {
-      auto t = peek_token(err);
-      if (!t)
+   bool get_null_pred() {
+      auto t = peek_token();
+      if(t.get().type != json_token_type::type_null)
          return false;
-      if (t->get().type != json_token_type::type_null) {
-         err = convert_json_error( from_json_error::expected_null );
-         return false;
-      }
       eat_token();
       return true;
    }
-
-   std::optional<bool> get_bool(std::string_view& err) {
-      auto t = peek_token(err);
-      if (!t)
-         return {};
-      if (t->get().type != json_token_type::type_bool) {
-         err = convert_json_error(from_json_error::expected_bool);
-         return {};
-      }
-      eat_token();
-      return t->get().value_bool;
+   void get_null() {
+      check(get_null_pred(),
+             convert_json_error(from_json_error::expected_null) );
    }
 
-   std::optional<std::string_view> get_string(std::string_view& err) {
-      auto t = peek_token(err);
-      if (!t)
-         return {};
-      if (t->get().type != json_token_type::type_string) {
-         err = convert_json_error(from_json_error::expected_string);
-         return {};
-      }
+   bool get_bool() {
+      auto t = peek_token();
+      check(t.get().type == json_token_type::type_bool,
+             convert_json_error(from_json_error::expected_bool) );
       eat_token();
-      return t->get().value_string;
+      return t.get().value_bool;
    }
 
-   bool get_start_object(std::string_view& err) {
-      auto t = peek_token(err);
-      if (!t)
-         return false;
-      if (t->get().type != json_token_type::type_start_object) {
-         err = convert_json_error(from_json_error::expected_start_object);
-         return false;
-      }
+   std::string_view get_string() {
+      auto t = peek_token();
+      check(t.get().type == json_token_type::type_string,
+          convert_json_error(from_json_error::expected_string) );
       eat_token();
-      return true;
+      return t.get().value_string;
    }
 
-   std::optional<std::string_view> get_key(std::string_view& err) {
-      auto t = peek_token(err);
-      if (!t)
-         return {};
-      if (t->get().type != json_token_type::type_key) {
-         err = convert_json_error(from_json_error::expected_key);
-         return {};
-      }
+   void get_start_object() {
+      auto t = peek_token();
+      check(t.get().type == json_token_type::type_start_object,
+            convert_json_error(from_json_error::expected_start_object) );
       eat_token();
-      return t->get().key;
    }
 
-   bool get_end_object(std::string_view& err) {
-      auto t = peek_token(err);
-      if (!t)
+   std::string_view get_key() {
+      auto t = peek_token();
+      check(t.get().type == json_token_type::type_key,
+            convert_json_error(from_json_error::expected_key) );
+      eat_token();
+      return t.get().key;
+   }
+
+   std::optional<std::string_view> maybe_get_key() {
+      auto t = peek_token();
+      if(t.get().type != json_token_type::type_key)
+         return {};
+      eat_token();
+      return t.get().key;
+   }
+
+   void get_end_object() {
+      auto t = peek_token();
+      check(t.get().type == json_token_type::type_end_object,
+          convert_json_error(from_json_error::expected_end_object) );
+      eat_token();
+   }
+
+   bool get_start_array_pred() {
+      auto t = peek_token();
+      if(t.get().type != json_token_type::type_start_array)
          return false;
-      if (t->get().type != json_token_type::type_end_object) {
-         err = convert_json_error(from_json_error::expected_end_object);
-         return false;
-      }
       eat_token();
       return true;
    }
 
-   bool get_start_array(std::string_view& err) {
-      auto t = peek_token(err);
-      if (!t)
+   bool get_end_array_pred() {
+      auto t = peek_token();
+      if(t.get().type != json_token_type::type_end_array)
          return false;
-      if (t->get().type != json_token_type::type_start_array) {
-         err = convert_json_error(from_json_error::expected_start_array);
-         return false;
-      }
       eat_token();
       return true;
    }
+   void get_start_array() {
+      check(get_start_array_pred(),
+           convert_json_error(from_json_error::expected_start_array) );
+   }
 
-   bool get_end_array(std::string_view& err) {
-      auto t = peek_token(err);
-      if (!t)
-         return false;
-      if (t->get().type != json_token_type::type_end_array) {
-         err = convert_json_error(from_json_error::expected_end_array);
-         return false;
-      }
-      eat_token();
-      return true;
+   void get_end_array() {
+      check(get_end_array_pred(),
+           convert_json_error(from_json_error::expected_end_array));
    }
 
    // BaseReaderHandler methods
@@ -456,38 +356,30 @@ template <typename SrcIt, typename DestIt>
 
 /// \exclude
 template <typename T, typename S>
-bool from_json(T& result, S& stream, std::string_view&);
+void from_json(T& result, S& stream);
 
 /// \group from_json_explicit Parse JSON (Explicit Types)
 /// Parse JSON and convert to `result`. These overloads handle specified types.
 template <typename S>
-bool from_json(std::string_view& result, S& stream, std::string_view& err) {
-   auto r = stream.get_string(err);
-   if (!r)
-      return false;
-   result = *r;
-   return true;
+void from_json(std::string_view& result, S& stream) {
+   auto r = stream.get_string();
+   result = r;
 }
 
 /// \group from_json_explicit Parse JSON (Explicit Types)
 /// Parse JSON and convert to `result`. These overloads handle specified types.
 template <typename S>
-bool from_json(std::string& result, S& stream, std::string_view& err) {
-   auto r = stream.get_string(err);
-   if (!r)
-      return false;
+void from_json(std::string& result, S& stream) {
+   auto r = stream.get_string();
    result = *r;
-   return true;
 }
 
 /// \exclude
 template <typename T, typename S>
-bool from_json_int(T& result, S& stream, std::string_view& err) {
-   auto r = stream.get_string(err);
-   if (!r)
-      return false;
-   auto pos   = *r.data();
-   auto end   = pos + *r.size();
+void from_json_int(T& result, S& stream) {
+   auto r = stream.get_string();
+   auto pos   = r.data();
+   auto end   = pos + r.size();
    bool found = false;
    result     = 0;
    T limit;
@@ -503,122 +395,98 @@ bool from_json_int(T& result, S& stream, std::string_view& err) {
    while (pos != end && *pos >= '0' && *pos <= '9') {
       T digit = (*pos++ - '0');
       // abs(result) can overflow.  Use -abs(result) instead.
-      if (std::is_signed_v<T> && (-sign * limit + digit) / 10 > -sign * result) {
-         err = convert_json_error(from_json_error::number_out_of_range);
-         return false;
-      }
-      if (!std::is_signed_v<T> && (limit - digit) / 10 < result) {
-         err = convert_json_error(from_json_error::number_out_of_range);
-         return false;
-      }
+      // TODO refactor this logic, don't have time now
+      check(!(std::is_signed_v<T> && (-sign * limit + digit) / 10 > -sign * result),
+            convert_json_error(from_json_error::number_out_of_range) );
+      check(!(!std::is_signed_v<T> && (limit - digit) / 10 < result),
+            convert_json_error(from_json_error::number_out_of_range) );
       result = result * 10 + sign * digit;
       found  = true;
    }
-   if (pos != end || !found) {
-      err = convert_json_error(from_json_error::expected_int);
-      return false;
-   }
-   return true;
+   check( pos == end && found, convert_json_error(from_json_error::expected_int) );
 }
 
 /// \group from_json_explicit
 template <typename S>
-bool from_json(uint8_t& result, S& stream, std::string_view& err) {
-   return from_json_int(result, stream, err);
+void from_json(uint8_t& result, S& stream) {
+   from_json_int(result, stream);
 }
 
 /// \group from_json_explicit
 template <typename S>
-bool from_json(uint16_t& result, S& stream, std::string_view& err) {
-   return from_json_int(result, stream, err);
+void from_json(uint16_t& result, S& stream) {
+   from_json_int(result, stream);
 }
 
 /// \group from_json_explicit
 template <typename S>
-bool from_json(uint32_t& result, S& stream, std::string_view& err) {
-   return from_json_int(result, stream, err);
+void from_json(uint32_t& result, S& stream) {
+   from_json_int(result, stream);
 }
 
 /// \group from_json_explicit
 template <typename S>
-bool from_json(uint64_t& result, S& stream, std::string_view& err) {
-   return from_json_int(result, stream, err);
+void from_json(uint64_t& result, S& stream) {
+   from_json_int(result, stream);
 }
 
 /// \group from_json_explicit
 template <typename S>
-bool from_json(unsigned __int128& result, S& stream, std::string_view& err) {
-   return from_json_int(result, stream, err);
+void from_json(unsigned __int128& result, S& stream) {
+   from_json_int(result, stream);
 }
 
 /// \group from_json_explicit
 template <typename S>
-bool from_json(int8_t& result, S& stream, std::string_view& err) {
-   return from_json_int(result, stream, err);
+void from_json(int8_t& result, S& stream) {
+   from_json_int(result, stream);
 }
 
 /// \group from_json_explicit
 template <typename S>
-bool from_json(int16_t& result, S& stream, std::string_view& err) {
-   return from_json_int(result, stream, err);
+void from_json(int16_t& result, S& stream) {
+   from_json_int(result, stream);
 }
 
 /// \group from_json_explicit
 template <typename S>
-bool from_json(int32_t& result, S& stream, std::string_view& err) {
-   return from_json_int(result, stream, err);
+void from_json(int32_t& result, S& stream) {
+   from_json_int(result, stream);
 }
 
 /// \group from_json_explicit
 template <typename S>
-bool from_json(int64_t& result, S& stream, std::string_view& err) {
-   return from_json_int(result, stream, err);
+void from_json(int64_t& result, S& stream) {
+   from_json_int(result, stream);
 }
 
 /// \group from_json_explicit
 template <typename S>
-bool from_json(__int128& result, S& stream, std::string_view& err) {
-   return from_json_int(result, stream, err);
+void from_json(__int128& result, S& stream) {
+   from_json_int(result, stream);
 }
 
 template <typename S>
-bool from_json(float& result, S& stream, std::string_view& err) {
-   auto sv = stream.get_string(err);
-   if (!sv)
-      return false;
-   if (*sv.empty()) {
-      err = convert_json_error(from_json_error::expected_number);
-      return false;
-   }
-   std::string s(*sv); // strtof expects a null-terminated string
+void from_json(float& result, S& stream) {
+   auto sv = stream.get_string();
+   check( !sv.empty(), convert_json_error(from_json_error::expected_number) );
+   std::string s(sv); // strtof expects a null-terminated string
    errno = 0;
    char* end;
    result = std::strtof(s.c_str(), &end);
-   if (errno || end != s.c_str() + s.size()) {
-      err = convert_json_error(from_json_error::expected_number);
-      return false;
-   }
-   return true;
+   check( !errno && end == s.c_str() + s.size(),
+         convert_json_error(from_json_error::expected_number) );
 }
 
 template <typename S>
-bool from_json(double& result, S& stream, std::string_view& err) {
-   auto sv = stream.get_string(err);
-   if (!sv)
-      return false;
-   if (*sv.empty()) {
-      err = convert_json_error(from_json_error::expected_number);
-      return false;
-   }
+void from_json(double& result, S& stream) {
+   auto sv = stream.get_string();
+   check( !sv.empty(), convert_json_error(from_json_error::expected_number) );
    std::string s(sv);
    errno = 0;
    char* end;
    result = std::strtod(s.c_str(), &end);
-   if (errno || end != s.c_str() + s.size()) {
-      err = convert_json_error(from_json_error::expected_number);
-      return false;
-   }
-   return true;
+   check( !errno && end == s.c_str() + s.size(), convert_json_error(from_json_error::expected_number) );
 }
 
 /*
@@ -653,44 +521,31 @@ result<void> from_json(int32_t& result, S& stream) {
 */
 /// \group from_json_explicit
 template <typename S>
-bool from_json(bool& result, S& stream, std::string_view& err) {
-   auto r = stream.get_bool(err);
-   if (!r)
-      return false;
-   result = *r;
-   return true;
+void from_json(bool& result, S& stream) {
+   result = stream.get_bool();
 }
 
 /// \group from_json_explicit
 template <typename T, typename S>
-bool from_json(std::vector<T>& result, S& stream, std::string_view& err) {
-   auto r = stream.get_start_array(err);
-   if (!r)
-      return false;
+void from_json(std::vector<T>& result, S& stream) {
+   stream.get_start_array();
    while (true) {
-      auto t = stream.peek_token(err);
-      if (!t)
-         return false;
-      if (t->get().type == json_token_type::type_end_array)
+      auto t = stream.peek_token();
+      if (t.get().type == json_token_type::type_end_array)
          break;
       result.emplace_back();
-      r = from_json(result.back(), stream, err);
-      if (!r)
-         return r;
+      from_json(result.back(), stream);
    }
-   return stream.get_end_array(err);
+   stream.get_end_array();
 }
 
 /// \group from_json_explicit
 template <typename T, typename S>
-bool from_json(std::optional<T>& result, S& stream, std::string_view& err) {
-   if (stream.get_null(err)) {
-      result = std::nullopt;
-      return true;
-   } else {
-      result.emplace();
-      return from_json(*result, stream, err);
-   }
+void from_json(std::optional<T>& result, S& stream) {
+   result = std::nullopt;
+   stream.get_null();
+   result.emplace();
+   from_json(*result, stream);
 }
 
 template <int N = 0, typename... T>
@@ -704,108 +559,78 @@ void set_variant_impl(std::variant<T...>& result, uint32_t type) {
 
 /// \group from_json_explicit
 template <typename... T, typename S>
-bool from_json(std::variant<T...>& result, S& stream, std::string_view& err) {
-   if (!stream.get_start_array(err))
-      return false;
+void from_json(std::variant<T...>& result, S& stream) {
+   stream.get_start_array();
    std::string_view type;
-   if (!from_json(type, stream, err))
-      return false;
+   from_json(type, stream);
    const char* const type_names[] = { get_type_name((T*)nullptr)... };
    uint32_t          type_idx     = std::find(type_names, type_names + sizeof...(T), type) - type_names;
-   if (type_idx >= sizeof...(T)) {
-      err = convert_json_error(from_json_error::invalid_type_for_variant);
-      return false;
-   }
+   check( type_idx < sizeof...(T), convert_json_error(from_json_error::invalid_type_for_variant) );
    set_variant_impl(result, type_idx);
-   if (!std::visit([&](auto& x) { return from_json(x, stream, err); }, result))
-      return false;
-   return stream.get_end_array(err);
+   std::visit([&](auto& x) { from_json(x, stream); }, result);
+   stream.get_end_array();
 }
 
 /// \group from_json_explicit
 template <typename S>
-bool from_json_hex(std::vector<char>& result, S& stream, std::string_view& err) {
-   auto s = stream.get_string(err);
-   if (!s)
-      return false;
-   if (*s.size() & 1) {
-      err = convert_json_error(from_json_error::expected_hex_string);
-      return false;
-   }
+void from_json_hex(std::vector<char>& result, S& stream) {
+   auto s = stream.get_string();
+   check( !(s.size() & 1), convert_json_error(from_json_error::expected_hex_string) );
    result.clear();
    result.reserve(s.size() / 2);
-   if (!unhex(std::back_inserter(result), s.begin(), s.end())) {
-      err = convert_json_error(from_json_error::expected_hex_string);
-      return false;
-   }
-   return true;
+   check( unhex(std::back_inserter(result), s.begin(), s.end()),
+         convert_json_error(from_json_error::expected_hex_string) );
 }
 
 /// \exclude
 template <typename S, typename F>
-inline bool from_json_object(S& stream, F f, std::string_view& err) {
-   auto r = stream.get_start_object(err);
-   if (!r)
-      return false;
+inline void from_json_object(S& stream, F f) {
+   stream.get_start_object();
    while (true) {
-      auto t = stream.peek_token(err);
-      if (!t)
-         return false;
-      if (t->get().type == json_token_type::type_end_object)
+      auto t = stream.peek_token();
+      if (t.get().type == json_token_type::type_end_object)
          break;
-      auto k = stream.get_key(err);
-      if (!k)
-         return false;
-      r = f(*k);
-      if (!r)
-         return r;
+      auto k = stream.get_key();
+      f(k);
    }
-   return stream.get_end_object(err);
+   stream.get_end_object();
 }
 
 template <typename S>
-bool from_json_skip_value(S& stream, std::string_view& err) {
+void from_json_skip_value(S& stream) {
    uint64_t depth = 0;
    do {
-      auto t = stream.peek_token(err);
-      if (!t)
-         return false;
-      auto type = t->get().type;
+      auto t = stream.peek_token();
+      auto type = t.get().type;
       if (type == json_token_type::type_start_object || type == json_token_type::type_start_array)
          ++depth;
       else if (type == json_token_type::type_end_object || type == json_token_type::type_end_array)
          --depth;
       stream.eat_token();
    } while (depth);
-   return true;
 }
 
 /// \output_section Parse JSON (Reflected Objects)
 /// Parse JSON and convert to `obj`. This overload works with
 /// [reflected objects](standardese://reflection/).
 template <typename T, typename S>
-bool from_json(T& obj, S& stream, std::string_view& err) {
-   return from_json_object(stream, [&](std::string_view key) -> bool {
+void from_json(T& obj, S& stream) {
+   from_json_object(stream, [&](std::string_view key) {
       bool found = false;
-      bool r     = true;
-      for_each_field<T>([&](std::string_view member_name, auto member) {
+      eosio::for_each_field<T>([&](std::string_view member_name, auto member) {
          if (!found && key == member_name) {
-            r     = from_json(member(&obj), stream, err);
+            from_json(member(&obj), stream);
             found = true;
          }
       });
-      if (!r)
-         return r;
       if (!found)
-         return from_json_skip_value(stream, err);
-      return true;
-   }, err);
+         from_json_skip_value(stream);
+   });
 }
 
 template <typename First, typename Second, typename S>
-bool from_json(std::pair<First, Second>& obj, S& stream, std::string_view& err) {
-   err = convert_json_error(from_json_error::from_json_no_pair);
-   return false;
+void from_json(std::pair<First, Second>& obj, S& stream) {
+   check( false, convert_json_error(from_json_error::from_json_no_pair) );
 }
 
 /*
@@ -837,11 +662,9 @@ T from_json(std::string_view s) {
 
 /// Parse JSON and return result. This overload wraps the other `to_json` overloads.
 template <typename T, typename S>
-bool from_json(S& stream, std::string_view& err) {
+void from_json(S& stream) {
    T    x;
-   auto r = from_json(x, stream, err);
-   if (!r)
-      return false;
+   from_json(x, stream);
    return x;
 }
 

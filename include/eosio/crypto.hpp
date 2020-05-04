@@ -2,8 +2,8 @@
 
 #include <cstdint>
 //#include <eosio/eosio_outcome.hpp>
-#include <eosio/operators.hpp>
-#include <eosio/reflection.hpp>
+#include "operators.hpp"
+#include "reflection.hpp"
 #include <string>
 #include <variant>
 #include <vector>
@@ -109,66 +109,37 @@ constexpr const char* get_type_name(public_key*) { return "public_key"; }
 constexpr const char* get_type_name(private_key*) { return "private_key"; }
 constexpr const char* get_type_name(signature*) { return "signature"; }
 
-std::optional<std::string> public_key_to_string(const public_key& obj, std::string_view& err);
-std::optional<public_key>  public_key_from_string(std::string_view s, std::string_view& err);
-std::optional<std::string> private_key_to_string(const private_key& obj, std::string_view& err);
-std::optional<private_key> private_key_from_string(std::string_view s, std::string_view& err);
-std::optional<std::string> signature_to_string(const signature& obj, std::string_view& err);
-std::optional<signature>   signature_from_string(std::string_view s, std::string_view& err);
+std::string public_key_to_string(const public_key& obj);
+public_key  public_key_from_string(std::string_view s);
+std::string private_key_to_string(const private_key& obj);
+private_key private_key_from_string(std::string_view s);
+std::string signature_to_string(const signature& obj);
+signature   signature_from_string(std::string_view s);
 
 template <typename S>
-bool to_json(const public_key& obj, S& stream, std::string_view& err) {
-   auto s = public_key_to_string(obj, err);
-   if (!s)
-      return false;
-   return to_json(*s, stream, err);
+void to_json(const public_key& obj, S& stream) {
+   to_json(public_key_to_string(obj), stream);
 }
 template <typename S>
-bool from_json(public_key& obj, S& stream, std::string_view& err) {
-   auto s = stream.get_string(err);
-   if (!s)
-      return false;
-   auto result = public_key_from_string(*s);
-   if (!result)
-      return false;
-   obj = std::move(*result);
-   return true;
+void from_json(public_key& obj, S& stream) {
+   auto s = stream.get_string();
+   obj = public_key_from_string(s);
 }
 template <typename S>
-bool to_json(const private_key& obj, S& stream, std::string_view& err) {
-   auto s = private_key_to_string(obj, err);
-   if (!s)
-      return false;
-   return to_json(*s, stream, err);
+void to_json(const private_key& obj, S& stream) {
+   to_json(private_key_to_string(obj), stream);
 }
 template <typename S>
-bool from_json(private_key& obj, S& stream, std::string_view& err) {
-   auto s = stream.get_string(err);
-   if (!s)
-      return false;
-   auto result = private_key_from_string(*s);
-   if (!result)
-      return false;
-   obj = std::move(*result);
-   return true;
+void from_json(private_key& obj, S& stream) {
+   obj = private_key_from_string(stream.get_string());
 }
 template <typename S>
-bool to_json(const signature& obj, S& stream, std::string_view& err) {
-   auto s = signature_to_string(obj, err);
-   if (!s)
-      return false;
-   return to_json(*s, stream, err);
+void to_json(const signature& obj, S& stream) {
+   return to_json(signature_to_string(obj), stream);
 }
 template <typename S>
-bool from_json(signature& obj, S& stream, std::string_view& err) {
-   auto s = stream.get_string(err);
-   if (!s)
-      return false;
-   auto result = signature_from_string(s, err);
-   if (!result)
-      return false;
-   obj = std::move(*result);
-   return true;
+void from_json(signature& obj, S& stream) {
+   obj = signature_from_string(stream.get_string());
 }
 
  std::string to_base58(const char* d, size_t s );

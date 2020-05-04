@@ -328,26 +328,24 @@ struct asset {
 EOSIO_REFLECT(asset, amount, symbol);
 
 template <typename S>
-inline result<void> from_string(asset& result, S& stream) {
+inline void from_string(asset& result, S& stream) {
    int64_t  amount;
    uint64_t sym;
-   if (!eosio::string_to_asset(amount, sym, stream.pos, stream.end, true))
-      return eosio::stream_error::invalid_asset_format;
+   check(eosio::string_to_asset(amount, sym, stream.pos, stream.end, true),
+      convert_stream_error(eosio::stream_error::invalid_asset_format));
    result = asset{ amount, symbol{ sym } };
-   return eosio::outcome::success();
 }
 
 template <typename S>
-result<void> to_json(const asset& obj, S& stream) {
-   return to_json(asset_to_string(obj.amount, obj.symbol.value), stream);
+void to_json(const asset& obj, S& stream) {
+   to_json(asset_to_string(obj.amount, obj.symbol.value), stream);
 }
 
 template <typename S>
-result<void> from_json(asset& obj, S& stream) {
-   OUTCOME_TRY(s, stream.get_string());
-   if (!string_to_asset(obj.amount, obj.symbol.value, s.data(), s.data() + s.size()))
-      return eosio::from_json_error::expected_symbol_code;
-   return eosio::outcome::success();
+void from_json(asset& obj, S& stream) {
+   auto s = stream.get_string();
+   check(string_to_asset(obj.amount, obj.symbol.value, s.data(), s.data() + s.size()),
+      convert_json_error(eosio::from_json_error::expected_symbol_code));
 }
 
 /**

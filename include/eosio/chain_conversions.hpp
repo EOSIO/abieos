@@ -1,11 +1,12 @@
 #pragma once
 
-#include <eosio/stream.hpp>
+#include "stream.hpp"
 #include <chrono>
 #include <stdint.h>
 #include <string>
 #include <string_view>
 #include <vector>
+#include <optional>
 
 namespace eosio {
 
@@ -136,6 +137,23 @@ inline constexpr uint64_t string_to_name(std::string_view str) { return string_t
 
 inline uint64_t string_to_name(const std::string& str) { return string_to_name(str.data(), str.size()); }
 
+constexpr inline bool is_valid_char(char c) {
+   return (c >= 'a' && c <= 'z') ||
+          (c >= '1' && c <= '5') ||
+          (c == '.');
+}
+
+template <char C>
+constexpr inline uint64_t char_to_name_digit_strict() {
+   static_assert(is_valid_char(C), "character is not for an eosio name");
+   if constexpr (C >= 'a' && C <= 'z')
+      return (C - 'a') + 6;
+   else if constexpr (C >= '1' && C <= '5')
+      return (C - '1') + 1;
+   else if constexpr (C == '.')
+      return 0;
+}
+
 [[nodiscard]] inline constexpr bool char_to_name_digit_strict(char c, uint64_t& result) {
    if (c >= 'a' && c <= 'z') {
       result = (c - 'a') + 6;
@@ -154,90 +172,57 @@ inline uint64_t string_to_name(const std::string& str) { return string_to_name(s
    }
 }
 
-[[nodiscard]] inline constexpr bool char_to_name_digit_strict(char c, uint64_t& result, std::string_view& err) {
-   if (c >= 'a' && c <= 'z') {
-      result = (c - 'a') + 6;
-      return true;
-   }
-   if (c >= '1' && c <= '5') {
-      result = (c - '1') + 1;
-      return true;
-   }
-   if (c == '.') {
-      result = 0;
-      return true;
-   }
-   else {
-      err = convert_stream_error(stream_error::invalid_name_char);
-      return false;
-   }
+template <std::size_t N, uint64_t ValueSoFar, char C, char... Rest>
+constexpr inline uint64_t string_to_name_strict_impl() {
+   if constexpr (N == 12)
+      static_assert((char_to_name_digit_strict<C>() & 0xf) == char_to_name_digit_strict<C>(),
+            "eosio name 13th character cannot be a letter after j");
+   if constexpr (sizeof...(Rest) > 0)
+      return string_to_name_strict_impl<N+1,
+             ValueSoFar | (char_to_name_digit_strict<C>() & 0x1f) << (64 - 5 * (N+1)), Rest...>();
+   else
+      return ValueSoFar;
 }
-[[nodiscard]] inline constexpr std::optional<uint64_t> string_to_name_strict(std::string_view str) {
-   std::string_view err;
+
+template <char... Str>
+constexpr inline uint64_t string_to_name_strict() {
+   static_assert(sizeof...(Str) <= 12, "eosio name string is too long");
+   if constexpr (sizeof...(Str) == 0)
+      return 0;
+   else
+      return string_to_name_strict_impl<0, 0, Str...>();
+}
+
+// std::optional is killing constexpr'ness
+namespace detail {
+   struct simple_optional {
+      constexpr inline simple_optional() : valid(false) {}
+      constexpr inline simple_optional( uint64_t v ) : valid(true), val(v) {}
+      constexpr inline operator bool() const { return valid; }
+      constexpr inline auto value() const { return val; }
+      bool valid = false;
+      uint64_t val = 0;
+   };
+}
+
+[[nodiscard]] constexpr inline detail::simple_optional string_to_name_strict(std::string_view str) {
    uint64_t name       = 0;
    unsigned i = 0;
    for (; i < str.size() && i < 12; ++i) {
       uint64_t x = 0;
-      // - this is not safe in const expression OUTCOME_TRY(char_to_name_digit_strict(str[i], x));
-      auto r = char_to_name_digit_strict(str[i], x, err);
-      if( !r ) {
-         return {};
-      }
+      if (!char_to_name_digit_strict(str[i], x)) return {};
       name |= (x & 0x1f) << (64 - 5 * (i + 1));
    }
    if (i < str.size() && i == 12) {
       uint64_t x = 0;
-      // - this is not safe in const expression OUTCOME_TRY(char_to_name_digit_strict(str[i], x));
-      auto r = char_to_name_digit_strict(str[i], x, err);
-      if( !r ) {
-         return {};
-      }
+      if (!char_to_name_digit_strict(str[i], x)) return {};
 
-      if (x != (x & 0xf)) {
-         return {};
-      }
+      if(x != (x & 0xf)) return {};
       name |= x;
       ++i;
    }
-   if (i < str.size()) {
-      return {};
-   }
-   return name;
-}
-[[nodiscard]] inline constexpr std::optional<uint64_t> string_to_name_strict(std::string_view str, std::string_view& err) {
-   uint64_t name       = 0;
-   unsigned i = 0;
-   for (; i < str.size() && i < 12; ++i) {
-      uint64_t x = 0;
-      // - this is not safe in const expression OUTCOME_TRY(char_to_name_digit_strict(str[i], x));
-      auto r = char_to_name_digit_strict(str[i], x, err);
-      if( !r ) {
-         err = convert_stream_error(stream_error::invalid_name_char);
-         return {};
-      }
-      name |= (x & 0x1f) << (64 - 5 * (i + 1));
-   }
-   if (i < str.size() && i == 12) {
-      uint64_t x = 0;
-      // - this is not safe in const expression OUTCOME_TRY(char_to_name_digit_strict(str[i], x));
-      auto r = char_to_name_digit_strict(str[i], x, err);
-      if( !r ) {
-         err = convert_stream_error(stream_error::invalid_name_char);
-         return {};
-      }
-
-      if (x != (x & 0xf)) {
-         err = convert_stream_error(stream_error::invalid_name_char13);
-         return {};
-      }
-      name |= x;
-      ++i;
-   }
-   if (i < str.size()) {
-      err = convert_stream_error(stream_error::name_too_long);
-      return {};
-   }
-   return name;
+   if(i < str.size()) return {};
+   return {name};
 }
 
 inline std::string name_to_string(uint64_t name) {

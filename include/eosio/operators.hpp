@@ -1,6 +1,6 @@
 #pragma once
 
-#include <eosio/for_each_field.hpp>
+#include "for_each_field.hpp"
 
 namespace eosio { namespace operators {
 

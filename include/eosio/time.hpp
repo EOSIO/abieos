@@ -1,8 +1,9 @@
 #pragma once
-#include <eosio/chain_conversions.hpp>
-#include <eosio/check.hpp>
-#include <eosio/operators.hpp>
-#include <eosio/reflection.hpp>
+#include "chain_conversions.hpp"
+#include "check.hpp"
+#include "operators.hpp"
+#include "reflection.hpp"
+#include "from_json.hpp"
 #include <stdint.h>
 #include <string>
 

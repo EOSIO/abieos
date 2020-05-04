@@ -1,7 +1,7 @@
 #pragma once
 
-#include <eosio/for_each_field.hpp>
-#include <eosio/stream.hpp>
+#include "for_each_field.hpp"
+#include "stream.hpp"
 #include <optional>
 #include <type_traits>
 #include <utility>

@@ -23,34 +23,22 @@ enum class abi_error {
    bad_abi
 };
 
+constexpr inline std::string_view convert_abi_error(eosio::abi_error e) {
+   switch(e) {
+      case abi_error::no_error: return "No error";
+      case abi_error::recursion_limit_reached: return "Recursion limit reached";
+      case abi_error::invalid_nesting: return "Invalid nesting";
+      case abi_error::unknown_type: return "Unknown type";
+      case abi_error::missing_name: return "Missing name";
+      case abi_error::redefined_type: return "Redefined type";
+      case abi_error::base_not_a_struct: return "Base not a struct";
+      case abi_error::extension_typedef: return "Extension typedef";
+      case abi_error::bad_abi: return "Bad ABI";
+      default: return "internal failure";
+   };
 }
-
-namespace std {
-template <>
-struct is_error_code_enum<eosio::abi_error> : true_type {};
-}
-
-namespace eosio {
 
 struct abi_serializer;
-
-class abi_error_category_type : public std::error_category {
- public:
-   const char* name() const noexcept override final { return "ABIError"; }
-
-   std::string message(int c) const override final {
-      switch(static_cast<abi_error>(c)) {
-      default: return "unknown";
-      }
-   }
-};
-
-inline const abi_error_category_type& abi_error_category() {
-   static abi_error_category_type c;
-   return c;
-}
-
-inline std::error_code make_error_code(abi_error e) { return { static_cast<int>(e), abi_error_category() }; }
 
 template <typename T>
 struct might_not_exist {
@@ -58,14 +46,13 @@ struct might_not_exist {
 };
 
 template <typename T, typename S>
-result<void> from_bin(might_not_exist<T>& obj, S& stream) {
+void from_bin(might_not_exist<T>& obj, S& stream) {
     if (stream.remaining())
         return from_bin(obj.value, stream);
-    return eosio::outcome::success();
 }
 
 template <typename T, typename S>
-result<void> from_json(might_not_exist<T>& obj, S& stream) {
+void from_json(might_not_exist<T>& obj, S& stream) {
     return from_json(obj.value, stream);
 }
 
@@ -197,27 +184,27 @@ struct abi_type {
        return std::get_if<variant>(&_data);
     }
 
-    result<std::string> bin_to_json(input_stream& bin, std::function<void()> f = []{}) const;
-    result<std::vector<char>> json_to_bin(std::string_view json, std::function<void()> f = []{}) const;
-    result<std::vector<char>> json_to_bin_reorderable(std::string_view json, std::function<void()> f = []{}) const;
+    std::string bin_to_json(input_stream& bin, std::function<void()> f = []{}) const;
+    std::vector<char> json_to_bin(std::string_view json, std::function<void()> f = []{}) const;
+    std::vector<char> json_to_bin_reorderable(std::string_view json, std::function<void()> f = []{}) const;
 };
 
 struct abi {
     std::map<eosio::name, std::string> action_types;
     std::map<eosio::name, std::string> table_types;
     std::map<std::string, abi_type> abi_types;
-    result<const abi_type*> get_type(const std::string& name);
+    const abi_type* get_type(const std::string& name);
 
     // Adds a type to the abi.  Has no effect if the type is already present.
     // If the type is a struct, all members will be added recursively.
     // Exception Safety: basic. If add_type fails, some objects may have
     // an incomplete list of fields.
     template<typename T>
-    result<abi_type*> add_type();
+    abi_type* add_type();
 };
 
-result<void> convert(const abi_def& def, abi&);
-result<void> convert(const abi& def, abi_def&);
+void convert(const abi_def& def, abi&);
+void convert(const abi& def, abi_def&);
 
 extern const abi_serializer* const object_abi_serializer;
 extern const abi_serializer* const variant_abi_serializer;
@@ -226,57 +213,47 @@ extern const abi_serializer* const extension_abi_serializer;
 extern const abi_serializer* const optional_abi_serializer;
 
 template<typename T>
-auto add_type(abi& a, T*) -> std::enable_if_t<reflection::has_for_each_field_v<T>, result<abi_type*>> {
+auto add_type(abi& a, T*) -> std::enable_if_t<reflection::has_for_each_field_v<T>, abi_type*> {
    std::string name = get_type_name((T*)nullptr);
    auto [iter, inserted] = a.abi_types.try_emplace(name, name, abi_type::struct_{}, object_abi_serializer);
    if(!inserted)
       return &iter->second;
    auto& s = std::get<abi_type::struct_>(iter->second._data);
-   result<void> okay = outcome::success();
    for_each_field<T>([&](const char* name, auto&& member){
-      if(okay) {
-         auto member_type = a.add_type<std::decay_t<decltype(member((T*)nullptr))>>();
-         if(member_type) {
-            s.fields.push_back({name, member_type.value()});
-         } else {
-            okay = member_type.error();
-         }
+      auto member_type = a.add_type<std::decay_t<decltype(member((T*)nullptr))>>();
+      if(member_type) {
+         s.fields.push_back({name, member_type.value()});
       }
    });
    return &iter->second;
 }
 
 template<typename T>
-auto add_type(abi& a, T* t) -> std::enable_if_t<!reflection::has_for_each_field_v<T>, result<abi_type*>> {
+auto add_type(abi& a, T* t) -> std::enable_if_t<!reflection::has_for_each_field_v<T>, abi_type*> {
    auto iter = a.abi_types.find(get_type_name(t));
-   if(iter != a.abi_types.end()) return &iter->second;
-   else return abi_error::unknown_type;
+   check( iter == a.abi_types.end(),
+      convert_abi_error(abi_error::unknown_type) );
+   return &iter->second;
 }
 
 template<typename T>
-result<abi_type*> add_type(abi& a, std::vector<T>*) {
-   OUTCOME_TRY(element_type, a.add_type<T>());
-   if (element_type->optional_of() || element_type->array_of() || element_type->extension_of())
-      return abi_error::invalid_nesting;
+abi_type* add_type(abi& a, std::vector<T>*) {
+   auto element_type = a.add_type<T>();
+   check(!(element_type->optional_of() || element_type->array_of() || element_type->extension_of()),
+      convert_abi_error(abi_error::invalid_nesting));
    std::string name = get_type_name((std::vector<T>*)nullptr);
    auto [iter, inserted] = a.abi_types.try_emplace(name, name, abi_type::array{element_type}, array_abi_serializer);
    return &iter->second;
 }
 
 template<typename... T>
-result<abi_type*> add_type(abi& a, std::variant<T...>*) {
+abi_type* add_type(abi& a, std::variant<T...>*) {
    abi_type::variant types;
-   result<void> okay = outcome::success();
    ([&](auto* t) {
-      if(okay) {
-         if(auto type = add_type(a, t)) {
-            types.push_back({type.value()->name, type.value()});
-         } else {
-            okay = type.error();
-         }
+      if(auto type = add_type(a, t)) {
+         types.push_back({type.value()->name, type.value()});
       }
    }((T*)nullptr), ...);
-   OUTCOME_TRY(okay);
    std::string name = get_type_name((std::variant<T...>*)nullptr);
 
    auto [iter, inserted] = a.abi_types.try_emplace(name, name, std::move(types), variant_abi_serializer);
@@ -284,27 +261,27 @@ result<abi_type*> add_type(abi& a, std::variant<T...>*) {
 }
 
 template<typename T>
-result<abi_type*> add_type(abi& a, std::optional<T>*) {
-   OUTCOME_TRY(element_type, a.add_type<T>());
-   if (element_type->optional_of() || element_type->array_of() || element_type->extension_of())
-      return abi_error::invalid_nesting;
+abi_type* add_type(abi& a, std::optional<T>*) {
+   auto element_type = a.add_type<T>();
+   check(!(element_type->optional_of() || element_type->array_of() || element_type->extension_of()),
+      convert_abi_error(abi_error::invalid_nesting));
    std::string name = get_type_name((std::optional<T>*)nullptr);
    auto [iter, inserted] = a.abi_types.try_emplace(name, name, abi_type::optional{element_type}, optional_abi_serializer);
    return &iter->second;
 }
 
 template<typename T>
-result<abi_type*> add_type(abi& a, might_not_exist<T>*) {
-   OUTCOME_TRY(element_type, a.add_type<T>());
-   if (element_type->extension_of())
-      return abi_error::invalid_nesting;
+abi_type* add_type(abi& a, might_not_exist<T>*) {
+   auto element_type = a.add_type<T>();
+   check(!element_type->extension_of(),
+      convert_abi_error(abi_error::invalid_nesting));
    std::string name = element_type->name + "$";
    auto [iter, inserted] = a.abi_types.try_emplace(name, name, abi_type::extension{element_type}, extension_abi_serializer);
    return &iter->second;
 }
 
 template<typename T>
-result<abi_type*> abi::add_type() {
+abi_type* abi::add_type() {
    using eosio::add_type;
    return add_type(*this, (T*)nullptr);
 }
