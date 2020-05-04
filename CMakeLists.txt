@@ -1,8 +1,6 @@
 # copyright defined in abieos/LICENSE.txt
 
-set(CMAKE_OSX_DEPLOYMENT_TARGET 10.14)
-
-cmake_minimum_required (VERSION 3.11)
+cmake_minimum_required (VERSION 3.8)
 project(abieos VERSION 0.1 LANGUAGES CXX C)
 
 set(default_build_type "Release")
