@@ -186,7 +186,7 @@ constexpr inline uint64_t string_to_name_strict_impl() {
 
 template <char... Str>
 constexpr inline uint64_t string_to_name_strict() {
-   static_assert(sizeof...(Str) <= 12, "eosio name string is too long");
+   static_assert(sizeof...(Str) <= 13, "eosio name string is too long");
    if constexpr (sizeof...(Str) == 0)
       return 0;
    else
