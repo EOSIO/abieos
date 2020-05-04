@@ -236,7 +236,7 @@ void from_bin(std::tuple<T...>& obj, S& stream) {
 template <typename T, typename S>
 void from_bin(T& obj, S& stream) {
    if constexpr (has_bitwise_serialization<T>()) {
-      return stream.read(reinterpret_cast<char*>(&obj), sizeof(T));
+      stream.read(reinterpret_cast<char*>(&obj), sizeof(T));
    } else if constexpr (std::is_same_v<serialization_type<T>, void>) {
       for_each_field(obj, [&](auto& member) {
          from_bin(member, stream);
