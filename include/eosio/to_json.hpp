@@ -217,7 +217,7 @@ void to_json(const T& t, S& stream) {
       if constexpr ( not is_std_optional<member_type>::value ) {
          addfield();
       } else {
-         if( !!m )
+         if( !!m || true )
             addfield();
       }
    });

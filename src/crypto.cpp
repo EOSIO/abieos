@@ -101,7 +101,7 @@ Key string_to_key(std::string_view s, key_type type, std::string_view suffix) {
     std::vector<char> whole;
     whole.push_back(uint8_t{type});
     base58_to_binary(whole, s);
-    check(whole.size() <= 5,
+    check(whole.size() > 5,
         convert_json_error(eosio::from_json_error::expected_key));
     auto ripe_digest = digest_suffix_ripemd160(std::string_view(whole.data() + 1, whole.size() - 5), suffix);
     check(memcmp(ripe_digest.data(), whole.data() + whole.size() - 4, 4)==0,

@@ -721,19 +721,21 @@ inline void json_to_bin(pseudo_object*, json_to_bin_state& state, bool allow_ext
     }
     auto& stack_entry = state.stack.back();
     const std::vector<eosio::abi_field>& fields = type->as_struct()->fields;
-    state.get_end_object();
-    if (stack_entry.position + 1 != (ptrdiff_t)fields.size()) {
-        auto& field = fields[stack_entry.position + 1];
-        if (!field.type->extension_of() || !allow_extensions) {
-            stack_entry.position = -1;
-            eosio::check(false, eosio::convert_json_error(eosio::from_json_error::expected_field));
+    if (state.get_end_object_pred()) {
+        if (stack_entry.position + 1 != (ptrdiff_t)fields.size()) {
+            auto& field = fields[stack_entry.position + 1];
+            if (!field.type->extension_of() || !allow_extensions) {
+                stack_entry.position = -1;
+                eosio::check(false, eosio::convert_json_error(eosio::from_json_error::expected_field));
+            }
+            ++stack_entry.position;
+            state.skipped_extension = true;
         }
-        ++stack_entry.position;
-        state.skipped_extension = true;
+        if (trace_json_to_bin)
+            printf("%*s}\n", int((state.stack.size() - 1) * 4), "");
+        state.stack.pop_back();
+        return;
     }
-    if (trace_json_to_bin)
-        printf("%*s}\n", int((state.stack.size() - 1) * 4), "");
-    state.stack.pop_back();
     auto key = state.maybe_get_key();
     if (key) {
        eosio::check(!(++stack_entry.position >= (ptrdiff_t)fields.size() || state.skipped_extension),
@@ -763,6 +765,7 @@ inline void json_to_bin(pseudo_array*, json_to_bin_state& state, bool, const abi
         state.stack.back().size_insertion_index = state.size_insertions.size();
         // FIXME: add Stream::tellp or similar.
         state.size_insertions.push_back({state.writer.data.size()});
+        return;
     }
     auto& stack_entry = state.stack.back();
     if (state.get_end_array_pred()) {
@@ -786,6 +789,7 @@ inline void json_to_bin(pseudo_variant*, json_to_bin_state& state, bool allow_ex
         if (trace_json_to_bin)
             printf("%*s[ variant\n", int(state.stack.size() * 4), "");
         state.stack.push_back({type, allow_extensions});
+        return;
     }
     auto& stack_entry = state.stack.back();
     ++stack_entry.position;
@@ -795,6 +799,7 @@ inline void json_to_bin(pseudo_variant*, json_to_bin_state& state, bool allow_ex
         if (trace_json_to_bin)
             printf("%*s]\n", int((state.stack.size() - 1) * 4), "");
         state.stack.pop_back();
+        return;
     }
     const std::vector<eosio::abi_field>& fields = *stack_entry.type->as_variant();
     if (stack_entry.position == 0) {

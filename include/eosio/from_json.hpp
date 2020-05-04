@@ -256,6 +256,14 @@ class json_token_stream : public rapidjson::BaseReaderHandler<rapidjson::UTF8<>,
       return t.get().key;
    }
 
+   bool get_end_object_pred() {
+      auto t = peek_token();
+      if(t.get().type != json_token_type::type_end_object)
+         return false;
+      eat_token();
+      return true;
+   }
+
    void get_end_object() {
       auto t = peek_token();
       check(t.get().type == json_token_type::type_end_object,
@@ -541,10 +549,12 @@ void from_json(std::vector<T>& result, S& stream) {
 /// \group from_json_explicit
 template <typename T, typename S>
 void from_json(std::optional<T>& result, S& stream) {
-   result = std::nullopt;
-   stream.get_null();
-   result.emplace();
-   from_json(*result, stream);
+   if(stream.get_null_pred()) {
+      result = std::nullopt;
+   } else {
+      result.emplace();
+      from_json(*result, stream);
+   }
 }
 
 template <int N = 0, typename... T>
