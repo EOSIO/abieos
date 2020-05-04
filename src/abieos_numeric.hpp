@@ -56,7 +56,7 @@ void negate(std::array<uint8_t, size>& a) {
 }
 
 template <auto size>
-ABIEOS_NODISCARD inline void decimal_to_binary(std::array<uint8_t, size>& result,
+inline void decimal_to_binary(std::array<uint8_t, size>& result,
                                                               std::string_view s) {
     memset(result.begin(), 0, result.size());
     for (auto& src_digit : s) {

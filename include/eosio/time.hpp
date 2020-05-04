@@ -88,21 +88,18 @@ EOSIO_REFLECT(time_point, elapsed);
 EOSIO_COMPARE(time_point);
 
 template <typename S>
-bool from_json(time_point& obj, S& stream, std::string_view& err) {
-   auto s = stream.get_string(err);
-   if (!s)
-      return false;
+void from_json(time_point& obj, S& stream) {
+   auto s = stream.get_string();
    uint64_t utc_microseconds;
    if (!eosio::string_to_utc_microseconds(utc_microseconds, s.data(), s.data() + s.size())) {
-      err = convert_json_error(eosio::from_json_error::expected_time_point);
+      check(false, convert_json_error(eosio::from_json_error::expected_time_point));
    }
    obj = time_point(microseconds(utc_microseconds));
-   return true;
 }
 
 template <typename S>
-bool to_json(const time_point& obj, S& stream, std::string_view& err) {
-   return to_json(eosio::microseconds_to_str(obj.elapsed._count), stream, err);
+void to_json(const time_point& obj, S& stream) {
+   return to_json(eosio::microseconds_to_str(obj.elapsed._count), stream);
 }
 
 /**
@@ -171,21 +168,17 @@ EOSIO_REFLECT(time_point_sec, utc_seconds);
 EOSIO_COMPARE(time_point);
 
 template <typename S>
-bool from_json(time_point_sec& obj, S& stream, std::string_view& err) {
-   auto s = stream.get_string(err);
-   if (!s)
-      return false;
+void from_json(time_point_sec& obj, S& stream) {
+   auto s = stream.get_string();
    const char* p = s.data();
    if (!eosio::string_to_utc_seconds(obj.utc_seconds, p, s.data() + s.size(), true, true)) {
-      err = convert_json_error(from_json_error::expected_time_point);
-      return false;
+      check(false, convert_json_error(from_json_error::expected_time_point));
    }
-   return true;
 }
 
 template <typename S>
-bool to_json(const time_point_sec& obj, S& stream, std::string_view& err) {
-   return to_json(eosio::microseconds_to_str(uint64_t(obj.utc_seconds) * 1'000'000), stream, err);
+void to_json(const time_point_sec& obj, S& stream) {
+   return to_json(eosio::microseconds_to_str(uint64_t(obj.utc_seconds) * 1'000'000), stream);
 }
 
 /**
@@ -257,17 +250,15 @@ typedef block_timestamp block_timestamp_type;
 EOSIO_REFLECT(block_timestamp_type, slot);
 
 template <typename S>
-bool from_json(block_timestamp& obj, S& stream, std::string_view& err) {
+void from_json(block_timestamp& obj, S& stream) {
    time_point tp;
-   if (!from_json(tp, stream, err))
-      return false;
+   from_json(tp, stream);
    obj = block_timestamp(tp);
-   return true;
 }
 
 template <typename S>
-bool to_json(const block_timestamp& obj, S& stream, std::string_view& err) {
-   return to_json(time_point(obj), stream, err);
+void to_json(const block_timestamp& obj, S& stream) {
+   return to_json(time_point(obj), stream);
 }
 
 } // namespace eosio

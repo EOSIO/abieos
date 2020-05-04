@@ -44,8 +44,8 @@ EOSIO_COMPARE(struct_type);
 // Verifies that the ordering of keys is the same as the ordering of the original objects
 template<typename T>
 void test_key(const T& x, const T& y) {
-   auto keyx = eosio::convert_to_key(x).value();
-   auto keyy = eosio::convert_to_key(y).value();
+   auto keyx = eosio::convert_to_key(x);
+   auto keyy = eosio::convert_to_key(y);
    CHECK(std::lexicographical_compare(keyx.begin(), keyx.end(), keyy.begin(), keyy.end(), std::less<unsigned char>()) == (x < y));
    CHECK(std::lexicographical_compare(keyy.begin(), keyy.end(), keyx.begin(), keyx.end(), std::less<unsigned char>()) == (y < x));
 }
@@ -75,7 +75,7 @@ enum class enum_s16 : std::int16_t {
 template<typename T>
 std::size_t key_size(const T& obj) {
    eosio::size_stream ss;
-   eosio::check_discard(to_key(obj, ss));
+   to_key(obj, ss);
    return ss.size;
 }
 

@@ -30,21 +30,21 @@ std::vector<char> test_serialize(const T& value, F&& f) {
    std::vector<char> buf1;
    eosio::vector_stream vecstream(buf1);
    eosio::size_stream szstream;
-   CHECK(f(value, vecstream));
-   CHECK(f(value, szstream));
+   f(value, vecstream);
+   f(value, szstream);
    CHECK(szstream.size == vecstream.data.size());
    std::vector<char> buf2(szstream.size);
    eosio::fixed_buf_stream fxstream(buf2.data(), buf2.size());
-   CHECK(f(value, fxstream));
+   f(value, fxstream);
    CHECK(buf1 == buf2);
    return buf1;
 }
 
 eosio::abi round_trip_abi(const eosio::abi& src) {
    eosio::abi_def def;
-   CHECK(convert(src, def));
+   convert(src, def);
    eosio::abi result;
-   CHECK(convert(def, result));
+   convert(def, result);
    return result;
 }
 
@@ -63,12 +63,12 @@ void test(const T& value, eosio::abi& abi1, eosio::abi& abi2) {
    {
       T bin_value;
       eosio::input_stream bin_stream(bin);
-      CHECK(from_bin(bin_value, bin_stream));
+      from_bin(bin_value, bin_stream);
       CHECK(bin_value == value);
       T json_value;
       std::string mutable_json(json.data(), json.size());
       eosio::json_token_stream json_stream(mutable_json.data());
-      CHECK(from_json(json_value, json_stream));
+      from_json(json_value, json_stream);
       CHECK(json_value == value);
    }
 
@@ -76,14 +76,14 @@ void test(const T& value, eosio::abi& abi1, eosio::abi& abi2) {
    {
       // Get the ABI
       using eosio::get_type_name;
-      const eosio::abi_type* type = abi->get_type(get_type_name((T*)nullptr)).value();
+      const eosio::abi_type* type = abi->get_type(get_type_name((T*)nullptr));
 
       // bin_to_json
-      auto bin2 = check_result(type->json_to_bin({json.data(), json.size()}));
+      auto bin2 = type->json_to_bin({json.data(), json.size()});
       CHECK(bin2 == bin);
       // json_to_bin
       eosio::input_stream bin_stream{bin};
-      auto json2 = check_result(type->bin_to_json(bin_stream));
+      auto json2 = type->bin_to_json(bin_stream);
       CHECK(json2 == std::string(json.data(), json.size()));
    }
 }
@@ -130,10 +130,10 @@ EOSIO_COMPARE(struct_type);
 
 int main() {
    eosio::json_token_stream stream(empty_abi);
-   eosio::abi_def def = eosio::from_json<eosio::abi_def>(stream).value();
+   eosio::abi_def def = eosio::from_json<eosio::abi_def>(stream);
    eosio::abi abi;
-   CHECK(convert(def, abi));
-   CHECK(abi.add_type<struct_type>());
+   convert(def, abi);
+   abi.add_type<struct_type>();
    eosio::abi new_abi(round_trip_abi(abi));
    test(true, abi, new_abi);
    test(false, abi, new_abi);

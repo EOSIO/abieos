@@ -449,7 +449,7 @@ ABIEOS_NODISCARD inline bool receive_event(struct json_to_jvalue_state& state, e
 }
 
 template<typename F>
-ABIEOS_NODISCARD inline void json_to_jvalue(jvalue& value, std::string_view json, F&& f) {
+inline void json_to_jvalue(jvalue& value, std::string_view json, F&& f) {
     std::string mutable_json{json};
     mutable_json.push_back(0);
     mutable_json.push_back(0);
@@ -922,8 +922,7 @@ inline void bin_to_json(pseudo_variant*, bin_to_json_state& state, bool allow_ex
         uint32_t index;
         varuint32_from_bin(index, state.bin);
         const std::vector<eosio::abi_field>& fields = *stack_entry.type->as_variant();
-        if (index >= fields.size())
-            return eosio::stream_error::bad_variant_index;
+        eosio::check(index < fields.size(), eosio::convert_stream_error(eosio::stream_error::bad_variant_index));
         auto& f = fields[index];
         to_json(f.name, state.writer);
         state.writer.write(',');

@@ -143,7 +143,7 @@ template <typename S> void to_json(float value, S& stream) { return fp_to_json(v
 
 template <typename T, typename S>
 void to_json(const std::vector<T>& obj, S& stream) {
-   stream.writre('[');
+   stream.write('[');
    bool first = true;
    for (auto& v : obj) {
       if (first) {

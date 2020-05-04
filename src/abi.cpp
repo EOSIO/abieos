@@ -136,7 +136,7 @@ abi_type::struct_ resolve(std::map<std::string, abi_type>& abi_types, const stru
         auto t = get_type(abi_types, field.type, depth + 1);
         result.fields.push_back(abi_field{field.name, t});
     }
-    return std::move(result);
+    return result;
 }
 
 
@@ -148,7 +148,7 @@ abi_type::variant resolve(std::map<std::string, abi_type>& abi_types, const vari
         auto t = get_type(abi_types, field, depth + 1);
         result.push_back({field, t});
     }
-    return std::move(result);
+    return result;
 }
 
 abi_type::alias resolve(std::map<std::string, abi_type>& abi_types, const abi_type::alias_def* type, int depth) {

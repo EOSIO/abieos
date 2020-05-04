@@ -210,28 +210,28 @@ void convert(const varuint32& src, uint32_t& dst, F&& chooser) {
 }
 
 template <typename S>
-bool from_bin(varuint32& obj, S& stream, std::string_view& err) {
-   return varuint32_from_bin(obj.value, stream, err);
+void from_bin(varuint32& obj, S& stream) {
+   return varuint32_from_bin(obj.value, stream);
 }
 
 template <typename S>
-bool to_bin(const varuint32& obj, S& stream, std::string_view& err) {
-   return varuint32_to_bin(obj.value, stream, err);
+void to_bin(const varuint32& obj, S& stream) {
+   return varuint32_to_bin(obj.value, stream);
 }
 
 template <typename S>
-bool from_json(varuint32& obj, S& stream, std::string_view& err) {
-   return from_json(obj.value, stream, err);
+void from_json(varuint32& obj, S& stream) {
+   return from_json(obj.value, stream);
 }
 
 template <typename S>
-bool to_json(const varuint32& obj, S& stream, std::string_view& err) {
-   return to_json(obj.value, stream, err);
+void to_json(const varuint32& obj, S& stream) {
+   return to_json(obj.value, stream);
 }
 
 template <typename S>
-bool to_key(const varuint32& obj, S& stream, std::string_view& err) {
-   return to_key_varuint32(obj.value, stream, err);
+void to_key(const varuint32& obj, S& stream) {
+   return to_key_varuint32(obj.value, stream);
 }
 
 /**
@@ -425,28 +425,28 @@ using varint32 = signed_int;
 EOSIO_REFLECT(varint32, value);
 
 template <typename S>
-bool from_bin(varint32& obj, S& stream, std::string_view& err) {
-   return varint32_from_bin(obj.value, stream, err);
+void from_bin(varint32& obj, S& stream) {
+   return varint32_from_bin(obj.value, stream);
 }
 
 template <typename S>
-bool to_bin(const varint32& obj, S& stream, std::string_view& err) {
-   return varuint32_to_bin((uint32_t(obj.value) << 1) ^ uint32_t(obj.value >> 31), stream, err);
+void to_bin(const varint32& obj, S& stream) {
+   return varuint32_to_bin((uint32_t(obj.value) << 1) ^ uint32_t(obj.value >> 31), stream);
 }
 
 template <typename S>
-bool from_json(varint32& obj, S& stream, std::string_view& err) {
-   return from_json(obj.value, stream, err);
+void from_json(varint32& obj, S& stream) {
+   return from_json(obj.value, stream);
 }
 
 template <typename S>
-bool to_json(const varint32& obj, S& stream, std::string_view& err) {
-   return to_json(obj.value, stream, err);
+void to_json(const varint32& obj, S& stream) {
+   return to_json(obj.value, stream);
 }
 
 template <typename S>
-bool to_key(const varint32& obj, S& stream, std::string_view& err) {
-   return to_key_varint32(obj.value, stream, err);
+void to_key(const varint32& obj, S& stream) {
+   return to_key_varint32(obj.value, stream);
 }
 
 } // namespace eosio

@@ -221,9 +221,7 @@ auto add_type(abi& a, T*) -> std::enable_if_t<reflection::has_for_each_field_v<T
    auto& s = std::get<abi_type::struct_>(iter->second._data);
    for_each_field<T>([&](const char* name, auto&& member){
       auto member_type = a.add_type<std::decay_t<decltype(member((T*)nullptr))>>();
-      if(member_type) {
-         s.fields.push_back({name, member_type.value()});
-      }
+      s.fields.push_back({name, member_type});
    });
    return &iter->second;
 }
@@ -250,9 +248,8 @@ template<typename... T>
 abi_type* add_type(abi& a, std::variant<T...>*) {
    abi_type::variant types;
    ([&](auto* t) {
-      if(auto type = add_type(a, t)) {
-         types.push_back({type.value()->name, type.value()});
-      }
+      auto type = add_type(a, t);
+      types.push_back({type->name, type});
    }((T*)nullptr), ...);
    std::string name = get_type_name((std::variant<T...>*)nullptr);
 

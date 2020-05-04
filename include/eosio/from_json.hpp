@@ -370,8 +370,7 @@ void from_json(std::string_view& result, S& stream) {
 /// Parse JSON and convert to `result`. These overloads handle specified types.
 template <typename S>
 void from_json(std::string& result, S& stream) {
-   auto r = stream.get_string();
-   result = *r;
+   result = stream.get_string();
 }
 
 /// \exclude
@@ -662,7 +661,7 @@ T from_json(std::string_view s) {
 
 /// Parse JSON and return result. This overload wraps the other `to_json` overloads.
 template <typename T, typename S>
-void from_json(S& stream) {
+T from_json(S& stream) {
    T    x;
    from_json(x, stream);
    return x;
