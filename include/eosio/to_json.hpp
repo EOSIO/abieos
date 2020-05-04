@@ -239,6 +239,14 @@ void to_json_hex(const char* data, size_t size, S& stream) {
    stream.write('"');
 }
 
+#ifdef __eosio_cdt__
+
+template <typename S> void to_json(long double value, S& stream) {
+   return to_json_hex(reinterpret_cast<const char*>(&value), sizeof(long double), stream);
+}
+
+#endif
+
 template <typename T>
 std::string convert_to_json(const T& t) {
    size_stream ss;

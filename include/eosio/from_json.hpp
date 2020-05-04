@@ -591,6 +591,17 @@ void from_json_hex(std::vector<char>& result, S& stream) {
          convert_json_error(from_json_error::expected_hex_string) );
 }
 
+#ifdef __eosio_cdt__
+
+template <typename S> void from_json(long double& result, S& stream) {
+   auto s = stream.get_string();
+   check( s.size() == 32, convert_json_error(from_json_error::expected_hex_string) );
+   check( unhex(reinterpret_cast<char*>(&result), s.begin(), s.end()),
+          convert_json_error(from_json_error::expected_hex_string) );
+}
+
+#endif
+
 /// \exclude
 template <typename S, typename F>
 inline void from_json_object(S& stream, F f) {
