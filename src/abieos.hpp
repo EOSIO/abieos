@@ -770,6 +770,7 @@ inline void json_to_bin(pseudo_array*, json_to_bin_state& state, bool, const abi
             printf("%*s]\n", int((state.stack.size() - 1) * 4), "");
         state.size_insertions[stack_entry.size_insertion_index].size = stack_entry.position + 1;
         state.stack.pop_back();
+        return;
     }
     ++stack_entry.position;
     if (trace_json_to_bin)

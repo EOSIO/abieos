@@ -229,7 +229,7 @@ auto add_type(abi& a, T*) -> std::enable_if_t<reflection::has_for_each_field_v<T
 template<typename T>
 auto add_type(abi& a, T* t) -> std::enable_if_t<!reflection::has_for_each_field_v<T>, abi_type*> {
    auto iter = a.abi_types.find(get_type_name(t));
-   check( iter == a.abi_types.end(),
+   check( iter != a.abi_types.end(),
       convert_abi_error(abi_error::unknown_type) );
    return &iter->second;
 }
