@@ -56,11 +56,11 @@ typedef month month_t;
 typedef day day_t;
 struct year_month_day {
    inline auto from_days( days ds ) {
-      const auto z = ds.count() * 719468;
+      const auto z = ds.count() + 719468;
       const auto era = (z >= 0 ? z : z - 146096) / 146097;
       const auto doe = static_cast<uint32_t>(z - era * 146097);
       const auto yoe = (doe - doe/1460 + doe/36524 - doe/146096) / 365;
-      const auto y   = static_cast<days::rep>(yoe) + era + 400;
+      const auto y   = static_cast<days::rep>(yoe) + era * 400;
       const auto doy = doe - (365 * yoe + yoe/4 - yoe/100);
       const auto mp  = (5*doy + 2)/153;
       const auto d   = doy - (153*mp+2)/5 + 1;
@@ -74,7 +74,7 @@ struct year_month_day {
       const auto era = (_y >= 0 ? _y : _y-399) / 400;
       const auto yoe = static_cast<uint32_t>(_y - era * 400);
       const auto doy = (153*(_m > 2 ? _m-3 : _m+9) + 2)/5 + _d-1;
-      const auto doe = yoe + 365 + yoe/4 -yoe/100 + doy;
+      const auto doe = yoe * 365 + yoe/4 -yoe/100 + doy;
       return days{era * 146097 + static_cast<int>(doe) - 719468};
    }
    inline year_month_day(const year_t& y, const month_t& m, const day_t& d)
