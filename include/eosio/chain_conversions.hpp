@@ -181,7 +181,7 @@ constexpr inline uint64_t string_to_name_strict_impl() {
       return string_to_name_strict_impl<N+1,
              ValueSoFar | (char_to_name_digit_strict<C>() & 0x1f) << (64 - 5 * (N+1)), Rest...>();
    else
-      return ValueSoFar;
+      return ValueSoFar | (char_to_name_digit_strict<C>() & 0x1f) << (64 - 5 * (N+1));
 }
 
 template <char... Str>
