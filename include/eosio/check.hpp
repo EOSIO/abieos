@@ -12,6 +12,8 @@ extern "C" {
 __attribute__((eosio_wasm_import, noreturn))
 void eosio_assert_message(uint32_t, const char*, uint32_t);
 __attribute__((eosio_wasm_import, noreturn))
+void eosio_assert(uint32_t, const char*);
+__attribute__((eosio_wasm_import, noreturn))
 void eosio_assert_code(uint32_t, uint64_t);
 }
 }
@@ -44,6 +46,13 @@ namespace detail {
          internal_use_do_not_use::eosio_assert_message(false, msg.data(), msg.size());
 #else
          throw std::runtime_error(msg.data());
+#endif
+   }
+   [[noreturn]] inline void assert_or_throw(const char* msg) {
+#ifdef __eosio_cdt__
+         internal_use_do_not_use::eosio_assert(false, msg);
+#else
+         throw std::runtime_error(std::move(msg));
 #endif
    }
    [[noreturn]] inline void assert_or_throw(std::string&& msg) {
@@ -89,7 +98,7 @@ inline void check(bool pred, std::string_view msg) {
  */
 inline void check(bool pred, const char* msg) {
    if (!pred)
-      detail::assert_or_throw(std::string_view(msg));
+      detail::assert_or_throw(msg);
 }
 
 /**
