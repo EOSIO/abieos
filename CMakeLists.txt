@@ -17,8 +17,6 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS ON)
 
-option(ABIEOS_PIC "build ABIEOS with position independence" ON)
-option(ABIEOS_ASSERT_ERRORS "instead of allow EOSIO_TRY to return an error and propagate through, it will through an exception or an eosio_assert in the case of using EOSIO.CDT" OFF)
 option(ABIEOS_ONLY_LIBRARY "define and build the ABIEOS library" OFF)
 
 if(NOT DEFINED SKIP_SUBMODULE_CHECK)

@@ -25,8 +25,6 @@ void eosio_assert_code(uint32_t, uint64_t);
 #include <string>
 #include <string_view>
 
-#include "config.hpp"
-
 namespace eosio {
 
 /**

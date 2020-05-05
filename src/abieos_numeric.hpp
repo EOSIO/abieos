@@ -7,7 +7,6 @@
 #include <stdint.h>
 #include <string>
 #include <string_view>
-#include <eosio/eosio_outcome.hpp>
 #include <eosio/from_json.hpp>
 
 #include "abieos_ripemd160.hpp"

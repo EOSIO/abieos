@@ -2,7 +2,6 @@
 #include <array>
 #include <cstdint>
 #include "../include/eosio/crypto.hpp"
-#include "../include/eosio/eosio_outcome.hpp"
 #include "../include/eosio/from_bin.hpp"
 #include "../include/eosio/from_json.hpp"
 #include "../include/eosio/to_bin.hpp"
