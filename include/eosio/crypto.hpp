@@ -143,6 +143,6 @@ void from_json(signature& obj, S& stream) {
 }
 
 std::string to_base58(const char* d, size_t s );
-result<std::vector<char>> from_base58(const std::string_view& s);
+std::vector<char> from_base58(const std::string_view& s);
 
 } // namespace eosio

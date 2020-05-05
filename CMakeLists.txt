@@ -50,7 +50,7 @@ add_test(NAME test_abieos COMMAND test_abieos)
 
 add_executable(test_abieos_template src/template_test.cpp src/abieos.cpp)
 target_link_libraries(test_abieos_template abieos ${CMAKE_THREAD_LIBS_INIT})
-#add_test(NAME test_abieos_template COMMAND test_abieos_template)   TODO: fix tests
+add_test(NAME test_abieos_template COMMAND test_abieos_template)
 
 add_executable(test_abieos_key src/key_test.cpp src/abieos.cpp)
 target_link_libraries(test_abieos_key abieos ${CMAKE_THREAD_LIBS_INIT})

@@ -208,9 +208,9 @@ namespace eosio {
         return binary_to_base58( std::string_view(d,s) );
     }
 
-    result<std::vector<char>> from_base58(const std::string_view& s) {
+    std::vector<char> from_base58(const std::string_view& s) {
         std::vector<char> ret;
-        OUTCOME_TRY( base58_to_binary( ret, s) );
+        base58_to_binary(ret, s);
         return ret;
     }
 }
