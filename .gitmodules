@@ -1,12 +1,6 @@
 [submodule "external/rapidjson"]
 	path = external/rapidjson
 	url = https://github.com/Tencent/rapidjson.git
-[submodule "external/date"]
-	path = external/date
-	url = https://github.com/HowardHinnant/date.git
 [submodule "external/eosjs_"]
 	path = external/eosjs
 	url = https://github.com/EOSIO/eosjs.git
-[submodule "external/outcome"]
-	path = external/outcome
-	url = https://github.com/ned14/outcome.git
