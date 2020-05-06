@@ -178,7 +178,7 @@ constexpr inline uint64_t string_to_name_strict() {
 // std::optional is killing constexpr'ness
 namespace detail {
    struct simple_optional {
-      constexpr inline simple_optional( stream_error e ) : valid(e) {}
+      explicit constexpr inline simple_optional( stream_error e ) : valid(e) {}
       explicit constexpr inline simple_optional( uint64_t v ) : val(v) {}
       explicit constexpr inline operator bool() const { return valid == stream_error::no_error; }
       constexpr inline auto value() const { return val; }
@@ -192,18 +192,18 @@ namespace detail {
    unsigned i = 0;
    for (; i < str.size() && i < 12; ++i) {
       uint64_t x = 0;
-      if (!char_to_name_digit_strict(str[i], x)) return stream_error::invalid_name_char;
+      if (!char_to_name_digit_strict(str[i], x)) return detail::simple_optional{stream_error::invalid_name_char};
       name |= (x & 0x1f) << (64 - 5 * (i + 1));
    }
    if (i < str.size() && i == 12) {
       uint64_t x = 0;
-      if (!char_to_name_digit_strict(str[i], x)) return stream_error::invalid_name_char;
+      if (!char_to_name_digit_strict(str[i], x)) return detail::simple_optional{stream_error::invalid_name_char};
 
-      if(x != (x & 0xf)) return stream_error::invalid_name_char13;
+      if(x != (x & 0xf)) return detail::simple_optional{stream_error::invalid_name_char13};
       name |= x;
       ++i;
    }
-   if(i < str.size()) return stream_error::name_too_long;
+   if(i < str.size()) return detail::simple_optional{stream_error::name_too_long};
    return detail::simple_optional{name};
 }
 
