@@ -43,14 +43,14 @@ namespace detail {
 #ifdef __eosio_cdt__
          internal_use_do_not_use::eosio_assert_message(false, msg.data(), msg.size());
 #else
-         throw std::runtime_error(msg.data());
+         throw std::runtime_error(std::string(msg));
 #endif
    }
    [[noreturn]] inline void assert_or_throw(const char* msg) {
 #ifdef __eosio_cdt__
          internal_use_do_not_use::eosio_assert(false, msg);
 #else
-         throw std::runtime_error(std::move(msg));
+         throw std::runtime_error(msg);
 #endif
    }
    [[noreturn]] inline void assert_or_throw(std::string&& msg) {

@@ -92,24 +92,6 @@ struct year_month_day {
 };
 }
 
-//template<typename T>
-//using cresult = outcome::basic_result<T, stream_error, outcome::policy::all_narrow>;
-//
-//template<typename T>
-//constexpr T check(cresult<T> r) {
-//   if(!r) {
-//      check(std::error_code(r.error()));
-//   }
-//   return std::move(r.value());
-//}
-
-//template <typename T>
-//constexpr T check(std::optional<T> r) {
-//   if (!r)
-//      throw std::runtime_error("check failed");
-//   return std::move(*r);
-//}
-
 inline constexpr uint64_t char_to_name_digit(char c) {
    if (c >= 'a' && c <= 'z')
       return (c - 'a') + 6;

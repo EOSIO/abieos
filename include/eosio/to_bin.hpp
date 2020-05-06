@@ -44,8 +44,6 @@ void varuint32_to_bin(uint64_t val, S& stream) {
    } while (val);
 }
 
-// !!! temp
-// TODO fix this to properly propagate the error
 inline void push_varuint32(std::vector<char>& bin, uint32_t v) {
    vector_stream st{ bin };
    varuint32_to_bin(v, st);
