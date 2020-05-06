@@ -1,6 +1,6 @@
 #pragma once
 
-#include <eosio/reflection.hpp>
+#include "reflection.hpp"
 #include <utility>
 
 #if __has_include(<boost/pfr/precise/core.hpp>)
@@ -13,7 +13,6 @@ constexpr auto for_each_field(T&& t, F&& f) -> std::enable_if_t<!reflection::has
    return boost::pfr::for_each_field(static_cast<T&&>(t), static_cast<F&&>(f));
 }
 } // namespace eosio
-
 #endif
 
 namespace eosio {

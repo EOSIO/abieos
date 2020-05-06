@@ -4,8 +4,26 @@
  */
 #pragma once
 
-#include <exception>
+#ifdef __eosio_cdt__
+#include <cstdint>
+namespace eosio {
+namespace internal_use_do_not_use {
+extern "C" {
+__attribute__((eosio_wasm_import, noreturn))
+void eosio_assert_message(uint32_t, const char*, uint32_t);
+__attribute__((eosio_wasm_import, noreturn))
+void eosio_assert(uint32_t, const char*);
+__attribute__((eosio_wasm_import, noreturn))
+void eosio_assert_code(uint32_t, uint64_t);
+}
+}
+}
+#else
+#include <stdexcept>
+#endif
+
 #include <string>
+#include <string_view>
 
 namespace eosio {
 
@@ -14,6 +32,57 @@ namespace eosio {
  *  @ingroup core
  *  @brief Defines wrappers over eosio_assert
  */
+
+
+struct eosio_error : std::exception {
+   explicit eosio_error(uint64_t code) {}
+};
+
+namespace detail {
+   [[noreturn]] inline void assert_or_throw(std::string_view msg) {
+#ifdef __eosio_cdt__
+         internal_use_do_not_use::eosio_assert_message(false, msg.data(), msg.size());
+#else
+         throw std::runtime_error(std::string(msg));
+#endif
+   }
+   [[noreturn]] inline void assert_or_throw(const char* msg) {
+#ifdef __eosio_cdt__
+         internal_use_do_not_use::eosio_assert(false, msg);
+#else
+         throw std::runtime_error(msg);
+#endif
+   }
+   [[noreturn]] inline void assert_or_throw(std::string&& msg) {
+#ifdef __eosio_cdt__
+         internal_use_do_not_use::eosio_assert_message(false, msg.c_str(), msg.size());
+#else
+         throw std::runtime_error(std::move(msg));
+#endif
+   }
+   [[noreturn]] inline void assert_or_throw(uint64_t code) {
+#ifdef __eosio_cdt__
+         internal_use_do_not_use::eosio_assert_code(false, code);
+#else
+         throw std::runtime_error(std::to_string(code));
+#endif
+   }
+} // ns eosio::detail
+
+/**
+ *  Assert if the predicate fails and use the supplied message.
+ *
+ *  @ingroup system
+ *
+ *  Example:
+ *  @code
+ *  eosio::check(a == b, "a does not equal b");
+ *  @endcode
+ */
+inline void check(bool pred, std::string_view msg) {
+   if (!pred)
+      detail::assert_or_throw(msg);
+}
 
 /**
  *  Assert if the predicate fails and use the supplied message.
@@ -26,9 +95,8 @@ namespace eosio {
  *  @endcode
  */
 inline void check(bool pred, const char* msg) {
-   if (!pred) {
-      throw std::runtime_error(msg);
-   }
+   if (!pred)
+      detail::assert_or_throw(msg);
 }
 
 /**
@@ -42,9 +110,8 @@ inline void check(bool pred, const char* msg) {
  *  @endcode
  */
 inline void check(bool pred, const std::string& msg) {
-   if (!pred) {
-      throw std::runtime_error(msg);
-   }
+   if (!pred)
+      detail::assert_or_throw(std::string_view{msg.c_str(), msg.size()});
 }
 
 /**
@@ -58,9 +125,8 @@ inline void check(bool pred, const std::string& msg) {
  *  @endcode
  */
 inline void check(bool pred, std::string&& msg) {
-   if (!pred) {
-      throw std::runtime_error(msg);
-   }
+   if (!pred)
+      detail::assert_or_throw(std::move(msg));
 }
 
 /**
@@ -75,9 +141,8 @@ inline void check(bool pred, std::string&& msg) {
  *  @endcode
  */
 inline void check(bool pred, const char* msg, size_t n) {
-   if (!pred) {
-      throw std::runtime_error(std::string(msg, n));
-   }
+   if (!pred)
+      detail::assert_or_throw(std::string_view{msg, n});
 }
 
 /**
@@ -92,14 +157,9 @@ inline void check(bool pred, const char* msg, size_t n) {
  *  @endcode
  */
 inline void check(bool pred, const std::string& msg, size_t n) {
-   if (!pred) {
-      throw std::runtime_error(msg.substr(0, n));
-   }
+   if (!pred)
+      detail::assert_or_throw(msg.substr(0, n));
 }
-
-struct eosio_error : std::exception {
-   explicit eosio_error(uint64_t code) {}
-};
 
 /**
  *  Assert if the predicate fails and use the supplied error code.
@@ -112,8 +172,7 @@ struct eosio_error : std::exception {
  *  @endcode
  */
 inline void check(bool pred, uint64_t code) {
-   if (!pred) {
-      throw eosio_error(code);
-   }
+   if (!pred)
+      detail::assert_or_throw(code);
 }
 } // namespace eosio

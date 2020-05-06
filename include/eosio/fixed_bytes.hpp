@@ -3,10 +3,10 @@
 #include <cstddef>
 #include <cstdint>
 #include <cstring>
-#include <eosio/from_json.hpp>
-#include <eosio/operators.hpp>
-#include <eosio/reflection.hpp>
-#include <eosio/to_json.hpp>
+#include "from_json.hpp"
+#include "operators.hpp"
+#include "reflection.hpp"
+#include "to_json.hpp"
 #include <type_traits>
 
 namespace eosio {
@@ -78,14 +78,14 @@ class fixed_bytes {
 
    template <typename T, typename U>
    static constexpr std::array<T, count_words<T>()> convert_array(const U* u) {
-      std::array<T, count_words<T>()> result;
+      std::array<T, count_words<T>()> result{0};
       convert_array(u, result.data());
       return result;
    }
 
    template <typename T, typename U>
    static constexpr std::array<T, count_words<T>()> convert_array(const U* u, const U* end) {
-      std::array<U, count_words<U>()> tmp{};
+      std::array<U, count_words<U>()> tmp{0};
       std::size_t                     count = std::min(static_cast<std::size_t>(end - u), tmp.size());
       for (std::size_t i = 0; i < count; ++i) { tmp[i] = u[i]; }
       return convert_array<T>(tmp.data());
@@ -188,7 +188,7 @@ class fixed_bytes {
     * Get the contained std::array
     */
    constexpr const auto&                 get_array() const { return value; }
-   std::array<Word, count_words<Word>()> value{};
+   std::array<Word, count_words<Word>()> value{0};
 };
 
 // This is only needed to make eosio.cdt/tests/unit/fixed_bytes_tests.cpp pass.
@@ -211,39 +211,36 @@ EOSIO_REFLECT(checksum256, value);
 EOSIO_REFLECT(checksum512, value);
 
 template <typename T, std::size_t Size, typename S>
-result<void> from_bin(fixed_bytes<Size, T>& obj, S& stream) {
+void from_bin(fixed_bytes<Size, T>& obj, S& stream) {
    std::array<std::uint8_t, Size> bytes;
-   OUTCOME_TRY(from_bin(bytes, stream));
+   from_bin(bytes, stream);
    obj = fixed_bytes<Size, T>(bytes);
-   return outcome::success();
 }
 
 template <typename T, std::size_t Size, typename S>
-result<void> to_bin(const fixed_bytes<Size, T>& obj, S& stream) {
-   return to_bin(obj.extract_as_byte_array(), stream);
+void to_bin(const fixed_bytes<Size, T>& obj, S& stream) {
+   to_bin(obj.extract_as_byte_array(), stream);
 }
 
 template <typename T, std::size_t Size, typename S>
-result<void> to_key(const fixed_bytes<Size, T>& obj, S& stream) {
-   return to_bin(obj.extract_as_byte_array(), stream);
+void to_key(const fixed_bytes<Size, T>& obj, S& stream) {
+   to_bin(obj.extract_as_byte_array(), stream);
 }
 
 template <typename T, std::size_t Size, typename S>
-result<void> from_json(fixed_bytes<Size, T>& obj, S& stream) {
+void from_json(fixed_bytes<Size, T>& obj, S& stream) {
    std::vector<char> v;
-   OUTCOME_TRY(eosio::from_json_hex(v, stream));
-   if (v.size() != Size)
-      return eosio::from_json_error::hex_string_incorrect_length;
+   eosio::from_json_hex(v, stream);
+   check(v.size() == Size, convert_json_error(eosio::from_json_error::hex_string_incorrect_length));
    std::array<uint8_t, Size> bytes;
    std::memcpy(bytes.data(), v.data(), Size);
    obj = fixed_bytes<Size, T>(bytes);
-   return outcome::success();
 }
 
 template <typename T, std::size_t Size, typename S>
-result<void> to_json(const fixed_bytes<Size, T>& obj, S& stream) {
+void to_json(const fixed_bytes<Size, T>& obj, S& stream) {
    auto bytes = obj.extract_as_byte_array();
-   return eosio::to_json_hex((const char*)bytes.data(), bytes.size(), stream);
+   eosio::to_json_hex((const char*)bytes.data(), bytes.size(), stream);
 }
 
 } // namespace eosio

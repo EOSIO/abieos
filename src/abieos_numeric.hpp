@@ -7,7 +7,6 @@
 #include <stdint.h>
 #include <string>
 #include <string_view>
-#include <eosio/eosio_outcome.hpp>
 #include <eosio/from_json.hpp>
 
 #include "abieos_ripemd160.hpp"
@@ -56,22 +55,21 @@ void negate(std::array<uint8_t, size>& a) {
 }
 
 template <auto size>
-ABIEOS_NODISCARD inline eosio::result<void> decimal_to_binary(std::array<uint8_t, size>& result,
+inline void decimal_to_binary(std::array<uint8_t, size>& result,
                                                               std::string_view s) {
     memset(result.begin(), 0, result.size());
     for (auto& src_digit : s) {
-        if (src_digit < '0' || src_digit > '9')
-            return eosio::from_json_error::expected_int;
+       eosio::check(!(src_digit < '0' || src_digit > '9'),
+            eosio::convert_json_error(eosio::from_json_error::expected_int));
         uint8_t carry = src_digit - '0';
         for (auto& result_byte : result) {
             int x = result_byte * 10 + carry;
             result_byte = x;
             carry = x >> 8;
         }
-        if (carry)
-            return eosio::from_json_error::number_out_of_range;
+        eosio::check(!carry,
+              eosio::convert_json_error(eosio::from_json_error::number_out_of_range));
     }
-    return eosio::outcome::success();
 }
 
 template <auto size>

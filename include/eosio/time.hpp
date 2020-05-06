@@ -1,8 +1,9 @@
 #pragma once
-#include <eosio/chain_conversions.hpp>
-#include <eosio/check.hpp>
-#include <eosio/operators.hpp>
-#include <eosio/reflection.hpp>
+#include "chain_conversions.hpp"
+#include "check.hpp"
+#include "operators.hpp"
+#include "reflection.hpp"
+#include "from_json.hpp"
 #include <stdint.h>
 #include <string>
 
@@ -63,7 +64,7 @@ class time_point {
    explicit time_point(microseconds e) : elapsed(e) {}
    const microseconds& time_since_epoch() const { return elapsed; }
    uint32_t            sec_since_epoch() const { return uint32_t(elapsed.count() / 1000000); }
-   
+
    static time_point max() { return time_point( microseconds::maximum() ); }
 
    /// @cond INTERNAL
@@ -87,17 +88,17 @@ EOSIO_REFLECT(time_point, elapsed);
 EOSIO_COMPARE(time_point);
 
 template <typename S>
-eosio::result<void> from_json(time_point& obj, S& stream) {
-   OUTCOME_TRY(s, stream.get_string());
+void from_json(time_point& obj, S& stream) {
+   auto s = stream.get_string();
    uint64_t utc_microseconds;
-   if (!eosio::string_to_utc_microseconds(utc_microseconds, s.data(), s.data() + s.size()))
-      return eosio::from_json_error::expected_time_point;
+   if (!eosio::string_to_utc_microseconds(utc_microseconds, s.data(), s.data() + s.size())) {
+      check(false, convert_json_error(eosio::from_json_error::expected_time_point));
+   }
    obj = time_point(microseconds(utc_microseconds));
-   return eosio::outcome::success();
 }
 
 template <typename S>
-eosio::result<void> to_json(const time_point& obj, S& stream) {
+void to_json(const time_point& obj, S& stream) {
    return to_json(eosio::microseconds_to_str(obj.elapsed._count), stream);
 }
 
@@ -167,16 +168,16 @@ EOSIO_REFLECT(time_point_sec, utc_seconds);
 EOSIO_COMPARE(time_point);
 
 template <typename S>
-result<void> from_json(time_point_sec& obj, S& stream) {
-   OUTCOME_TRY(s, stream.get_string());
+void from_json(time_point_sec& obj, S& stream) {
+   auto s = stream.get_string();
    const char* p = s.data();
-   if (!eosio::string_to_utc_seconds(obj.utc_seconds, p, s.data() + s.size(), true, true))
-      return from_json_error::expected_time_point;
-   return outcome::success();
+   if (!eosio::string_to_utc_seconds(obj.utc_seconds, p, s.data() + s.size(), true, true)) {
+      check(false, convert_json_error(from_json_error::expected_time_point));
+   }
 }
 
 template <typename S>
-result<void> to_json(const time_point_sec& obj, S& stream) {
+void to_json(const time_point_sec& obj, S& stream) {
    return to_json(eosio::microseconds_to_str(uint64_t(obj.utc_seconds) * 1'000'000), stream);
 }
 
@@ -249,15 +250,14 @@ typedef block_timestamp block_timestamp_type;
 EOSIO_REFLECT(block_timestamp_type, slot);
 
 template <typename S>
-eosio::result<void> from_json(block_timestamp& obj, S& stream) {
+void from_json(block_timestamp& obj, S& stream) {
    time_point tp;
-   OUTCOME_TRY(from_json(tp, stream));
+   from_json(tp, stream);
    obj = block_timestamp(tp);
-   return eosio::outcome::success();
 }
 
 template <typename S>
-eosio::result<void> to_json(const block_timestamp& obj, S& stream) {
+void to_json(const block_timestamp& obj, S& stream) {
    return to_json(time_point(obj), stream);
 }
 

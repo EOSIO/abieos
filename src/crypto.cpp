@@ -1,12 +1,11 @@
 #include <algorithm>
 #include <array>
 #include <cstdint>
-#include <eosio/crypto.hpp>
-#include <eosio/eosio_outcome.hpp>
-#include <eosio/from_bin.hpp>
-#include <eosio/from_json.hpp>
-#include <eosio/to_bin.hpp>
-#include <eosio/to_json.hpp>
+#include "../include/eosio/crypto.hpp"
+#include "../include/eosio/from_bin.hpp"
+#include "../include/eosio/from_json.hpp"
+#include "../include/eosio/to_bin.hpp"
+#include "../include/eosio/to_json.hpp"
 #include <string>
 #include <string_view>
 
@@ -36,12 +35,12 @@ constexpr auto create_base58_map() {
 constexpr auto base58_map = create_base58_map();
 
 template <typename Container>
-result<void> base58_to_binary(Container& result, std::string_view s) {
+void base58_to_binary(Container& result, std::string_view s) {
     std::size_t offset = result.size();
     for (auto& src_digit : s) {
         int carry = base58_map[static_cast<uint8_t>(src_digit)];
-        if (carry < 0)
-            return from_json_error::expected_key;
+        check(carry >= 0,
+            ::eosio::convert_json_error(::eosio::from_json_error::expected_key));
         for (std::size_t i = offset; i < result.size(); ++i) {
             auto& result_byte = result[i];
             int x = static_cast<uint8_t>(result_byte) * 58 + carry;
@@ -57,7 +56,6 @@ result<void> base58_to_binary(Container& result, std::string_view s) {
         else
             break;
     std::reverse(result.begin() + offset, result.end());
-    return outcome::success();
 }
 
 template <typename Container>
@@ -86,41 +84,41 @@ std::string binary_to_base58(const Container& bin) {
 }
 
 template <typename... Container>
-result<std::array<unsigned char, 20>> digest_suffix_ripemd160(const Container&... data) {
+std::array<unsigned char, 20> digest_suffix_ripemd160(const Container&... data) {
     std::array<unsigned char, 20> digest;
     abieos_ripemd160::ripemd160_state self;
     abieos_ripemd160::ripemd160_init(&self);
     (abieos_ripemd160::ripemd160_update(&self, data.data(), data.size()), ...);
-    if (!abieos_ripemd160::ripemd160_digest(&self, digest.data()))
-        return eosio::from_json_error::invalid_signature;
+    check( abieos_ripemd160::ripemd160_digest(&self, digest.data()),
+        convert_json_error(eosio::from_json_error::invalid_signature) );
     return digest;
 }
 
 
 template <typename Key>
-result<Key> string_to_key(std::string_view s, key_type type, std::string_view suffix) {
+Key string_to_key(std::string_view s, key_type type, std::string_view suffix) {
     std::vector<char> whole;
     whole.push_back(uint8_t{type});
-    OUTCOME_TRY(base58_to_binary(whole, s));
-    if (whole.size() <= 5)
-        return eosio::from_json_error::expected_key;
-    OUTCOME_TRY(ripe_digest, digest_suffix_ripemd160(std::string_view(whole.data() + 1, whole.size() - 5), suffix));
-    if (memcmp(ripe_digest.data(), whole.data() + whole.size() - 4, 4))
-        return from_json_error::expected_key;
+    base58_to_binary(whole, s);
+    check(whole.size() > 5,
+        convert_json_error(eosio::from_json_error::expected_key));
+    auto ripe_digest = digest_suffix_ripemd160(std::string_view(whole.data() + 1, whole.size() - 5), suffix);
+    check(memcmp(ripe_digest.data(), whole.data() + whole.size() - 4, 4)==0,
+        convert_json_error(from_json_error::expected_key));
     whole.erase(whole.end() - 4, whole.end());
     return convert_from_bin<Key>(whole);
 }
 
 template <typename Key>
-result<std::string> key_to_string(const Key& key, std::string_view suffix, const char* prefix) {
-    OUTCOME_TRY(whole, convert_to_bin(key));
-    OUTCOME_TRY(ripe_digest, digest_suffix_ripemd160(std::string_view(whole.data() + 1, whole.size() - 1), suffix));
+std::string key_to_string(const Key& key, std::string_view suffix, const char* prefix) {
+    auto whole = convert_to_bin(key);
+    auto ripe_digest = digest_suffix_ripemd160(std::string_view(whole.data() + 1, whole.size() - 1), suffix);
     whole.insert(whole.end(), ripe_digest.data(), ripe_digest.data() + 4);
     return prefix + binary_to_base58(std::string_view(whole.data() + 1, whole.size() - 1));
 }
 } // namespace
 
-result<std::string> eosio::public_key_to_string(const public_key& key) {
+std::string eosio::public_key_to_string(const public_key& key) {
     if (key.index() == key_type::k1) {
         return key_to_string(key, "K1", "PUB_K1_");
     } else if (key.index() == key_type::r1) {
@@ -128,11 +126,12 @@ result<std::string> eosio::public_key_to_string(const public_key& key) {
     } else if (key.index() == key_type::wa) {
         return key_to_string(key, "WA", "PUB_WA_");
     } else {
-        return eosio::from_json_error::expected_public_key;
+       check(false, convert_json_error(eosio::from_json_error::expected_public_key));
+       __builtin_unreachable();
     }
 }
 
-result<public_key> eosio::public_key_from_string(std::string_view s) {
+public_key eosio::public_key_from_string(std::string_view s) {
     public_key result;
     if (s.substr(0, 3) == "EOS") {
         return string_to_key<public_key>(s.substr(3), key_type::k1, "");
@@ -143,67 +142,74 @@ result<public_key> eosio::public_key_from_string(std::string_view s) {
     } else if (s.substr(0, 7) == "PUB_WA_") {
         return string_to_key<public_key>(s.substr(7), key_type::wa, "WA");
     } else {
-        return from_json_error::expected_public_key;
+       check(false, convert_json_error(from_json_error::expected_public_key));
+       __builtin_unreachable();
     }
 }
 
-result<std::string> eosio::private_key_to_string(const private_key& private_key) {
+std::string eosio::private_key_to_string(const private_key& private_key) {
     if (private_key.index() == key_type::k1)
         return key_to_string(private_key, "K1", "PVT_K1_");
     else if (private_key.index() == key_type::r1)
         return key_to_string(private_key, "R1", "PVT_R1_");
-    else
-        return from_json_error::expected_private_key;
+    else {
+       check(false, convert_json_error(from_json_error::expected_private_key));
+       __builtin_unreachable();
+    }
 }
 
-result<private_key> eosio::private_key_from_string(std::string_view s) {
+private_key eosio::private_key_from_string(std::string_view s) {
     if (s.substr(0, 7) == "PVT_K1_")
         return string_to_key<private_key>(s.substr(7), key_type::k1, "K1");
     else if (s.substr(0, 7) == "PVT_R1_")
         return string_to_key<private_key>(s.substr(7), key_type::r1, "R1");
-    else if (s.substr(0, 4) == "PVT_")
-        return from_json_error::expected_private_key;
-    else {
+    else if (s.substr(0, 4) == "PVT_") {
+       check(false, convert_json_error(from_json_error::expected_private_key));
+       __builtin_unreachable();
+    } else {
         std::vector<char> whole;
-        OUTCOME_TRY(base58_to_binary(whole, s));
-        if (whole.size() < 5)
-            return from_json_error::expected_private_key;
+        base58_to_binary(whole, s);
+        check(whole.size() >= 5, convert_json_error(from_json_error::expected_private_key));
         whole[0] = key_type::k1;
         whole.erase(whole.end() - 4, whole.end());
         return convert_from_bin<private_key>(whole);
     }
 }
 
-result<std::string> eosio::signature_to_string(const eosio::signature& signature) {
+std::string eosio::signature_to_string(const eosio::signature& signature) {
     if (signature.index() == key_type::k1)
         return key_to_string(signature, "K1", "SIG_K1_");
     else if (signature.index() == key_type::r1)
         return key_to_string(signature, "R1", "SIG_R1_");
     else if (signature.index() == key_type::wa)
         return key_to_string(signature, "WA", "SIG_WA_");
-    else
-        return eosio::from_json_error::expected_signature;
+    else {
+       check(false, convert_json_error(eosio::from_json_error::expected_signature));
+       __builtin_unreachable();
+    }
 }
 
-result<signature> eosio::signature_from_string(std::string_view s) {
+signature eosio::signature_from_string(std::string_view s) {
     if (s.size() >= 7 && s.substr(0, 7) == "SIG_K1_")
         return string_to_key<signature>(s.substr(7), key_type::k1, "K1");
     else if (s.size() >= 7 && s.substr(0, 7) == "SIG_R1_")
         return string_to_key<signature>(s.substr(7), key_type::r1, "R1");
     else if (s.size() >= 7 && s.substr(0, 7) == "SIG_WA_")
         return string_to_key<signature>(s.substr(7), key_type::wa, "WA");
-    else
-        return eosio::from_json_error::expected_signature;
+    else {
+       check(false, convert_json_error(eosio::from_json_error::expected_signature));
+       __builtin_unreachable();
+    }
 }
 
 namespace eosio {
-    std::string to_base58(const char* d, size_t s ) { 
+    std::string to_base58(const char* d, size_t s ) {
         return binary_to_base58( std::string_view(d,s) );
     }
 
-    result<std::vector<char>> from_base58(const std::string_view& s) {
+    std::vector<char> from_base58(const std::string_view& s) {
         std::vector<char> ret;
-        OUTCOME_TRY( base58_to_binary( ret, s) );
+        base58_to_binary(ret, s);
         return ret;
     }
 }

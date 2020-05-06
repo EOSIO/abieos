@@ -1,19 +1,18 @@
 #pragma once
 
-#include <eosio/check.hpp>
-#include <eosio/crypto.hpp>
-#include <eosio/eosio_outcome.hpp>
-#include <eosio/fixed_bytes.hpp>
-#include <eosio/float.hpp>
-#include <eosio/name.hpp>
-#include <eosio/stream.hpp>
-#include <eosio/time.hpp>
-#include <eosio/varint.hpp>
+#include "check.hpp"
+#include "crypto.hpp"
+#include "fixed_bytes.hpp"
+#include "float.hpp"
+#include "name.hpp"
+#include "stream.hpp"
+#include "time.hpp"
+#include "varint.hpp"
 
 // todo: move
 namespace eosio {
 template <typename S>
-result<void> to_json(const input_stream& data, S& stream) {
+void to_json(const input_stream& data, S& stream) {
    return to_json_hex(data.pos, data.end - data.pos, stream);
 }
 } // namespace eosio
@@ -74,7 +73,7 @@ namespace eosio { namespace ship_protocol {
    }
 
    template <typename S>
-   eosio::result<void> to_json(const transaction_status& status, S& stream) {
+   void to_json(const transaction_status& status, S& stream) {
       // todo: switch to new serializer string support.
       return eosio::to_json(to_string(status), stream);
    }
@@ -283,17 +282,17 @@ namespace eosio { namespace ship_protocol {
    };
 
    template <typename S>
-   eosio::result<void> to_bin(const recurse_transaction_trace& obj, S& stream) {
+   void to_bin(const recurse_transaction_trace& obj, S& stream) {
       return to_bin(obj.recurse, stream);
    }
 
    template <typename S>
-   eosio::result<void> from_bin(recurse_transaction_trace& obj, S& stream) {
+   void from_bin(recurse_transaction_trace& obj, S& stream) {
       return from_bin(obj.recurse, stream);
    }
 
    template <typename S>
-   eosio::result<void> to_json(const recurse_transaction_trace& obj, S& stream) {
+   void to_json(const recurse_transaction_trace& obj, S& stream) {
       return to_json(obj.recurse, stream);
    }
 

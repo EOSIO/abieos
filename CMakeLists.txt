@@ -17,10 +17,12 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS ON)
 
+option(ABIEOS_ONLY_LIBRARY "define and build the ABIEOS library" OFF)
+
 if(NOT DEFINED SKIP_SUBMODULE_CHECK)
   execute_process(COMMAND git submodule status --recursive
                   COMMAND grep -c "^[+\-]"
-                  WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+                  WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
                   OUTPUT_VARIABLE submodule_status
                   OUTPUT_STRIP_TRAILING_WHITESPACE)
   if(submodule_status GREATER 0)
@@ -32,11 +34,11 @@ endif()
 find_package(Threads)
 
 add_library(abieos STATIC src/abi.cpp src/crypto.cpp include/eosio/fpconv.c)
-target_include_directories(abieos PUBLIC include external/outcome/single-header external/rapidjson/include external/date/include)
-set_target_properties(abieos PROPERTIES POSITION_INDEPENDENT_CODE ON)
+target_include_directories(abieos PUBLIC include external/rapidjson/include)
 
-add_library(abieos_module MODULE src/abieos.cpp)
-target_link_libraries(abieos_module abieos ${CMAKE_THREAD_LIBS_INIT})
+add_library(abieos_module MODULE src/abieos.cpp src/abi.cpp src/crypto.cpp include/eosio/fpconv.c)
+target_include_directories(abieos_module PUBLIC include external/rapidjson/include)
+target_link_libraries(abieos_module ${CMAKE_THREAD_LIBS_INIT})
 set_target_properties(abieos_module PROPERTIES OUTPUT_NAME "abieos")
 
 enable_testing()
@@ -47,7 +49,7 @@ add_test(NAME test_abieos COMMAND test_abieos)
 
 add_executable(test_abieos_template src/template_test.cpp src/abieos.cpp)
 target_link_libraries(test_abieos_template abieos ${CMAKE_THREAD_LIBS_INIT})
-#add_test(NAME test_abieos_template COMMAND test_abieos_template)   TODO: fix tests
+add_test(NAME test_abieos_template COMMAND test_abieos_template)
 
 add_executable(test_abieos_key src/key_test.cpp src/abieos.cpp)
 target_link_libraries(test_abieos_key abieos ${CMAKE_THREAD_LIBS_INIT})
@@ -74,4 +76,6 @@ if (CMAKE_CXX_COMPILER_ID MATCHES Clang|AppleClang)
     target_compile_options(test_abieos PRIVATE -Wall -Wextra -Wno-unused-parameter -fcolor-diagnostics)
 endif()
 
+if (NOT ABIEOS_ONLY_LIBRARY)
 add_subdirectory(tools)
+endif()

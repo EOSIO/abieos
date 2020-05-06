@@ -1,10 +1,10 @@
 #pragma once
 
-#include <eosio/chain_conversions.hpp>
-#include <eosio/check.hpp>
-#include <eosio/operators.hpp>
-#include <eosio/reflection.hpp>
-#include <eosio/murmur.hpp>
+#include "chain_conversions.hpp"
+#include "check.hpp"
+#include "operators.hpp"
+#include "reflection.hpp"
+#include "murmur.hpp"
 #include <string>
 
 namespace eosio {
@@ -16,7 +16,9 @@ struct name {
    constexpr name() = default;
    constexpr explicit name(uint64_t value) : value{ value } {}
    constexpr explicit name(name::raw value) : value{ static_cast<uint64_t>(value) } {}
-   constexpr explicit name(std::string_view str) : value{ check(string_to_name_strict(str)) } { }
+   //constexpr explicit name(std::string_view str) : value{ check(string_to_name_strict(str)) } { }
+   //TODO fix this after new OUTCOME system
+   constexpr explicit name(std::string_view str) : value{string_to_name(str)} { }
 
 
    constexpr name(const name&) = default;
@@ -140,6 +142,8 @@ struct name {
    }
 };
 
+// TODO this seems weird and the name is misleading
+// and I don't think this has ever been truly constexpr
 inline constexpr uint64_t hash_name( std::string_view str ) {
    auto r = string_to_name_strict(str);
    if( r ) return r.value();
@@ -150,21 +154,24 @@ EOSIO_REFLECT(name, value);
 EOSIO_COMPARE(name);
 
 template <typename S>
-result<void> from_json(name& obj, S& stream) {
-   OUTCOME_TRY(r, stream.get_string());
-   //OUTCOME_TRY(value, string_to_name_strict(r));
-   obj = name(hash_name(r)); 
-   return eosio::outcome::success();
+void from_json(name& obj, S& stream) {
+   auto r = stream.get_string();
+   obj = name(hash_name(r));
 }
 
 template <typename S>
-result<void> to_json(const name& obj, S& stream) {
-   return to_json(eosio::name_to_string(obj.value), stream);
+void to_json(const name& obj, S& stream) {
+   to_json(eosio::name_to_string(obj.value), stream);
 }
 
 inline namespace literals {
-   inline constexpr name operator""_n(const char* s, size_t) { return name( check(string_to_name_strict(s)) ); }
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wgnu-string-literal-operator-template"
+   template <typename T, T... Str>
+   inline constexpr name operator""_n() {
+      return name(string_to_name_strict<Str...>()); }
    inline constexpr name operator""_h(const char* s, size_t) { return name( hash_name(s) ); }
+#pragma clang diagnostic pop
 } // namespace literals
 
 } // namespace eosio

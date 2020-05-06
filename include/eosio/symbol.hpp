@@ -4,12 +4,12 @@
  */
 #pragma once
 
-#include <eosio/chain_conversions.hpp>
-#include <eosio/check.hpp>
-#include <eosio/from_json.hpp>
-#include <eosio/name.hpp>
-#include <eosio/operators.hpp>
-#include <eosio/reflection.hpp>
+#include "chain_conversions.hpp"
+#include "check.hpp"
+#include "from_json.hpp"
+#include "name.hpp"
+#include "operators.hpp"
+#include "reflection.hpp"
 
 #include <limits>
 #include <string_view>
@@ -168,16 +168,15 @@ EOSIO_REFLECT(symbol_code, value);
 EOSIO_COMPARE(symbol_code);
 
 template <typename S>
-result<void> to_json(const symbol_code& obj, S& stream) {
-   return to_json(symbol_code_to_string(obj.value), stream);
+void to_json(const symbol_code& obj, S& stream) {
+   to_json(symbol_code_to_string(obj.value), stream);
 }
 
 template <typename S>
-result<void> from_json(symbol_code& obj, S& stream) {
-   OUTCOME_TRY(s, stream.get_string());
-   if (!string_to_symbol_code(obj.value, s.data(), s.data() + s.size()))
-      return eosio::from_json_error::expected_symbol_code;
-   return eosio::outcome::success();
+void from_json(symbol_code& obj, S& stream) {
+   auto s = stream.get_string();
+   check(string_to_symbol_code(obj.value, s.data(), s.data() + s.size()),
+      convert_json_error(eosio::from_json_error::expected_symbol_code));
 }
 
 /**
@@ -247,16 +246,15 @@ EOSIO_REFLECT(symbol, value);
 EOSIO_COMPARE(symbol);
 
 template <typename S>
-result<void> to_json(const symbol& obj, S& stream) {
-   return to_json(symbol_to_string(obj.value), stream);
+void to_json(const symbol& obj, S& stream) {
+   to_json(symbol_to_string(obj.value), stream);
 }
 
 template <typename S>
-result<void> from_json(symbol& obj, S& stream) {
-   OUTCOME_TRY(s, stream.get_string());
-   if (!string_to_symbol(obj.value, s.data(), s.data() + s.size()))
-      return eosio::from_json_error::expected_symbol;
-   return eosio::outcome::success();
+void from_json(symbol& obj, S& stream) {
+   auto s = stream.get_string();
+   check(string_to_symbol(obj.value, s.data(), s.data() + s.size()),
+      convert_json_error(eosio::from_json_error::expected_symbol));
 }
 
 /**

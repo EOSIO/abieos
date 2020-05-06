@@ -4,10 +4,10 @@
  */
 #pragma once
 
-#include <eosio/from_bin.hpp>
-#include <eosio/from_json.hpp>
-#include <eosio/to_bin.hpp>
-#include <eosio/to_json.hpp>
+#include "from_bin.hpp"
+#include "from_json.hpp"
+#include "to_bin.hpp"
+#include "to_json.hpp"
 
 namespace eosio {
 /**
@@ -210,27 +210,27 @@ void convert(const varuint32& src, uint32_t& dst, F&& chooser) {
 }
 
 template <typename S>
-result<void> from_bin(varuint32& obj, S& stream) {
+void from_bin(varuint32& obj, S& stream) {
    return varuint32_from_bin(obj.value, stream);
 }
 
 template <typename S>
-result<void> to_bin(const varuint32& obj, S& stream) {
+void to_bin(const varuint32& obj, S& stream) {
    return varuint32_to_bin(obj.value, stream);
 }
 
 template <typename S>
-result<void> from_json(varuint32& obj, S& stream) {
+void from_json(varuint32& obj, S& stream) {
    return from_json(obj.value, stream);
 }
 
 template <typename S>
-result<void> to_json(const varuint32& obj, S& stream) {
+void to_json(const varuint32& obj, S& stream) {
    return to_json(obj.value, stream);
 }
 
 template <typename S>
-result<void> to_key(const varuint32& obj, S& stream) {
+void to_key(const varuint32& obj, S& stream) {
    return to_key_varuint32(obj.value, stream);
 }
 
@@ -425,27 +425,27 @@ using varint32 = signed_int;
 EOSIO_REFLECT(varint32, value);
 
 template <typename S>
-result<void> from_bin(varint32& obj, S& stream) {
+void from_bin(varint32& obj, S& stream) {
    return varint32_from_bin(obj.value, stream);
 }
 
 template <typename S>
-result<void> to_bin(const varint32& obj, S& stream) {
+void to_bin(const varint32& obj, S& stream) {
    return varuint32_to_bin((uint32_t(obj.value) << 1) ^ uint32_t(obj.value >> 31), stream);
 }
 
 template <typename S>
-result<void> from_json(varint32& obj, S& stream) {
+void from_json(varint32& obj, S& stream) {
    return from_json(obj.value, stream);
 }
 
 template <typename S>
-result<void> to_json(const varint32& obj, S& stream) {
+void to_json(const varint32& obj, S& stream) {
    return to_json(obj.value, stream);
 }
 
 template <typename S>
-result<void> to_key(const varint32& obj, S& stream) {
+void to_key(const varint32& obj, S& stream) {
    return to_key_varint32(obj.value, stream);
 }
 
