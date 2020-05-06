@@ -179,8 +179,8 @@ constexpr inline uint64_t string_to_name_strict() {
 namespace detail {
    struct simple_optional {
       constexpr inline simple_optional() : valid(false) {}
-      constexpr inline simple_optional( uint64_t v ) : valid(true), val(v) {}
-      constexpr inline operator bool() const { return valid; }
+      explicit constexpr inline simple_optional( uint64_t v ) : valid(true), val(v) {}
+      explicit constexpr inline operator bool() const { return valid; }
       constexpr inline auto value() const { return val; }
       bool valid = false;
       uint64_t val = 0;
@@ -204,7 +204,7 @@ namespace detail {
       ++i;
    }
    if(i < str.size()) return {};
-   return {name};
+   return detail::simple_optional{name};
 }
 
 inline std::string name_to_string(uint64_t name) {
