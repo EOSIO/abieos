@@ -292,7 +292,7 @@ template <typename T>
 std::vector<char> convert_to_key(const T& t) {
    std::vector<char> result;
    convert_to_key(t, result);
-   return std::move(result);
+   return result;
 }
 
 } // namespace eosio
