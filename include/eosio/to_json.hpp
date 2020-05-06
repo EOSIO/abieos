@@ -217,6 +217,8 @@ void to_json(const T& t, S& stream) {
       if constexpr ( not is_std_optional<member_type>::value ) {
          addfield();
       } else {
+         // !!! Skipping empty optionals breaks the tests, because
+         // abi serialization can't handle it.
          if( !!m || true )
             addfield();
       }
