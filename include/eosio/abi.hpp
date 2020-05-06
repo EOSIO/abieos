@@ -160,7 +160,7 @@ struct abi_type {
 
     template<typename T>
     abi_type(std::string name, T&& arg, const abi_serializer* ser)
-        : name(std::move(name)), _data(std::move(arg)), ser(ser) {}
+        : name(std::move(name)), _data(std::forward<T>(arg)), ser(ser) {}
     abi_type(const abi_type&) = delete;
     abi_type& operator=(const abi_type&) = delete;
 
