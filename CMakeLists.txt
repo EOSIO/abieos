@@ -22,7 +22,7 @@ option(ABIEOS_ONLY_LIBRARY "define and build the ABIEOS library" OFF)
 if(NOT DEFINED SKIP_SUBMODULE_CHECK)
   execute_process(COMMAND git submodule status --recursive
                   COMMAND grep -c "^[+\-]"
-                  WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+                  WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
                   OUTPUT_VARIABLE submodule_status
                   OUTPUT_STRIP_TRAILING_WHITESPACE)
   if(submodule_status GREATER 0)
