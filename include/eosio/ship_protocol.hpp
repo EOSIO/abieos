@@ -1,14 +1,13 @@
 #pragma once
 
-#include <eosio/check.hpp>
-#include <eosio/crypto.hpp>
-//#include <eosio/eosio_outcome.hpp>
-#include <eosio/fixed_bytes.hpp>
-#include <eosio/float.hpp>
-#include <eosio/name.hpp>
-#include <eosio/stream.hpp>
-#include <eosio/time.hpp>
-#include <eosio/varint.hpp>
+#include "check.hpp"
+#include "crypto.hpp"
+#include "fixed_bytes.hpp"
+#include "float.hpp"
+#include "name.hpp"
+#include "stream.hpp"
+#include "time.hpp"
+#include "varint.hpp"
 
 // todo: move
 namespace eosio {

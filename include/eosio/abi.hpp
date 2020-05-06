@@ -5,8 +5,8 @@
 #include <map>
 #include <vector>
 #include <variant>
-#include <eosio/types.hpp>
-#include <eosio/name.hpp>
+#include "types.hpp"
+#include "name.hpp"
 
 namespace eosio {
 

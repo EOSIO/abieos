@@ -1,9 +1,9 @@
 #pragma once
 
-#include <eosio/chain_conversions.hpp>
-#include <eosio/check.hpp>
-#include <eosio/reflection.hpp>
-#include <eosio/symbol.hpp>
+#include "chain_conversions.hpp"
+#include "check.hpp"
+#include "reflection.hpp"
+#include "symbol.hpp"
 
 #include <limits>
 #include <tuple>

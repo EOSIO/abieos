@@ -1,6 +1,5 @@
 #pragma once
 
-//#include <eosio/eosio_outcome.hpp>
 #include "check.hpp"
 #include <string>
 #include <string_view>

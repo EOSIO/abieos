@@ -1,7 +1,7 @@
 #pragma once
 
 #include "chain_conversions.hpp"
-#include <eosio/check.hpp>
+#include "check.hpp"
 #include "operators.hpp"
 #include "reflection.hpp"
 #include "murmur.hpp"

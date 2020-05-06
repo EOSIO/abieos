@@ -4,10 +4,10 @@
  */
 #pragma once
 
-#include <eosio/from_bin.hpp>
-#include <eosio/from_json.hpp>
-#include <eosio/to_bin.hpp>
-#include <eosio/to_json.hpp>
+#include "from_bin.hpp"
+#include "from_json.hpp"
+#include "to_bin.hpp"
+#include "to_json.hpp"
 
 namespace eosio {
 /**

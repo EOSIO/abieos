@@ -1,7 +1,6 @@
 #pragma once
 
 #include <cstdint>
-//#include <eosio/eosio_outcome.hpp>
 #include "operators.hpp"
 #include "reflection.hpp"
 #include <string>

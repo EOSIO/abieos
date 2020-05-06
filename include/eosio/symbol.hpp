@@ -4,12 +4,12 @@
  */
 #pragma once
 
-#include <eosio/chain_conversions.hpp>
-#include <eosio/check.hpp>
-#include <eosio/from_json.hpp>
-#include <eosio/name.hpp>
-#include <eosio/operators.hpp>
-#include <eosio/reflection.hpp>
+#include "chain_conversions.hpp"
+#include "check.hpp"
+#include "from_json.hpp"
+#include "name.hpp"
+#include "operators.hpp"
+#include "reflection.hpp"
 
 #include <limits>
 #include <string_view>
