@@ -16,10 +16,7 @@ struct name {
    constexpr name() = default;
    constexpr explicit name(uint64_t value) : value{ value } {}
    constexpr explicit name(name::raw value) : value{ static_cast<uint64_t>(value) } {}
-   //constexpr explicit name(std::string_view str) : value{ check(string_to_name_strict(str)) } { }
-   //TODO fix this after new OUTCOME system
-   constexpr explicit name(std::string_view str) : value{string_to_name(str)} { }
-
+   constexpr explicit name(std::string_view str) : value{ string_to_name_strict(str) } { }
 
    constexpr name(const name&) = default;
 
@@ -145,7 +142,7 @@ struct name {
 // TODO this seems weird and the name is misleading
 // and I don't think this has ever been truly constexpr
 inline constexpr uint64_t hash_name( std::string_view str ) {
-   auto r = string_to_name_strict(str);
+   auto r = try_string_to_name_strict(str);
    if( r ) return r.value();
    return  murmur64( str.data(), str.size() );
 }

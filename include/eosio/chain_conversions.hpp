@@ -163,7 +163,7 @@ constexpr inline uint64_t string_to_name_strict_impl() {
       return string_to_name_strict_impl<N+1,
              ValueSoFar | (char_to_name_digit_strict<C>() & 0x1f) << (64 - 5 * (N+1)), Rest...>();
    else
-      return ValueSoFar | (char_to_name_digit_strict<C>() & 0x1f) << (64 - 5 * (N+1));
+      return ValueSoFar | (char_to_name_digit_strict<C>() & 0x1f) << (64 + (N == 12) - 5 * (N+1));
 }
 
 template <char... Str>
@@ -178,33 +178,39 @@ constexpr inline uint64_t string_to_name_strict() {
 // std::optional is killing constexpr'ness
 namespace detail {
    struct simple_optional {
-      constexpr inline simple_optional() : valid(false) {}
-      explicit constexpr inline simple_optional( uint64_t v ) : valid(true), val(v) {}
-      explicit constexpr inline operator bool() const { return valid; }
+      constexpr inline simple_optional( stream_error e ) : valid(e) {}
+      explicit constexpr inline simple_optional( uint64_t v ) : val(v) {}
+      explicit constexpr inline operator bool() const { return valid == stream_error::no_error; }
       constexpr inline auto value() const { return val; }
-      bool valid = false;
+      stream_error valid = stream_error::no_error;
       uint64_t val = 0;
    };
 }
 
-[[nodiscard]] constexpr inline detail::simple_optional string_to_name_strict(std::string_view str) {
+[[nodiscard]] constexpr inline detail::simple_optional try_string_to_name_strict(std::string_view str) {
    uint64_t name       = 0;
    unsigned i = 0;
    for (; i < str.size() && i < 12; ++i) {
       uint64_t x = 0;
-      if (!char_to_name_digit_strict(str[i], x)) return {};
+      if (!char_to_name_digit_strict(str[i], x)) return stream_error::invalid_name_char;
       name |= (x & 0x1f) << (64 - 5 * (i + 1));
    }
    if (i < str.size() && i == 12) {
       uint64_t x = 0;
-      if (!char_to_name_digit_strict(str[i], x)) return {};
+      if (!char_to_name_digit_strict(str[i], x)) return stream_error::invalid_name_char;
 
-      if(x != (x & 0xf)) return {};
+      if(x != (x & 0xf)) return stream_error::invalid_name_char13;
       name |= x;
       ++i;
    }
-   if(i < str.size()) return {};
+   if(i < str.size()) return stream_error::name_too_long;
    return detail::simple_optional{name};
+}
+
+constexpr inline uint64_t string_to_name_strict(std::string_view str) {
+   if(auto r = try_string_to_name_strict(str)) return r.val;
+   else check(false, convert_stream_error(r.valid));
+   __builtin_unreachable();
 }
 
 inline std::string name_to_string(uint64_t name) {
