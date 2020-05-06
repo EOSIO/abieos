@@ -34,10 +34,11 @@ endif()
 find_package(Threads)
 
 add_library(abieos STATIC src/abi.cpp src/crypto.cpp include/eosio/fpconv.c)
-target_include_directories(abieos PUBLIC include external/outcome/single-header external/rapidjson/include external/date/include)
+target_include_directories(abieos PUBLIC include external/rapidjson/include)
 
-add_library(abieos_module MODULE src/abieos.cpp)
-target_link_libraries(abieos_module abieos ${CMAKE_THREAD_LIBS_INIT})
+add_library(abieos_module MODULE src/abieos.cpp src/abi.cpp src/crypto.cpp include/eosio/fpconv.c)
+target_include_directories(abieos_module PUBLIC include external/rapidjson/include)
+target_link_libraries(abieos_module ${CMAKE_THREAD_LIBS_INIT})
 set_target_properties(abieos_module PROPERTIES OUTPUT_NAME "abieos")
 
 enable_testing()
