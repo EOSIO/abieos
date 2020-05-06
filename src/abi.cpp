@@ -180,7 +180,7 @@ void fill(std::map<std::string, abi_type>& abi_types, abi_type& type, int depth)
 
 
 const abi_type* eosio::abi::get_type(const std::string& name) {
-   return (const abi_type*)(::get_type(abi_types, name, 0));
+   return ::get_type(abi_types, name, 0);
 }
 
 void eosio::convert(const abi_def& abi, eosio::abi& c) {
