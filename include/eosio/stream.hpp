@@ -197,9 +197,9 @@ struct input_stream {
 
    input_stream& operator=(const input_stream&) = default;
 
-   size_t remaining() { return end - pos; }
+   size_t remaining() const { return end - pos; }
 
-   void check_available(size_t size) {
+   void check_available(size_t size) const {
       check( size <= std::size_t(end-pos), convert_stream_error(stream_error::overrun) );
    }
 
