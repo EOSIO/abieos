@@ -15,6 +15,8 @@ template <typename S>
 void to_json(const input_stream& data, S& stream) {
    return to_json_hex(data.pos, data.end - data.pos, stream);
 }
+
+constexpr const char* get_type_name(const input_stream*) { return "bytes";  }
 } // namespace eosio
 
 namespace eosio { namespace ship_protocol {
@@ -141,16 +143,6 @@ namespace eosio { namespace ship_protocol {
 
    EOSIO_REFLECT(get_blocks_result_v0, base get_blocks_result_base_v0, block, traces, deltas)
 
-   struct get_blocks_result_v1 : get_blocks_result_base_v0 {
-      std::optional<eosio::input_stream> block             = {};
-      std::optional<eosio::input_stream> traces            = {};
-      std::optional<eosio::input_stream> deltas            = {};
-   };
-
-   EOSIO_REFLECT(get_blocks_result_v1, base get_blocks_result_base_v0, block, traces, deltas)
-
-   using result = std::variant<get_status_result_v0, get_blocks_result_v0, get_blocks_result_v1>;
-
    struct row {
       bool                present = {};
       eosio::input_stream data    = {};
@@ -250,6 +242,39 @@ namespace eosio { namespace ship_protocol {
 
    using action_trace = std::variant<action_trace_v0, action_trace_v1>;
 
+   struct prunable_data_type {
+      struct none {
+         eosio::checksum256 prunable_digest;
+      };
+
+      using segment_type = std::variant<eosio::checksum256, eosio::input_stream>;
+
+      struct partial {
+         std::vector<eosio::signature> signatures;
+         std::vector<segment_type> context_free_segments;
+      };
+
+      struct full {
+         std::vector<eosio::signature> signatures;
+         std::vector<eosio::input_stream> context_free_segments;
+      };
+
+      struct full_legacy {
+         std::vector<eosio::signature> signatures;
+         eosio::input_stream packed_context_free_data;
+      };
+
+      using prunable_data_t = std::variant<full_legacy, none, partial, full>;
+
+      prunable_data_t prunable_data;
+   };
+
+   EOSIO_REFLECT(prunable_data_type, prunable_data)
+   EOSIO_REFLECT(prunable_data_type::none, prunable_digest)
+   EOSIO_REFLECT(prunable_data_type::partial, signatures, context_free_segments)
+   EOSIO_REFLECT(prunable_data_type::full, signatures, context_free_segments)
+   EOSIO_REFLECT(prunable_data_type::full_legacy, signatures, packed_context_free_data)
+
    struct partial_transaction_v0 {
       eosio::time_point_sec            expiration             = {};
       uint16_t                         ref_block_num          = {};
@@ -265,7 +290,21 @@ namespace eosio { namespace ship_protocol {
    EOSIO_REFLECT(partial_transaction_v0, expiration, ref_block_num, ref_block_prefix, max_net_usage_words,
                  max_cpu_usage_ms, delay_sec, transaction_extensions, signatures, context_free_data)
 
-   using partial_transaction = std::variant<partial_transaction_v0>;
+   struct partial_transaction_v1 {
+      eosio::time_point_sec             expiration             = {};
+      uint16_t                          ref_block_num          = {};
+      uint32_t                          ref_block_prefix       = {};
+      eosio::varuint32                  max_net_usage_words    = {};
+      uint8_t                           max_cpu_usage_ms       = {};
+      eosio::varuint32                  delay_sec              = {};
+      std::vector<extension>            transaction_extensions = {};
+      std::optional<prunable_data_type> prunable_data          = {};
+   };
+
+   EOSIO_REFLECT(partial_transaction_v1, expiration, ref_block_num, ref_block_prefix, max_net_usage_words,
+                 max_cpu_usage_ms, delay_sec, transaction_extensions, prunable_data)
+
+   using partial_transaction = std::variant<partial_transaction_v0, partial_transaction_v1>;
 
    struct recurse_transaction_trace;
 
@@ -340,39 +379,6 @@ namespace eosio { namespace ship_protocol {
 
    EOSIO_REFLECT(packed_transaction_v0, signatures, compression, packed_context_free_data, packed_trx)
 
-   struct prunable_data_type {
-      struct none {
-         eosio::checksum256 prunable_digest;
-      };
-
-      using segment_type = std::variant<eosio::checksum256, eosio::input_stream>;
-
-      struct partial {
-         std::vector<eosio::signature> signatures;
-         std::vector<segment_type> context_free_segments;
-      };
-
-      struct full {
-         std::vector<eosio::signature> signatures;
-         std::vector<eosio::input_stream> context_free_segments;
-      };
-
-      struct full_legacy {
-         std::vector<eosio::signature> signatures;
-         eosio::input_stream packed_context_free_data;
-      };
-
-      using prunable_data_t = std::variant<full_legacy, none, partial, full>;
-
-      prunable_data_t prunable_data;
-   };
-
-   EOSIO_REFLECT(prunable_data_type, prunable_data)
-   EOSIO_REFLECT(prunable_data_type::none, prunable_digest)
-   EOSIO_REFLECT(prunable_data_type::partial, signatures, context_free_segments)
-   EOSIO_REFLECT(prunable_data_type::full, signatures, context_free_segments)
-   EOSIO_REFLECT(prunable_data_type::full_legacy, signatures, packed_context_free_data)
-
    struct packed_transaction {
       uint8_t                       compression              = {};
       prunable_data_type            prunable_data            = {};
@@ -431,9 +437,18 @@ namespace eosio { namespace ship_protocol {
       std::vector<extension>              block_extensions = {};
    };
 
-   EOSIO_REFLECT(signed_block, base signed_block_header, transactions, block_extensions)
+   EOSIO_REFLECT(signed_block, base signed_block_header, prune_state, transactions, block_extensions)
 
    using signed_block_variant = std::variant<signed_block_v0, signed_block>;
+
+   struct get_blocks_result_v1 : get_blocks_result_base_v0 {
+      std::optional<signed_block_variant> block  = {};
+      std::vector<transaction_trace>      traces = {};
+      eosio::input_stream                 deltas = {};
+   };
+
+   EOSIO_REFLECT(get_blocks_result_v1, base get_blocks_result_base_v0, block, traces, deltas)
+   using result = std::variant<get_status_result_v0, get_blocks_result_v0, get_blocks_result_v1>;
 
    struct transaction_header {
       eosio::time_point_sec expiration          = {};
