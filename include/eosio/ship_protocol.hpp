@@ -431,15 +431,15 @@ namespace eosio { namespace ship_protocol {
 
    EOSIO_REFLECT(signed_block_v0, base signed_block_header, transactions, block_extensions)
 
-   struct signed_block : signed_block_header {
+   struct signed_block_v1 : signed_block_header {
       uint8_t                             prune_state      = {};
       std::vector<transaction_receipt>    transactions     = {};
       std::vector<extension>              block_extensions = {};
    };
 
-   EOSIO_REFLECT(signed_block, base signed_block_header, prune_state, transactions, block_extensions)
+   EOSIO_REFLECT(signed_block_v1, base signed_block_header, prune_state, transactions, block_extensions)
 
-   using signed_block_variant = std::variant<signed_block_v0, signed_block>;
+   using signed_block_variant = std::variant<signed_block_v0, signed_block_v1>;
 
    struct get_blocks_result_v1 : get_blocks_result_base_v0 {
       std::optional<signed_block_variant> block  = {};
