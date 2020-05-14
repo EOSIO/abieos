@@ -56,7 +56,7 @@ void from_json(might_not_exist<T>& obj, S& stream) {
     return from_json(obj.value, stream);
 }
 
-using extensions_type = std::vector<std::pair<uint16_t, std::vector<char>>>;
+using abi_extensions_type = std::vector<std::pair<uint16_t, std::vector<char>>>;
 
 struct type_def {
     std::string new_type_name{};
@@ -127,7 +127,7 @@ struct abi_def {
     std::vector<table_def> tables{};
     std::vector<clause_pair> ricardian_clauses{};
     std::vector<error_message> error_messages{};
-    extensions_type abi_extensions{};
+    abi_extensions_type abi_extensions{};
     might_not_exist<std::vector<variant_def>> variants{};
 };
 
