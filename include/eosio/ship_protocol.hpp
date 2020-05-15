@@ -126,22 +126,22 @@ namespace eosio { namespace ship_protocol {
 
    using request = std::variant<get_status_request_v0, get_blocks_request_v0, get_blocks_ack_request_v0>;
 
-   struct get_blocks_result_base_v0 {
+   struct get_blocks_result_base {
       block_position                     head              = {};
       block_position                     last_irreversible = {};
       std::optional<block_position>      this_block        = {};
       std::optional<block_position>      prev_block        = {};
    };
 
-   EOSIO_REFLECT(get_blocks_result_base_v0, head, last_irreversible, this_block, prev_block)
+   EOSIO_REFLECT(get_blocks_result_base, head, last_irreversible, this_block, prev_block)
 
-   struct get_blocks_result_v0 : get_blocks_result_base_v0 {
+   struct get_blocks_result_v0 : get_blocks_result_base {
       std::optional<eosio::input_stream> block             = {};
       std::optional<eosio::input_stream> traces            = {};
       std::optional<eosio::input_stream> deltas            = {};
    };
 
-   EOSIO_REFLECT(get_blocks_result_v0, base get_blocks_result_base_v0, block, traces, deltas)
+   EOSIO_REFLECT(get_blocks_result_v0, base get_blocks_result_base, block, traces, deltas)
 
    struct row {
       bool                present = {};
@@ -441,13 +441,13 @@ namespace eosio { namespace ship_protocol {
 
    using signed_block_variant = std::variant<signed_block_v0, signed_block_v1>;
 
-   struct get_blocks_result_v1 : get_blocks_result_base_v0 {
+   struct get_blocks_result_v1 : get_blocks_result_base {
       std::optional<signed_block_variant> block  = {};
       std::vector<transaction_trace>      traces = {};
       eosio::input_stream                 deltas = {};
    };
 
-   EOSIO_REFLECT(get_blocks_result_v1, base get_blocks_result_base_v0, block, traces, deltas)
+   EOSIO_REFLECT(get_blocks_result_v1, base get_blocks_result_base, block, traces, deltas)
    using result = std::variant<get_status_result_v0, get_blocks_result_v0, get_blocks_result_v1>;
 
    struct transaction_header {
