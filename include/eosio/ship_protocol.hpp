@@ -5,6 +5,7 @@
 #include "fixed_bytes.hpp"
 #include "float.hpp"
 #include "name.hpp"
+#include "opaque.hpp"
 #include "stream.hpp"
 #include "time.hpp"
 #include "varint.hpp"
@@ -16,7 +17,7 @@ void to_json(const input_stream& data, S& stream) {
    return to_json_hex(data.pos, data.end - data.pos, stream);
 }
 
-constexpr const char* get_type_name(const input_stream*) { return "bytes";  }
+constexpr const char* get_type_name(const input_stream*) { return "bytes"; }
 } // namespace eosio
 
 namespace eosio { namespace ship_protocol {
@@ -127,18 +128,18 @@ namespace eosio { namespace ship_protocol {
    using request = std::variant<get_status_request_v0, get_blocks_request_v0, get_blocks_ack_request_v0>;
 
    struct get_blocks_result_base {
-      block_position                     head              = {};
-      block_position                     last_irreversible = {};
-      std::optional<block_position>      this_block        = {};
-      std::optional<block_position>      prev_block        = {};
+      block_position                head              = {};
+      block_position                last_irreversible = {};
+      std::optional<block_position> this_block        = {};
+      std::optional<block_position> prev_block        = {};
    };
 
    EOSIO_REFLECT(get_blocks_result_base, head, last_irreversible, this_block, prev_block)
 
    struct get_blocks_result_v0 : get_blocks_result_base {
-      std::optional<eosio::input_stream> block             = {};
-      std::optional<eosio::input_stream> traces            = {};
-      std::optional<eosio::input_stream> deltas            = {};
+      std::optional<eosio::input_stream> block  = {};
+      std::optional<eosio::input_stream> traces = {};
+      std::optional<eosio::input_stream> deltas = {};
    };
 
    EOSIO_REFLECT(get_blocks_result_v0, base get_blocks_result_base, block, traces, deltas)
@@ -222,19 +223,19 @@ namespace eosio { namespace ship_protocol {
                  console, account_ram_deltas, except, error_code)
 
    struct action_trace_v1 {
-      eosio::varuint32                   action_ordinal         = {};
-      eosio::varuint32                   creator_action_ordinal = {};
-      std::optional<action_receipt>      receipt                = {};
-      eosio::name                        receiver               = {};
-      action                             act                    = {};
-      bool                               context_free           = {};
-      int64_t                            elapsed                = {};
-      std::string                        console                = {};
-      std::vector<account_delta>         account_ram_deltas     = {};
-      std::vector<account_delta>         account_disk_deltas    = {};
-      std::optional<std::string>         except                 = {};
-      std::optional<uint64_t>            error_code             = {};
-      eosio::input_stream                return_value           = {};
+      eosio::varuint32              action_ordinal         = {};
+      eosio::varuint32              creator_action_ordinal = {};
+      std::optional<action_receipt> receipt                = {};
+      eosio::name                   receiver               = {};
+      action                        act                    = {};
+      bool                          context_free           = {};
+      int64_t                       elapsed                = {};
+      std::string                   console                = {};
+      std::vector<account_delta>    account_ram_deltas     = {};
+      std::vector<account_delta>    account_disk_deltas    = {};
+      std::optional<std::string>    except                 = {};
+      std::optional<uint64_t>       error_code             = {};
+      eosio::input_stream           return_value           = {};
    };
 
    EOSIO_REFLECT(action_trace_v1, action_ordinal, creator_action_ordinal, receipt, receiver, act, context_free, elapsed,
@@ -251,17 +252,17 @@ namespace eosio { namespace ship_protocol {
 
       struct partial {
          std::vector<eosio::signature> signatures;
-         std::vector<segment_type> context_free_segments;
+         std::vector<segment_type>     context_free_segments;
       };
 
       struct full {
-         std::vector<eosio::signature> signatures;
+         std::vector<eosio::signature>    signatures;
          std::vector<eosio::input_stream> context_free_segments;
       };
 
       struct full_legacy {
          std::vector<eosio::signature> signatures;
-         eosio::input_stream packed_context_free_data;
+         eosio::input_stream           packed_context_free_data;
       };
 
       using prunable_data_t = std::variant<full_legacy, none, partial, full>;
@@ -380,9 +381,9 @@ namespace eosio { namespace ship_protocol {
    EOSIO_REFLECT(packed_transaction_v0, signatures, compression, packed_context_free_data, packed_trx)
 
    struct packed_transaction {
-      uint8_t                       compression              = {};
-      prunable_data_type            prunable_data            = {};
-      eosio::input_stream           packed_trx               = {};
+      uint8_t             compression   = {};
+      prunable_data_type  prunable_data = {};
+      eosio::input_stream packed_trx    = {};
    };
 
    EOSIO_REFLECT(packed_transaction, compression, prunable_data, packed_trx)
@@ -432,9 +433,9 @@ namespace eosio { namespace ship_protocol {
    EOSIO_REFLECT(signed_block_v0, base signed_block_header, transactions, block_extensions)
 
    struct signed_block_v1 : signed_block_header {
-      uint8_t                             prune_state      = {};
-      std::vector<transaction_receipt>    transactions     = {};
-      std::vector<extension>              block_extensions = {};
+      uint8_t                          prune_state      = {};
+      std::vector<transaction_receipt> transactions     = {};
+      std::vector<extension>           block_extensions = {};
    };
 
    EOSIO_REFLECT(signed_block_v1, base signed_block_header, prune_state, transactions, block_extensions)
@@ -442,9 +443,9 @@ namespace eosio { namespace ship_protocol {
    using signed_block_variant = std::variant<signed_block_v0, signed_block_v1>;
 
    struct get_blocks_result_v1 : get_blocks_result_base {
-      std::optional<signed_block_variant> block  = {};
-      std::vector<transaction_trace>      traces = {};
-      eosio::input_stream                 deltas = {};
+      std::optional<signed_block_variant>           block  = {};
+      eosio::opaque<std::vector<transaction_trace>> traces = {};
+      eosio::opaque<std::vector<table_delta>>       deltas = {};
    };
 
    EOSIO_REFLECT(get_blocks_result_v1, base get_blocks_result_base, block, traces, deltas)
