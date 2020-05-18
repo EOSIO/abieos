@@ -22,7 +22,7 @@ namespace eosio {
 ///    struct foo_type {
 ///      uint32_t                    field1;
 ///      string                      field2;
-///      opaque<std::vector<string>> filed3;
+///      opaque<std::vector<string>> field3;
 ///    };
 /// </code>
 ///   
@@ -35,7 +35,7 @@ namespace eosio {
 ///   if (foo_value.field1 > 1 || foo_value.field2 == "meet_precondition") {
 ///      auto sz = foo_value.field3.unpack_size();
 ///      for (size_t i = 0; i < sz; ++i) {
-///         if (foo_value.field3.unpack() == "value_to_be_searched") {
+///         if (foo_value.field3.unpack_next() == "value_to_be_searched") {
 ///            do_something_when_found();
 ///            break;
 ///         }
