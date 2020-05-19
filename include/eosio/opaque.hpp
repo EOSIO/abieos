@@ -96,34 +96,8 @@ class opaque<std::vector<T>> : public opaque_base<std::vector<T>> {
 };
 
 template <typename T>
-constexpr auto get_opaque_type_name() {
-   constexpr std::size_t  size = sizeof("opaque") + (std::string_view(get_type_name((T*)nullptr)).size() + 1);
-   std::array<char, size> buffer{ 'o', 'p', 'a', 'q', 'u', 'e' };
-   (variant_type_appender{ buffer.data() + 6 } + std::string_view(get_type_name((T*)nullptr)));
-   buffer[buffer.size() - 1] = '\0';
-   return buffer;
-}
-
-template <typename T>
-constexpr auto get_opaque_vector_type_name() {
-   constexpr std::size_t size =
-         sizeof("opaque") + std::string_view(get_type_name((T*)nullptr)).size() + sizeof("vector") + 1;
-   std::array<char, size> buffer{ 'o', 'p', 'a', 'q', 'u', 'e' };
-   (variant_type_appender{ buffer.data() + 6 } + std::string_view(get_type_name((T*)nullptr)) +
-    std::string_view("vector"));
-   buffer[buffer.size() - 1] = '\0';
-   return buffer;
-}
-
-template <typename T>
-constexpr auto opaque_type_name = get_opaque_type_name<T>();
-
-template <typename T>
-constexpr auto opaque_type_name<std::vector<T>> = get_opaque_vector_type_name<T>();
-
-template <typename T>
 constexpr const char* get_type_name(opaque<T>*) {
-   return opaque_type_name<T>.data();
+   return "bytes";
 }
 
 template <typename T, typename S>
