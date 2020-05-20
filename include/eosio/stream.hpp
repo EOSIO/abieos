@@ -203,7 +203,7 @@ struct input_stream {
       check( size <= std::size_t(end-pos), convert_stream_error(stream_error::overrun) );
    }
 
-   auto get_pos()const { return pos; }
+   auto get_pos() const { return pos; }
 
    void read(void* dest, size_t size) {
       check( size <= size_t(end-pos), convert_stream_error(stream_error::overrun) );
