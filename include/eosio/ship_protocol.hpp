@@ -182,6 +182,7 @@ namespace eosio { namespace ship_protocol {
    };
 
    EOSIO_REFLECT(account_auth_sequence, account, sequence)
+   EOSIO_COMPARE(account_auth_sequence);
 
    struct action_receipt_v0 {
       eosio::name                        receiver        = {};
@@ -204,6 +205,7 @@ namespace eosio { namespace ship_protocol {
    };
 
    EOSIO_REFLECT(account_delta, account, delta)
+   EOSIO_COMPARE(account_delta);
 
    struct action_trace_v0 {
       eosio::varuint32              action_ordinal         = {};
@@ -844,5 +846,13 @@ namespace eosio { namespace ship_protocol {
                  account_cpu_usage_average_window, account_net_usage_average_window)
 
    using resource_limits_config = std::variant<resource_limits_config_v0>;
+
+   struct block_info {
+      uint32_t               block_num = {};
+      eosio::checksum256     block_id  = {};
+      eosio::block_timestamp timestamp;
+   };
+
+   EOSIO_REFLECT(block_info, block_num, block_id, timestamp);
 
 }} // namespace eosio::ship_protocol
