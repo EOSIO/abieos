@@ -847,12 +847,4 @@ namespace eosio { namespace ship_protocol {
 
    using resource_limits_config = std::variant<resource_limits_config_v0>;
 
-   struct block_info {
-      uint32_t               block_num = {};
-      eosio::checksum256     block_id  = {};
-      eosio::block_timestamp timestamp;
-   };
-
-   EOSIO_REFLECT(block_info, block_num, block_id, timestamp);
-
 }} // namespace eosio::ship_protocol
