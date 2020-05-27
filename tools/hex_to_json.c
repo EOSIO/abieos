@@ -1,6 +1,3 @@
-//
-// Created by Ian Holsman on 5/26/20.
-//
 #include "../src/abieos.h"
 #include <stdio.h>
 #include <stdlib.h>
