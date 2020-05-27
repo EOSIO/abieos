@@ -1,37 +1,35 @@
-//
-// Created by Ian Holsman on 5/26/20.
-//
+#include "../src/abieos.h"
+#include <libgen.h>
+#include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <stdbool.h>
 #include <strings.h>
-#include <libgen.h>
-#include "../src/abieos.h"
 
-void usage(char* name, bool reverse ) {
+void usage(char* name, bool reverse) {
     if (reverse) {
         fprintf(stderr, "Usage: %s abi_file.json type json\n", name);
         fputs("This example takes a json value, and returns the corresponding abieos encoded hex string\n", stderr);
         fputs("Example:\n", stderr);
-        fprintf(stderr,
-                "$ ./%s transaction.abi.json transaction '{your json here}'\n",  name);
+        fprintf(stderr, "$ ./%s transaction.abi.json transaction '{your json here}'\n", name);
     } else {
         fprintf(stderr, "Usage: %s abi_file.json hex-type hex-string\n", name);
         fputs("This example takes a abieos encoded hex string, and returns the corresponding json\n", stderr);
         fputs("Example:\n", stderr);
         fprintf(stderr,
-                "$ ./%s transaction.abi.json transaction AE0D635CDCAC90A6DCFA000000000100A6823403EA3055000000572D3CCDCD0100AEAA4AC15CFD4500000000A8ED32323B00AEAA4AC15CFD4500000060D234CD3DA06806000000000004454F53000000001A746865206772617373686F70706572206C69657320686561767900\n",
-              name);
+                "$ ./%s transaction.abi.json transaction "
+                "AE0D635CDCAC90A6DCFA000000000100A6823403EA3055000000572D3CCDCD0100AEAA4AC15CFD4500000000A8ED32323B00AE"
+                "AA4AC15CFD4500000060D234CD3DA06806000000000004454F53000000001A746865206772617373686F70706572206C696573"
+                "20686561767900\n",
+                name);
     }
 }
-
 
 int main(int argc, char* argv[]) {
     const char* contract_str = "eosio";
     bool reverse = false;
     char* program_name = basename(argv[0]);
 
-     if (strcasecmp(program_name, "json2hex") == 0) {
+    if (strcasecmp(program_name, "json2hex") == 0) {
         reverse = true;
     }
 
@@ -92,10 +90,10 @@ int main(int argc, char* argv[]) {
             fprintf(stderr, "Error: abieos_set_abi %s\n", abieos_get_error(context));
         } else {
             if (reverse) {
-                abieos_bool j2b_result  = abieos_json_to_bin(context, contract_name, hex_type, hex_json_string);
+                abieos_bool j2b_result = abieos_json_to_bin(context, contract_name, hex_type, hex_json_string);
                 if (j2b_result) {
-                    const char*hex = abieos_get_bin_hex(context);
-                    fprintf(stdout, "%s\n",hex);
+                    const char* hex = abieos_get_bin_hex(context);
+                    fprintf(stdout, "%s\n", hex);
                 } else {
                     fprintf(stderr, "Error: %s %s\n", program_name, abieos_get_error(context));
                 }
@@ -105,10 +103,9 @@ int main(int argc, char* argv[]) {
                 if (!json) {
                     fprintf(stderr, "Error: %s %s\n", program_name, abieos_get_error(context));
                 } else {
-                    fprintf(stdout, "%s\n",json);
+                    fprintf(stdout, "%s\n", json);
                 }
             }
-
         }
     }
     abieos_destroy(context);
