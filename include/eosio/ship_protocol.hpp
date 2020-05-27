@@ -182,6 +182,7 @@ namespace eosio { namespace ship_protocol {
    };
 
    EOSIO_REFLECT(account_auth_sequence, account, sequence)
+   EOSIO_COMPARE(account_auth_sequence);
 
    struct action_receipt_v0 {
       eosio::name                        receiver        = {};
@@ -204,6 +205,7 @@ namespace eosio { namespace ship_protocol {
    };
 
    EOSIO_REFLECT(account_delta, account, delta)
+   EOSIO_COMPARE(account_delta);
 
    struct action_trace_v0 {
       eosio::varuint32              action_ordinal         = {};
