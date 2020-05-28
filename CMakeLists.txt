@@ -33,23 +33,13 @@ endif()
 
 find_package(Threads)
 
-add_library(abieos STATIC src/abi.cpp src/crypto.cpp include/eosio/fpconv.c)
+add_library(abieos STATIC src/abi.cpp src/crypto.cpp include/eosio/fpconv.c src/abieos.cpp)
 target_include_directories(abieos PUBLIC include external/rapidjson/include)
-
-add_library(abieos_static STATIC src/abi.cpp src/abieos.cpp src/crypto.cpp include/eosio/fpconv.c)
-target_include_directories(abieos_static PUBLIC include external/outcome/single-header external/rapidjson/include external/date/include)
-set_target_properties(abieos_static PROPERTIES POSITION_INDEPENDENT_CODE ON)
 
 add_library(abieos_module MODULE src/abieos.cpp src/abi.cpp src/crypto.cpp include/eosio/fpconv.c)
 target_include_directories(abieos_module PUBLIC include external/rapidjson/include)
 target_link_libraries(abieos_module ${CMAKE_THREAD_LIBS_INIT})
 set_target_properties(abieos_module PROPERTIES OUTPUT_NAME "abieos")
-
-if (APPLE)
-  add_library(abieos_shared SHARED src/abieos.cpp)
-  target_link_libraries(abieos_shared abieos)
-  set_target_properties(abieos_shared PROPERTIES OUTPUT_NAME "abieos")
-endif()
 
 enable_testing()
 
@@ -90,4 +80,4 @@ if (NOT ABIEOS_ONLY_LIBRARY)
 add_subdirectory(tools)
 endif()
 
-install(TARGETS abieos_static DESTINATION .)
+install(TARGETS abieos DESTINATION .)
