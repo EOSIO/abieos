@@ -131,15 +131,19 @@ template <typename S> void to_json(unsigned char value, S& stream) { return int_
 template <typename S> void to_json(uint16_t value, S& stream) { return int_to_json(value, stream); }
 template <typename S> void to_json(uint32_t value, S& stream) { return int_to_json(value, stream); }
 template <typename S> void to_json(uint64_t value, S& stream) { return int_to_json(value, stream); }
-template <typename S> void to_json(unsigned __int128 value, S& stream) { return int_to_json(value, stream); }
 template <typename S> void to_json(char value, S& stream) { return int_to_json(value, stream); }
 template <typename S> void to_json(signed char value, S& stream) { return int_to_json(value, stream); }
 template <typename S> void to_json(int16_t value, S& stream) { return int_to_json(value, stream); }
 template <typename S> void to_json(int32_t value, S& stream) { return int_to_json(value, stream); }
 template <typename S> void to_json(int64_t value, S& stream) { return int_to_json(value, stream); }
-template <typename S> void to_json(__int128 value, S& stream) { return int_to_json(value, stream); }
 template <typename S> void to_json(double value, S& stream) { return fp_to_json(value, stream); }
 template <typename S> void to_json(float value, S& stream) { return fp_to_json(value, stream); }
+
+#ifndef ABIEOS_NO_INT128
+template <typename S> void to_json(unsigned __int128 value, S& stream) { return int_to_json(value, stream); }
+template <typename S> void to_json(__int128 value, S& stream) { return int_to_json(value, stream); }
+#endif
+
 // clang-format on
 
 template <typename T, typename S>
