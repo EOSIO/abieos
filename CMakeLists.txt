@@ -38,7 +38,7 @@ add_library(abieos STATIC src/abi.cpp src/crypto.cpp include/eosio/fpconv.c)
 target_include_directories(abieos PUBLIC include external/rapidjson/include)
 
 if(ABIEOS_NO_INT128)
-    target_compile_options(abieos PUBLIC -DABIEOS_NO_INT128)
+target_compile_definitions(abieos PUBLIC ABIEOS_NO_INT128)
 endif()
 
 add_library(abieos_module MODULE src/abieos.cpp src/abi.cpp src/crypto.cpp include/eosio/fpconv.c)
