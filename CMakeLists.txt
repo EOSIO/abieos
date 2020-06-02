@@ -17,6 +17,7 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS ON)
 
+option(ABIEOS_NO_INT128 "disable use of __int128" OFF)
 option(ABIEOS_ONLY_LIBRARY "define and build the ABIEOS library" OFF)
 
 if(NOT DEFINED SKIP_SUBMODULE_CHECK)
@@ -36,6 +37,10 @@ find_package(Threads)
 add_library(abieos STATIC src/abi.cpp src/crypto.cpp include/eosio/fpconv.c)
 target_include_directories(abieos PUBLIC include external/rapidjson/include)
 
+if(ABIEOS_NO_INT128)
+target_compile_definitions(abieos PUBLIC ABIEOS_NO_INT128)
+endif()
+
 add_library(abieos_module MODULE src/abieos.cpp src/abi.cpp src/crypto.cpp include/eosio/fpconv.c)
 target_include_directories(abieos_module PUBLIC include external/rapidjson/include)
 target_link_libraries(abieos_module ${CMAKE_THREAD_LIBS_INIT})
@@ -47,9 +52,11 @@ add_executable(test_abieos src/test.cpp src/abieos.cpp)
 target_link_libraries(test_abieos abieos ${CMAKE_THREAD_LIBS_INIT})
 add_test(NAME test_abieos COMMAND test_abieos)
 
-add_executable(test_abieos_template src/template_test.cpp src/abieos.cpp)
-target_link_libraries(test_abieos_template abieos ${CMAKE_THREAD_LIBS_INIT})
-add_test(NAME test_abieos_template COMMAND test_abieos_template)
+if(NOT ABIEOS_NO_INT128)
+    add_executable(test_abieos_template src/template_test.cpp src/abieos.cpp)
+    target_link_libraries(test_abieos_template abieos ${CMAKE_THREAD_LIBS_INIT})
+    add_test(NAME test_abieos_template COMMAND test_abieos_template)
+endif()
 
 add_executable(test_abieos_key src/key_test.cpp src/abieos.cpp)
 target_link_libraries(test_abieos_key abieos ${CMAKE_THREAD_LIBS_INIT})
