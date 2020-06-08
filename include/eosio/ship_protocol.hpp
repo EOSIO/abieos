@@ -293,21 +293,7 @@ namespace eosio { namespace ship_protocol {
    EOSIO_REFLECT(partial_transaction_v0, expiration, ref_block_num, ref_block_prefix, max_net_usage_words,
                  max_cpu_usage_ms, delay_sec, transaction_extensions, signatures, context_free_data)
 
-   struct partial_transaction_v1 {
-      eosio::time_point_sec             expiration             = {};
-      uint16_t                          ref_block_num          = {};
-      uint32_t                          ref_block_prefix       = {};
-      eosio::varuint32                  max_net_usage_words    = {};
-      uint8_t                           max_cpu_usage_ms       = {};
-      eosio::varuint32                  delay_sec              = {};
-      std::vector<extension>            transaction_extensions = {};
-      std::optional<prunable_data_type> prunable_data          = {};
-   };
-
-   EOSIO_REFLECT(partial_transaction_v1, expiration, ref_block_num, ref_block_prefix, max_net_usage_words,
-                 max_cpu_usage_ms, delay_sec, transaction_extensions, prunable_data)
-
-   using partial_transaction = std::variant<partial_transaction_v0, partial_transaction_v1>;
+   using partial_transaction = std::variant<partial_transaction_v0>;
 
    struct recurse_transaction_trace;
 
