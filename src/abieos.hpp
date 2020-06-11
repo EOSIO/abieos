@@ -770,6 +770,16 @@ inline void json_to_bin(std::vector<char>& bin, const abi_type* type, std::strin
 inline void json_to_bin(pseudo_object*, json_to_bin_state& state, bool allow_extensions,
                                        const abi_type* type, bool start) {
     if (start) {
+        // accept 'null' as a empty block '{}'
+        auto t = state.peek_token();
+        if (t.get().type == eosio::json_token_type::type_null) {
+            const std::vector<eosio::abi_field>& fields = type->as_struct()->fields;
+            if (fields.size() ==0) {
+                state.stack.back();
+                state.get_null();
+                return;
+            }
+        }
         state.get_start_object();
         if (trace_json_to_bin)
             printf("%*s{ %d fields, allow_ex=%d\n", int(state.stack.size() * 4), "", int(type->as_struct()->fields.size()),
