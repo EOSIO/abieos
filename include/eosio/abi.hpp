@@ -52,6 +52,11 @@ void from_bin(might_not_exist<T>& obj, S& stream) {
 }
 
 template <typename T, typename S>
+void to_bin(const might_not_exist<T>& obj, S& stream) {
+   return to_bin(obj.value, stream);
+}
+
+template <typename T, typename S>
 void from_json(might_not_exist<T>& obj, S& stream) {
     return from_json(obj.value, stream);
 }
