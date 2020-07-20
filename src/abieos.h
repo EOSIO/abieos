@@ -52,6 +52,10 @@ const char* abieos_get_type_for_action(abieos_context* context, uint64_t contrac
 // to retrieve error.
 const char* abieos_get_type_for_table(abieos_context* context, uint64_t contract, uint64_t table);
 
+// Get the type name for an action_result. The contract owns the returned memory. Returns null on error; use abieos_get_error
+// to retrieve error.
+const char* abieos_get_type_for_action_result(abieos_context* context, uint64_t contract, uint64_t action_result);
+
 // Convert json to binary. Use abieos_get_bin_* to retrieve result. Returns false on error.
 abieos_bool abieos_json_to_bin(abieos_context* context, uint64_t contract, const char* type, const char* json);
 
