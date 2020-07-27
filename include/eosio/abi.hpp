@@ -124,6 +124,13 @@ struct variant_def {
 
 EOSIO_REFLECT(variant_def, name, types);
 
+struct action_result_def {
+    eosio::name name{};
+    std::string result_type{};
+};
+
+EOSIO_REFLECT(action_result_def, name, result_type);
+
 struct abi_def {
     std::string version{};
     std::vector<type_def> types{};
@@ -134,10 +141,11 @@ struct abi_def {
     std::vector<error_message> error_messages{};
     abi_extensions_type abi_extensions{};
     might_not_exist<std::vector<variant_def>> variants{};
+    might_not_exist<std::vector<action_result_def>> action_results{};
 };
 
 EOSIO_REFLECT(abi_def, version, types, structs, actions, tables, ricardian_clauses, error_messages, abi_extensions,
-              variants);
+              variants, action_results);
 
 struct abi_type;
 
@@ -198,6 +206,7 @@ struct abi {
     std::map<eosio::name, std::string> action_types;
     std::map<eosio::name, std::string> table_types;
     std::map<std::string, abi_type> abi_types;
+    std::map<eosio::name, std::string> action_result_types;
     const abi_type* get_type(const std::string& name);
 
     // Adds a type to the abi.  Has no effect if the type is already present.
