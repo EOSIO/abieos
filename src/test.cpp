@@ -246,6 +246,146 @@ const char transactionAbi[] = R"({
     ]
 })";
 
+const char packedTransactionAbi[] = R"({
+    "version": "eosio::abi/1.0",
+    "types": [
+        {
+            "new_type_name": "account_name",
+            "type": "name"
+        },
+        {
+            "new_type_name": "action_name",
+            "type": "name"
+        },
+        {
+            "new_type_name": "permission_name",
+            "type": "name"
+        }
+    ],
+    "structs": [
+        {
+            "name": "permission_level",
+            "base": "",
+            "fields": [
+                {
+                    "name": "actor",
+                    "type": "account_name"
+                },
+                {
+                    "name": "permission",
+                    "type": "permission_name"
+                }
+            ]
+        },
+        {
+            "name": "action",
+            "base": "",
+            "fields": [
+                {
+                    "name": "account",
+                    "type": "account_name"
+                },
+                {
+                    "name": "name",
+                    "type": "action_name"
+                },
+                {
+                    "name": "authorization",
+                    "type": "permission_level[]"
+                },
+                {
+                    "name": "data",
+                    "type": "bytes"
+                }
+            ]
+        },
+        {
+            "name": "extension",
+            "base": "",
+            "fields": [
+                {
+                    "name": "type",
+                    "type": "uint16"
+                },
+                {
+                    "name": "data",
+                    "type": "bytes"
+                }
+            ]
+        },
+        {
+            "name": "transaction_header",
+            "base": "",
+            "fields": [
+                {
+                    "name": "expiration",
+                    "type": "time_point_sec"
+                },
+                {
+                    "name": "ref_block_num",
+                    "type": "uint16"
+                },
+                {
+                    "name": "ref_block_prefix",
+                    "type": "uint32"
+                },
+                {
+                    "name": "max_net_usage_words",
+                    "type": "varuint32"
+                },
+                {
+                    "name": "max_cpu_usage_ms",
+                    "type": "uint8"
+                },
+                {
+                    "name": "delay_sec",
+                    "type": "varuint32"
+                }
+            ]
+        },
+        {
+            "name": "transaction",
+            "base": "transaction_header",
+            "fields": [
+                {
+                    "name": "context_free_actions",
+                    "type": "action[]"
+                },
+                {
+                    "name": "actions",
+                    "type": "action[]"
+                },
+                {
+                    "name": "transaction_extensions",
+                    "type": "extension[]"
+                }
+            ]
+        },
+        {
+            "name": "packed_transaction_v0",
+            "base": "",
+            "fields": [
+                {
+                    "name": "signatures",
+                    "type": "signature[]"
+                },
+                {
+                    "name": "compression",
+                    "type": "uint8"
+                },
+                {
+                    "name": "packed_context_free_data",
+                    "type": "bytes"
+                },
+                {
+                    "name": "packed_trx",
+                    "type": "transaction"
+                }
+            ]
+        }
+    ]
+})";
+
 std::string string_to_hex(const std::string& s) {
     std::string result;
     uint8_t size = s.size();
@@ -315,6 +455,7 @@ void check_types() {
     auto testAbiName = check_context(context, abieos_string_to_name(context, "test.abi"));
     auto testHexAbiName = check_context(context, abieos_string_to_name(context, "test.hex"));
     check_context(context, abieos_set_abi(context, 0, transactionAbi));
+    check_context(context, abieos_set_abi(context, 1, packedTransactionAbi));
     check_context(context, abieos_set_abi_hex(context, token, tokenHexAbi));
     check_context(context, abieos_set_abi(context, testAbiName, testAbi));
     check_context(context, abieos_set_abi_hex(context, testHexAbiName, testHexAbi));
@@ -351,7 +492,10 @@ void check_types() {
         std::vector<char> abi;
         if (contract == 0) {
             abi_is_bin = false;
-            abi = {transactionAbi, transactionAbi + strlen(transactionAbi)};
+            abi = {transactionAbi, transactionAbi + strlen( transactionAbi )};
+        } else if (contract == 1) {
+           abi_is_bin = false;
+           abi = {packedTransactionAbi, packedTransactionAbi + strlen( packedTransactionAbi )};
         } else if (contract == token) {
             abi_is_bin = true;
             std::string error;
@@ -702,7 +846,11 @@ void check_types() {
         R"({"expiration":"2009-02-13T23:31:31.000","ref_block_num":1234,"ref_block_prefix":5678,"max_net_usage_words":0,"max_cpu_usage_ms":0,"delay_sec":0,"context_free_actions":[],"actions":[{"account":"eosio.token","name":"transfer","authorization":[{"actor":"useraaaaaaaa","permission":"active"}],"data":"608C31C6187315D6708C31C6187315D60100000000000000045359530000000000"}],"transaction_extensions":[]})",
         false);
 
-    check_error(context, "recursion limit reached", [&] {
+   check_type(
+         context, 1, "packed_transaction_v0",
+         R"({"signatures":["SIG_K1_K5PGhrkUBkThs8zdTD9mGUJZvxL4eU46UjfYJSEdZ9PXS2Cgv5jAk57yTx4xnrdSocQm6DDvTaEJZi5WLBsoZC4XYNS8b3"],"compression":0,"packed_context_free_data":"","packed_trx":{"expiration":"2009-02-13T23:31:31.000","ref_block_num":1234,"ref_block_prefix":5678,"max_net_usage_words":0,"max_cpu_usage_ms":0,"delay_sec":0,"context_free_actions":[],"actions":[{"account":"eosio.token","name":"transfer","authorization":[{"actor":"useraaaaaaaa","permission":"active"}],"data":"608C31C6187315D6708C31C6187315D60100000000000000045359530000000000"}],"transaction_extensions":[]}})");
+
+   check_error(context, "recursion limit reached", [&] {
         return abieos_json_to_bin_reorderable(
             context, 0, "int8",
             "[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[["
