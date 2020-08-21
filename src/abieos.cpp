@@ -181,6 +181,37 @@ extern "C" const char* abieos_get_type_for_table(abieos_context* context, uint64
     });
 }
 
+extern "C" const char* abieos_get_kv_table_def(abieos_context* context, uint64_t contract, uint64_t table) {
+    return handle_exceptions(context, nullptr, [&] {
+        auto contract_it = context->contracts.find(::abieos::name{contract});
+        if (contract_it == context->contracts.end())
+            throw std::runtime_error("contract \"" + eosio::name_to_string(contract) + "\" is not loaded");
+        auto& c = contract_it->second;
+
+        auto table_it = c.kv_tables.find(name{table});
+        if (table_it == c.kv_tables.end())
+            throw std::runtime_error("contract \"" + eosio::name_to_string(contract) + "\" does not have kv table \"" +
+                                        eosio::name_to_string(table) + "\"");
+        return table_it->second.c_str();
+    });
+}
+
+extern "C" const char* abieos_get_type_for_action_result(abieos_context* context, uint64_t contract, uint64_t action_result) {
+    return handle_exceptions(context, nullptr, [&] {
+        auto contract_it = context->contracts.find(::abieos::name{contract});
+        if (contract_it == context->contracts.end())
+            throw std::runtime_error("contract \"" + eosio::name_to_string(contract) + "\" is not loaded");
+        auto& c = contract_it->second;
+
+        auto action_result_it = c.action_result_types.find(name{action_result});
+        if (action_result_it == c.action_result_types.end())
+            throw std::runtime_error("contract \"" + eosio::name_to_string(contract) + "\" does not have action_result \"" +
+                                     eosio::name_to_string(action_result) + "\"");
+        return action_result_it->second.c_str();
+    });
+}
+
+>>>>>>> ced4079... Add kv tables to the abi
 extern "C" abieos_bool abieos_json_to_bin(abieos_context* context, uint64_t contract, const char* type,
                                           const char* json) {
     fix_null_str(type);
