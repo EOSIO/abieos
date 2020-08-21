@@ -131,6 +131,27 @@ struct action_result_def {
 
 EOSIO_REFLECT(action_result_def, name, result_type);
 
+struct primary_key_index_def {
+   std::string name{};
+   std::string type;
+};
+
+EOSIO_REFLECT(primary_key_index_def, name, type);
+
+struct secondary_index_def {
+   std::string type;
+};
+
+EOSIO_REFLECT(secondary_index_def, type);
+
+struct kv_table_entry_def {
+   std::string type;
+   primary_key_index_def primary_index;
+   std::map<std::string, secondary_index_def> secondary_indices;
+};
+
+EOSIO_REFLECT(kv_table_entry_def, type, primary_index, secondary_indices);
+
 struct abi_def {
     std::string version{};
     std::vector<type_def> types{};
@@ -142,10 +163,11 @@ struct abi_def {
     abi_extensions_type abi_extensions{};
     might_not_exist<std::vector<variant_def>> variants{};
     might_not_exist<std::vector<action_result_def>> action_results{};
+    might_not_exist<std::map<eosio::name, kv_table_entry_def>> kv_tables{};
 };
 
 EOSIO_REFLECT(abi_def, version, types, structs, actions, tables, ricardian_clauses, error_messages, abi_extensions,
-              variants, action_results);
+              variants, action_results, kv_tables);
 
 struct abi_type;
 
@@ -205,6 +227,7 @@ struct abi_type {
 struct abi {
     std::map<eosio::name, std::string> action_types;
     std::map<eosio::name, std::string> table_types;
+    std::map<eosio::name, std::string> kv_tables;
     std::map<std::string, abi_type> abi_types;
     std::map<eosio::name, std::string> action_result_types;
     const abi_type* get_type(const std::string& name);

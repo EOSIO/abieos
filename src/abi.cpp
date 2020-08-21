@@ -225,6 +225,13 @@ void eosio::convert(const abi_def& abi, eosio::abi& c) {
     for (auto& [_, t] : c.abi_types) {
         fill(c.abi_types, t, 0);
     }
+
+    for (const auto& [key, val] : abi.kv_tables.value) {
+        std::vector<char> bytes;
+        eosio::vector_stream strm(bytes);
+        to_json(val, strm);
+        c.kv_tables.try_emplace(key, bytes.begin(), bytes.end());
+    }
 }
 
 void to_abi_def(abi_def& def, const std::string& name, const abi_type::builtin&) {}

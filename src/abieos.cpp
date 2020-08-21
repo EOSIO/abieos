@@ -181,6 +181,21 @@ extern "C" const char* abieos_get_type_for_table(abieos_context* context, uint64
     });
 }
 
+extern "C" const char* abieos_get_kv_table_def(abieos_context* context, uint64_t contract, uint64_t table) {
+    return handle_exceptions(context, nullptr, [&] {
+        auto contract_it = context->contracts.find(::abieos::name{contract});
+        if (contract_it == context->contracts.end())
+            throw std::runtime_error("contract \"" + eosio::name_to_string(contract) + "\" is not loaded");
+        auto& c = contract_it->second;
+
+        auto table_it = c.kv_tables.find(name{table});
+        if (table_it == c.kv_tables.end())
+            throw std::runtime_error("contract \"" + eosio::name_to_string(contract) + "\" does not have kv table \"" +
+                                        eosio::name_to_string(table) + "\"");
+        return table_it->second.c_str();
+    });
+}
+
 extern "C" const char* abieos_get_type_for_action_result(abieos_context* context, uint64_t contract, uint64_t action_result) {
     return handle_exceptions(context, nullptr, [&] {
         auto contract_it = context->contracts.find(::abieos::name{contract});

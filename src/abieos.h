@@ -52,6 +52,10 @@ const char* abieos_get_type_for_action(abieos_context* context, uint64_t contrac
 // to retrieve error.
 const char* abieos_get_type_for_table(abieos_context* context, uint64_t contract, uint64_t table);
 
+// Get the definition for a kv table in json. The context owns the returned memory. Returns null on error; use abieos_get_error
+// to retrieve error.
+const char* abieos_get_kv_table_def(abieos_context* context, uint64_t contract, uint64_t table);
+
 // Get the type name for an action_result. The context owns the returned memory. Returns null on error; use abieos_get_error
 // to retrieve error.
 const char* abieos_get_type_for_action_result(abieos_context* context, uint64_t contract, uint64_t action_result);

@@ -246,6 +246,143 @@ const char transactionAbi[] = R"({
     ]
 })";
 
+const char testKvTablesAbi[] = R"({
+    "version": "eosio::abi/1.2",
+    "types": [],
+    "structs": [
+        {
+            "name": "get",
+            "base": "",
+            "fields": []
+        },
+        {
+            "name": "iteration",
+            "base": "",
+            "fields": []
+        },
+        {
+            "name": "my_struct",
+            "base": "",
+            "fields": [
+                {
+                    "name": "primary",
+                    "type": "name"
+                },
+                {
+                    "name": "foo",
+                    "type": "string"
+                },
+                {
+                    "name": "bar",
+                    "type": "uint64"
+                },
+                {
+                    "name": "fullname",
+                    "type": "string"
+                },
+                {
+                    "name": "age",
+                    "type": "uint32"
+                }
+            ]
+        },
+        {
+            "name": "nonunique",
+            "base": "",
+            "fields": []
+        },
+        {
+            "name": "setup",
+            "base": "",
+            "fields": []
+        },
+        {
+            "name": "tuple_string_uint32",
+            "base": "",
+            "fields": [
+                {
+                    "name": "field_0",
+                    "type": "string"
+                },
+                {
+                    "name": "field_1",
+                    "type": "uint32"
+                }
+            ]
+        },
+        {
+            "name": "update",
+            "base": "",
+            "fields": []
+        },
+        {
+            "name": "updateerr1",
+            "base": "",
+            "fields": []
+        },
+        {
+            "name": "updateerr2",
+            "base": "",
+            "fields": []
+        }
+    ],
+    "actions": [
+        {
+            "name": "get",
+            "type": "get",
+            "ricardian_contract": ""
+        },
+        {
+            "name": "iteration",
+            "type": "iteration",
+            "ricardian_contract": ""
+        },
+        {
+            "name": "nonunique",
+            "type": "nonunique",
+            "ricardian_contract": ""
+        },
+        {
+            "name": "setup",
+            "type": "setup",
+            "ricardian_contract": ""
+        },
+        {
+            "name": "update",
+            "type": "update",
+            "ricardian_contract": ""
+        },
+        {
+            "name": "updateerr1",
+            "type": "updateerr1",
+            "ricardian_contract": ""
+        },
+        {
+            "name": "updateerr2",
+            "type": "updateerr2",
+            "ricardian_contract": ""
+        }
+    ],
+    "tables": [],
+    "kv_tables": {
+        "testtable": {
+            "type": "my_struct",
+            "primary_index": {
+                "name": "primary",
+                "type": "name"
+            },
+            "secondary_indices": {
+                "foo": {
+                    "type": "string"
+                },
+                "bar": {
+                    "type": "uint64"
+                }
+            }
+        }
+    }
+})";
+
 std::string string_to_hex(const std::string& s) {
     std::string result;
     uint8_t size = s.size();
@@ -314,10 +451,12 @@ void check_types() {
     auto token = check_context(context, abieos_string_to_name(context, "eosio.token"));
     auto testAbiName = check_context(context, abieos_string_to_name(context, "test.abi"));
     auto testHexAbiName = check_context(context, abieos_string_to_name(context, "test.hex"));
+    auto testKvAbiName = check_context(context, abieos_string_to_name(context, "testkv.abi"));
     check_context(context, abieos_set_abi(context, 0, transactionAbi));
     check_context(context, abieos_set_abi_hex(context, token, tokenHexAbi));
     check_context(context, abieos_set_abi(context, testAbiName, testAbi));
     check_context(context, abieos_set_abi_hex(context, testHexAbiName, testHexAbi));
+    check_context(context, abieos_set_abi(context, testKvAbiName, testKvTablesAbi));
 
     int next_id = 0;
     auto write_corpus = [&](bool abi_is_bin, uint8_t operation, uint64_t contract, eosio::input_stream abi,
@@ -924,6 +1063,10 @@ void check_types() {
 
     testWith(testAbiName);
     testWith(testHexAbiName);
+
+    std::string table_def = check_context(context, abieos_get_kv_table_def(context, testKvAbiName, abieos_string_to_name(context, "testtable")));
+    if (table_def != R"({"type":"my_struct","primary_index":{"name":"primary","type":"name"},"secondary_indices":{"bar":{"type":"uint64"},"foo":{"type":"string"}}})")
+        throw std::runtime_error("mismatch");
 
     abieos_destroy(context);
 }
