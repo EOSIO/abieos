@@ -132,7 +132,7 @@ struct action_result_def {
 EOSIO_REFLECT(action_result_def, name, result_type);
 
 struct primary_key_index_def {
-   std::string name{};
+   eosio::name name{};
    std::string type;
 };
 
@@ -147,7 +147,7 @@ EOSIO_REFLECT(secondary_index_def, type);
 struct kv_table_entry_def {
    std::string type;
    primary_key_index_def primary_index;
-   std::map<std::string, secondary_index_def> secondary_indices;
+   std::map<eosio::name, secondary_index_def> secondary_indices;
 };
 
 EOSIO_REFLECT(kv_table_entry_def, type, primary_index, secondary_indices);
