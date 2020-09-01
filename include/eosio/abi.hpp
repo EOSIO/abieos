@@ -229,6 +229,7 @@ struct abi {
     std::map<eosio::name, std::string> table_types;
     std::map<eosio::name, std::string> kv_tables;
     std::map<std::string, abi_type> abi_types;
+    std::map<eosio::name, std::string> action_result_types;
     const abi_type* get_type(const std::string& name);
 
     // Adds a type to the abi.  Has no effect if the type is already present.

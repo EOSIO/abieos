@@ -188,6 +188,8 @@ void eosio::convert(const abi_def& abi, eosio::abi& c) {
         c.action_types[a.name] = a.type;
     for (auto& t : abi.tables)
         c.table_types[t.name] = t.type;
+    for (auto& r : abi.action_results.value)
+        c.action_result_types[r.name] = r.result_type;
     for_each_abi_type([&](auto* p) {
         const char* name = get_type_name(p);
         c.abi_types.try_emplace(name, name, abi_type::builtin{}, &abi_serializer_for<std::decay_t<decltype(*p)>>);

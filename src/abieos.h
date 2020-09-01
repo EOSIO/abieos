@@ -44,11 +44,11 @@ abieos_bool abieos_set_abi_bin(abieos_context* context, uint64_t contract, const
 // Set abi (hex format). Returns false on error.
 abieos_bool abieos_set_abi_hex(abieos_context* context, uint64_t contract, const char* hex);
 
-// Get the type name for an action. The contract owns the returned memory. Returns null on error; use abieos_get_error
+// Get the type name for an action. The context owns the returned memory. Returns null on error; use abieos_get_error
 // to retrieve error.
 const char* abieos_get_type_for_action(abieos_context* context, uint64_t contract, uint64_t action);
 
-// Get the type name for a table. The contract owns the returned memory. Returns null on error; use abieos_get_error
+// Get the type name for a table. The context owns the returned memory. Returns null on error; use abieos_get_error
 // to retrieve error.
 const char* abieos_get_type_for_table(abieos_context* context, uint64_t contract, uint64_t table);
 

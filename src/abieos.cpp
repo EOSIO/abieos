@@ -211,7 +211,6 @@ extern "C" const char* abieos_get_type_for_action_result(abieos_context* context
     });
 }
 
->>>>>>> ced4079... Add kv tables to the abi
 extern "C" abieos_bool abieos_json_to_bin(abieos_context* context, uint64_t contract, const char* type,
                                           const char* json) {
     fix_null_str(type);
