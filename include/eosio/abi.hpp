@@ -61,6 +61,11 @@ void from_json(might_not_exist<T>& obj, S& stream) {
     return from_json(obj.value, stream);
 }
 
+template <typename T, typename S>
+void to_json(might_not_exist<T>& obj, S& stream) {
+   return to_json(obj.value, stream);
+}
+
 using abi_extensions_type = std::vector<std::pair<uint16_t, std::vector<char>>>;
 
 struct type_def {

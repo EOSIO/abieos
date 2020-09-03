@@ -281,3 +281,52 @@ extern "C" const char* abieos_hex_to_json(abieos_context* context, uint64_t cont
         return abieos_bin_to_json(context, contract, type, data.data(), data.size());
     });
 }
+
+extern "C" abieos_bool abieos_abi_json_to_bin(abieos_context* context, const char* abi_json)
+{
+   fix_null_str(abi_json);
+   return handle_exceptions(context, false, [&] {
+      std::string abi_copy{abi_json};
+      eosio::json_token_stream json_stream(abi_copy.data());
+      abi_def def{};
+      std::string error;
+      from_json(def, json_stream);
+      if (!check_abi_version(def.version, error)) {
+         return set_error(context, std::move(error));
+      }
+      context->result_bin = convert_to_bin(def);
+      return true;
+   });
+}
+
+extern "C" abieos_bool abieos_abi_bin_to_json(abieos_context* context, const char* abi_bin_data, const size_t abi_bin_data_size)
+{
+   return handle_exceptions(context, false, [&] {
+      if (!abi_bin_data || abi_bin_data_size == 0) {
+         return set_error(context, "no data");
+      }
+      eosio::input_stream bin_stream{abi_bin_data, abi_bin_data_size};
+      abi_def def{};
+      from_bin(def, bin_stream);
+      std::string error;
+      if (!check_abi_version(def.version, error)) {
+         return set_error(context, std::move(error));
+      }
+      std::vector<char> bytes;
+      eosio::vector_stream byte_stream(bytes);
+      to_json(def, byte_stream);
+
+/*      context->result_str = byte_stream;
+*/      return true;
+   });
+}
+
+extern "C" abieos_bool abieos_abi_json_to_hex(abieos_context* context, const char* abi_json)
+{
+}
+
+extern "C" abieos_bool abieos_abi_hex_to_json(abieos_context* context, const char* abi_hex_data)
+{
+
+}
+

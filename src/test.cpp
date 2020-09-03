@@ -7,6 +7,7 @@
 #include <stdio.h>
 #include <string>
 #include <vector>
+#include <iostream>
 
 inline const bool generate_corpus = false;
 
@@ -1071,10 +1072,28 @@ void check_types() {
     abieos_destroy(context);
 }
 
+void test_abi_kv_table()
+{
+   using namespace std;
+/*
+   abieos_context* abi_cnxt = abieos_create();
+
+   if (!abieos_set_abi(abi_cnxt, eosio::string_to_name("kv.table.abi"), testKvTablesAbi)) {
+      throw std::runtime_error("Failed to add abi testKvTablesAbi");
+   }
+
+
+   abieos_destroy(abi_cnxt);
+*/
+}
+
 int main() {
     try {
         check_types();
-        printf("\nok\n\n");
+        printf("\ncheck_types ok\n\n");
+
+        test_abi_kv_table();
+        printf("\ntest_abi_kv_table ok\n\n");
         return 0;
     } catch (std::exception& e) {
         printf("error: %s\n", e.what());

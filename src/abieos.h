@@ -76,6 +76,18 @@ const char* abieos_bin_to_json(abieos_context* context, uint64_t contract, const
 // error.
 const char* abieos_hex_to_json(abieos_context* context, uint64_t contract, const char* type, const char* hex);
 
+// Convert abi json to bin
+abieos_bool abieos_abi_json_to_bin(abieos_context* context, const char* json);
+
+// Convert abi bin to json
+abieos_bool abieos_abi_bin_to_json(abieos_context* context, const char* abi_bin_data, const size_t abi_bin_data_size);
+
+// Convert abi json to hex
+abieos_bool abieos_abi_json_to_hex(abieos_context* context, const char* json);
+
+// Convert abi hex to json
+abieos_bool abieos_abi_hex_to_json(abieos_context* context, const char* hex_data);
+
 #ifdef __cplusplus
 }
 #endif
