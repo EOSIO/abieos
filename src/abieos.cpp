@@ -260,7 +260,7 @@ extern "C" const char* abieos_bin_to_json(abieos_context* context, uint64_t cont
         }
         auto t = contract_it->second.get_type(type);
         eosio::input_stream bin{data, size};
-           context->result_str = t->bin_to_json(bin);
+        context->result_str = t->bin_to_json(bin);
         if (bin.pos != bin.end)
             throw std::runtime_error("Extra data");
         return context->result_str.c_str();
