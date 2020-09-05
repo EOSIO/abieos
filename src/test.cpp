@@ -7,7 +7,9 @@
 #include <stdio.h>
 #include <string>
 #include <vector>
-#include <iostream>
+#include "rapidjson/document.h"
+#include "rapidjson/writer.h"
+#include "rapidjson/stringbuffer.h"
 
 inline const bool generate_corpus = false;
 
@@ -1075,16 +1077,110 @@ void check_types() {
 void test_abi_kv_table()
 {
    using namespace std;
-/*
-   abieos_context* abi_cnxt = abieos_create();
 
-   if (!abieos_set_abi(abi_cnxt, eosio::string_to_name("kv.table.abi"), testKvTablesAbi)) {
-      throw std::runtime_error("Failed to add abi testKvTablesAbi");
+   // empty abi_def
+   {
+      abieos_context* abi_cnxt = abieos_create();
+
+      abieos::abi_def empty_abi_def;
+      empty_abi_def.version = "eosio::abi/1.2";
+      std::vector<char> bytes;
+      eosio::vector_stream byte_stream(bytes);
+      to_json(empty_abi_def, byte_stream);
+      const std::string empty_abi_def_json(bytes.begin(), bytes.end());
+
+      if (!abieos_abi_json_to_bin(abi_cnxt, empty_abi_def_json.c_str())) {
+         printf("test_abi_kv_table: %s\n", abieos_get_error(abi_cnxt));
+         throw std::runtime_error("test_abi_kv_table: Failed to convert empty_abi_def_json (json) to bin");
+      }
+      printf("test_abi_kv_table: Successfully converted empty_abi_def_json (json) to bin\n");
+
+      const int bin_data_size = abieos_get_bin_size(abi_cnxt);
+      printf("test_abi_kv_table: Get empty_abi_def_json (bin) data size: %d\n", bin_data_size);
+
+      const char* abi_bin_data = abieos_get_bin_data(abi_cnxt);
+
+      const char* abi_json_data = abieos_abi_bin_to_json(abi_cnxt, abi_bin_data, bin_data_size);
+      if (abi_json_data == nullptr) {
+         throw std::runtime_error("empty_abi_def_json: Failed to convert testKvTablesAbi (bin) to json");
+      }
+      printf("test_abi_kv_table: Successfully converted empty_abi_def_json (bin) to json\n");
+
+      rapidjson::Document orig_json;
+      orig_json.Parse(empty_abi_def_json.c_str());
+      rapidjson::StringBuffer orig_buf;
+      rapidjson::Writer<rapidjson::StringBuffer> orig_writer(orig_buf);
+      orig_json.Accept(orig_writer);
+
+      rapidjson::Document cvtd_json;
+      cvtd_json.Parse(abi_json_data);
+      rapidjson::StringBuffer cvtd_buf;
+      rapidjson::Writer<rapidjson::StringBuffer> cvtd_writer(cvtd_buf);
+      cvtd_json.Accept(cvtd_writer);
+      if (strcmp(orig_buf.GetString(), cvtd_buf.GetString())) {
+         throw std::runtime_error("test_abi_kv_table: Converted empty_abi_def_json json is different from orig");
+      }
+      abieos_destroy(abi_cnxt);
    }
+   // every field o abi_def has some value
+   {
+      abieos_context* abi_cnxt = abieos_create();
 
+      abieos::abi_def all_abi_def;
+      all_abi_def.version = "eosio::abi/1.2";
+      all_abi_def.types.push_back({"t_new_type_1", "t_type1"});
+      all_abi_def.structs.push_back(eosio::struct_def{""});
+      all_abi_def.structs.push_back(eosio::struct_def{"s_name1", "s_base1", {eosio::field_def{"f_name1", "f_type1"}}});
+      all_abi_def.actions.push_back(eosio::action_def{eosio::name{"name1"}, "a_type1", "a_rc_1"});
+      all_abi_def.tables.push_back(eosio::table_def{eosio::name{"tname1"}, "idx_type1", {"k_name_1"}, {"k_type1"}, {"t_type1"}});
+      all_abi_def.ricardian_clauses.push_back(eosio::clause_pair{"cp_id_1", "cp_body_1"});
+      all_abi_def.error_messages.push_back(eosio::error_message{1234567890, "msg1"});
+      // should std::pair needs to be supported? from_json does not support
+      // all_abi_def.abi_extensions.push_back({123, {'a', 'b'}});
+      all_abi_def.variants.value.push_back(eosio::variant_def{"v_name1", {"v_type1"}});
+      all_abi_def.action_results.value.push_back(eosio::action_result_def{eosio::name{"aname1"}, {"a_type1"}});
+      eosio::kv_table_entry_def kv_def{"kv_type1", eosio::primary_key_index_def{eosio::name{"pki1"}, "kv_type1"}};
+      kv_def.secondary_indices[eosio::name{"sec2"}] = eosio::secondary_index_def{"sid2"};
+      all_abi_def.kv_tables.value[eosio::name{"kv1"}] = kv_def;
 
-   abieos_destroy(abi_cnxt);
-*/
+      std::vector<char> bytes;
+      eosio::vector_stream byte_stream(bytes);
+      to_json(all_abi_def, byte_stream);
+      const std::string all_abi_def_json(bytes.begin(), bytes.end());
+
+      if (!abieos_abi_json_to_bin(abi_cnxt, all_abi_def_json.c_str())) {
+         printf("test_abi_kv_table: %s\n", abieos_get_error(abi_cnxt));
+         throw std::runtime_error("test_abi_kv_table: Failed to convert all_abi_def_json (json) to bin");
+      }
+      printf("test_abi_kv_table: Successfully converted all_abi_def_json (json) to bin\n");
+
+      const int bin_data_size = abieos_get_bin_size(abi_cnxt);
+      printf("test_abi_kv_table: Get all_abi_def_json (bin) data size: %d\n", bin_data_size);
+
+      const char* abi_bin_data = abieos_get_bin_data(abi_cnxt);
+
+      const char* abi_json_data = abieos_abi_bin_to_json(abi_cnxt, abi_bin_data, bin_data_size);
+      if (abi_json_data == nullptr) {
+         throw std::runtime_error("all_abi_def_json: Failed to convert testKvTablesAbi (bin) to json");
+      }
+      printf("test_abi_kv_table: Successfully converted all_abi_def_json (bin) to json\n");
+
+      rapidjson::Document orig_json;
+      orig_json.Parse(all_abi_def_json.c_str());
+      rapidjson::StringBuffer orig_buf;
+      rapidjson::Writer<rapidjson::StringBuffer> orig_writer(orig_buf);
+      orig_json.Accept(orig_writer);
+
+      rapidjson::Document cvtd_json;
+      cvtd_json.Parse(abi_json_data);
+      rapidjson::StringBuffer cvtd_buf;
+      rapidjson::Writer<rapidjson::StringBuffer> cvtd_writer(cvtd_buf);
+      cvtd_json.Accept(cvtd_writer);
+      if (strcmp(orig_buf.GetString(), cvtd_buf.GetString())) {
+         throw std::runtime_error("test_abi_kv_table: Converted all_abi_def_json json is different from orig");
+      }
+      abieos_destroy(abi_cnxt);
+   }
 }
 
 int main() {
@@ -1093,7 +1189,7 @@ int main() {
         printf("\ncheck_types ok\n\n");
 
         test_abi_kv_table();
-        printf("\ntest_abi_kv_table ok\n\n");
+        printf("\ntest_abi_kv_table: ok\n\n");
         return 0;
     } catch (std::exception& e) {
         printf("error: %s\n", e.what());

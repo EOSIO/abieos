@@ -62,8 +62,8 @@ void from_json(might_not_exist<T>& obj, S& stream) {
 }
 
 template <typename T, typename S>
-void to_json(might_not_exist<T>& obj, S& stream) {
-   return to_json(obj.value, stream);
+void to_json(const might_not_exist<T>& val, S& stream) {
+   return to_json(val.value, stream);
 }
 
 using abi_extensions_type = std::vector<std::pair<uint16_t, std::vector<char>>>;
@@ -324,5 +324,81 @@ abi_type* abi::add_type() {
    using eosio::add_type;
    return add_type(*this, (T*)nullptr);
 }
+
+template <typename S>
+void to_json(const abi_extensions_type& ext_type, S& stream) {
+   stream.write('[');
+   bool first = true;
+   for(const auto& p : ext_type) {
+      if (first) {
+         first = false;
+      } else {
+         stream.write(',');
+      }
+      stream.write('{');
+      to_json(p.first, stream);
+      stream.write(':');
+      to_json(p.second, stream);
+      stream.write('}');
+   }
+   stream.write(']');
+}
+
+template <typename S>
+void to_json(const abi_def& def, S& stream) {
+   stream.write('{');
+   to_json("version", stream);
+   stream.write(':');
+   to_json(def.version, stream);
+   stream.write(',');
+   to_json("types", stream);
+   stream.write(':');
+   to_json(def.types, stream);
+   stream.write(',');
+   to_json("structs", stream);
+   stream.write(':');
+   to_json(def.structs, stream);
+   stream.write(',');
+   to_json("actions", stream);
+   stream.write(':');
+   to_json(def.actions, stream);
+   stream.write(',');
+   to_json("tables", stream);
+   stream.write(':');
+   to_json(def.tables, stream);
+   stream.write(',');
+
+   to_json("ricardian_clauses", stream);
+   stream.write(':');
+   to_json(def.ricardian_clauses, stream);
+   stream.write(',');
+   to_json("error_messages", stream);
+   stream.write(':');
+   to_json(def.error_messages, stream);
+   stream.write(',');
+   to_json("abi_extensions", stream);
+   stream.write(':');
+   to_json(def.abi_extensions, stream);
+   if (!def.variants.value.empty()) {
+      stream.write(',');
+      to_json("variants", stream);
+      stream.write(':');
+      to_json(def.variants.value, stream);
+   }
+   if (!def.action_results.value.empty()) {
+      stream.write(',');
+      to_json("action_results", stream);
+      stream.write(':');
+      to_json(def.action_results.value, stream);
+   }
+   if (!def.kv_tables.value.empty()) {
+      stream.write(',');
+      to_json("kv_tables", stream);
+      stream.write(':');
+      to_json(def.kv_tables.value, stream);
+   }
+   stream.write('}');
+}
+
 
 }

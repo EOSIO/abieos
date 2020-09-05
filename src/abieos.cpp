@@ -260,7 +260,7 @@ extern "C" const char* abieos_bin_to_json(abieos_context* context, uint64_t cont
         }
         auto t = contract_it->second.get_type(type);
         eosio::input_stream bin{data, size};
-        context->result_str = t->bin_to_json(bin);
+           context->result_str = t->bin_to_json(bin);
         if (bin.pos != bin.end)
             throw std::runtime_error("Extra data");
         return context->result_str.c_str();
@@ -299,34 +299,26 @@ extern "C" abieos_bool abieos_abi_json_to_bin(abieos_context* context, const cha
    });
 }
 
-extern "C" abieos_bool abieos_abi_bin_to_json(abieos_context* context, const char* abi_bin_data, const size_t abi_bin_data_size)
+extern "C" const char* abieos_abi_bin_to_json(abieos_context* context, const char* abi_bin_data, const size_t abi_bin_data_size)
 {
-   return handle_exceptions(context, false, [&] {
+   return handle_exceptions(context, nullptr, [&]() -> const char* {
       if (!abi_bin_data || abi_bin_data_size == 0) {
-         return set_error(context, "no data");
+         set_error(context, "no data");
+         return nullptr;
       }
       eosio::input_stream bin_stream{abi_bin_data, abi_bin_data_size};
       abi_def def{};
       from_bin(def, bin_stream);
       std::string error;
       if (!check_abi_version(def.version, error)) {
-         return set_error(context, std::move(error));
+         set_error(context, std::move(error));
+         return nullptr;
       }
       std::vector<char> bytes;
       eosio::vector_stream byte_stream(bytes);
       to_json(def, byte_stream);
 
-/*      context->result_str = byte_stream;
-*/      return true;
+      context->result_str.assign(bytes.begin(), bytes.end());
+      return context->result_str.c_str();
    });
 }
-
-extern "C" abieos_bool abieos_abi_json_to_hex(abieos_context* context, const char* abi_json)
-{
-}
-
-extern "C" abieos_bool abieos_abi_hex_to_json(abieos_context* context, const char* abi_hex_data)
-{
-
-}
-

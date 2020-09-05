@@ -76,17 +76,11 @@ const char* abieos_bin_to_json(abieos_context* context, uint64_t contract, const
 // error.
 const char* abieos_hex_to_json(abieos_context* context, uint64_t contract, const char* type, const char* hex);
 
-// Convert abi json to bin
+// Convert abi json to bin, Use abieos_get_bin_* to retrieve result. Returns false on error.
 abieos_bool abieos_abi_json_to_bin(abieos_context* context, const char* json);
 
-// Convert abi bin to json
-abieos_bool abieos_abi_bin_to_json(abieos_context* context, const char* abi_bin_data, const size_t abi_bin_data_size);
-
-// Convert abi json to hex
-abieos_bool abieos_abi_json_to_hex(abieos_context* context, const char* json);
-
-// Convert abi hex to json
-abieos_bool abieos_abi_hex_to_json(abieos_context* context, const char* hex_data);
+// Convert abi bin to json, The context.result_str has the result, Returns null on error; use abieos_get_error to retrieve
+const char* abieos_abi_bin_to_json(abieos_context* context, const char* abi_bin_data, const size_t abi_bin_data_size);
 
 #ifdef __cplusplus
 }
