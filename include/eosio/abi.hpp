@@ -326,13 +326,13 @@ abi_type* abi::add_type() {
 }
 
 template <typename T, typename S>
-void to_json_write_helper(const T& type, const std::string_view type_name, const bool has_comma, S& stream) {
-   if (has_comma) {
+void to_json_write_helper(const T& field, const std::string_view field_name, const bool need_comma, S& stream) {
+   if (need_comma) {
       stream.write(',');
    }
-   to_json(type_name, stream);
+   to_json(field_name, stream);
    stream.write(':');
-   to_json(type, stream);
+   to_json(field, stream);
 }
 
 template <typename S>
@@ -356,6 +356,4 @@ void to_json(const abi_def& def, S& stream) {
    }
    stream.write('}');
 }
-
-
 }
