@@ -3,13 +3,13 @@
 #include "abieos.h"
 #include "abieos.hpp"
 #include "fuzzer.hpp"
+#include "rapidjson/document.h"
+#include "rapidjson/stringbuffer.h"
+#include "rapidjson/writer.h"
 #include <stdexcept>
 #include <stdio.h>
 #include <string>
 #include <vector>
-#include "rapidjson/document.h"
-#include "rapidjson/writer.h"
-#include "rapidjson/stringbuffer.h"
 
 inline const bool generate_corpus = false;
 
@@ -540,10 +540,12 @@ void check_types() {
     check_type(context, 0, "bool", R"(false)");
     check_error(context, "Stream overrun", [&] { return abieos_hex_to_json(context, 0, "bool", ""); });
     // !!!
-    check_error(context, "The document root must not follow by other values", [&] { return abieos_json_to_bin(context, 0, "bool", R"(trues)"); });
+    check_error(context, "The document root must not follow by other values",
+                [&] { return abieos_json_to_bin(context, 0, "bool", R"(trues)"); });
     check_error(context, "Expected number or boolean",
                 [&] { return abieos_json_to_bin(context, 0, "bool", R"(null)"); });
-    check_error(context, "Expected positive integer", [&] { return abieos_json_to_bin(context, 0, "bool", R"("foo")"); });
+    check_error(context, "Expected positive integer",
+                [&] { return abieos_json_to_bin(context, 0, "bool", R"("foo")"); });
     check_type(context, 0, "int8", R"(0)");
     check_type(context, 0, "int8", R"(127)");
     check_type(context, 0, "int8", R"(-128)");
@@ -711,8 +713,11 @@ void check_types() {
     check_type(context, 0, "string", R"("This is a string.")");
     check_type(context, 0, "string", R"("' + '*'.repeat(128) + '")");
     check_type(context, 0, "string", R"("\u0000  这是一个测试  Это тест  هذا اختبار 👍")");
-    check(abieos_bin_to_json(context, 0, "string", "\x11invalid utf8: \xff\xfe\xfd", 18) == std::string(R"("invalid utf8: ???")"), "invalid utf8");
-    check(abieos_bin_to_json(context, 0, "string", "\4\xe8\xbf\x99\n", 5) == std::string("\"\xe8\xbf\x99\\u000A\""), "escaping");
+    check(abieos_bin_to_json(context, 0, "string", "\x11invalid utf8: \xff\xfe\xfd", 18) ==
+              std::string(R"("invalid utf8: ???")"),
+          "invalid utf8");
+    check(abieos_bin_to_json(context, 0, "string", "\4\xe8\xbf\x99\n", 5) == std::string("\"\xe8\xbf\x99\\u000A\""),
+          "escaping");
     check_error(context, "Stream overrun", [&] { return abieos_hex_to_json(context, 0, "string", "01"); });
     check_type(context, 0, "checksum160", R"("0000000000000000000000000000000000000000")");
     check_type(context, 0, "checksum160", R"("123456789ABCDEF01234567890ABCDEF70123456")");
@@ -1067,119 +1072,122 @@ void check_types() {
     testWith(testAbiName);
     testWith(testHexAbiName);
 
-    std::string table_def = check_context(context, abieos_get_kv_table_def(context, testKvAbiName, abieos_string_to_name(context, "testtable")));
-    if (table_def != R"({"type":"my_struct","primary_index":{"name":"primary","type":"name"},"secondary_indices":{"bar":{"type":"uint64"},"foo":{"type":"string"}}})")
+    std::string table_def = check_context(
+        context, abieos_get_kv_table_def(context, testKvAbiName, abieos_string_to_name(context, "testtable")));
+    if (table_def !=
+        R"({"type":"my_struct","primary_index":{"name":"primary","type":"name"},"secondary_indices":{"bar":{"type":"uint64"},"foo":{"type":"string"}}})")
         throw std::runtime_error("mismatch");
 
     abieos_destroy(context);
 }
 
-void test_abi_kv_table()
-{
-   using namespace std;
+void test_abi_kv_table() {
+    using namespace std;
 
-   // empty abi_def
-   {
-      abieos_context* abi_cnxt = abieos_create();
+    // empty abi_def
+    {
+        abieos_context* abi_cnxt = abieos_create();
 
-      abieos::abi_def empty_abi_def;
-      empty_abi_def.version = "eosio::abi/1.2";
-      std::vector<char> bytes;
-      eosio::vector_stream byte_stream(bytes);
-      to_json(empty_abi_def, byte_stream);
-      const std::string empty_abi_def_json(bytes.begin(), bytes.end());
+        abieos::abi_def empty_abi_def;
+        empty_abi_def.version = "eosio::abi/1.2";
+        std::vector<char> bytes;
+        eosio::vector_stream byte_stream(bytes);
+        to_json(empty_abi_def, byte_stream);
+        const std::string empty_abi_def_json(bytes.begin(), bytes.end());
 
-      if (!abieos_abi_json_to_bin(abi_cnxt, empty_abi_def_json.c_str())) {
-         printf("test_abi_kv_table: %s\n", abieos_get_error(abi_cnxt));
-         throw std::runtime_error("test_abi_kv_table: Failed to convert empty_abi_def_json (json) to bin");
-      }
-      printf("test_abi_kv_table: Successfully converted empty_abi_def_json (json) to bin\n");
+        if (!abieos_abi_json_to_bin(abi_cnxt, empty_abi_def_json.c_str())) {
+            printf("test_abi_kv_table: %s\n", abieos_get_error(abi_cnxt));
+            throw std::runtime_error("test_abi_kv_table: Failed to convert empty_abi_def_json (json) to bin");
+        }
+        printf("test_abi_kv_table: Successfully converted empty_abi_def_json (json) to bin\n");
 
-      const int bin_data_size = abieos_get_bin_size(abi_cnxt);
-      printf("test_abi_kv_table: Get empty_abi_def_json (bin) data size: %d\n", bin_data_size);
+        const int bin_data_size = abieos_get_bin_size(abi_cnxt);
+        printf("test_abi_kv_table: Get empty_abi_def_json (bin) data size: %d\n", bin_data_size);
 
-      const char* abi_bin_data = abieos_get_bin_data(abi_cnxt);
+        const char* abi_bin_data = abieos_get_bin_data(abi_cnxt);
 
-      const char* abi_json_data = abieos_abi_bin_to_json(abi_cnxt, abi_bin_data, bin_data_size);
-      if (abi_json_data == nullptr) {
-         throw std::runtime_error("empty_abi_def_json: Failed to convert testKvTablesAbi (bin) to json");
-      }
-      printf("test_abi_kv_table: Successfully converted empty_abi_def_json (bin) to json\n");
+        const char* abi_json_data = abieos_abi_bin_to_json(abi_cnxt, abi_bin_data, bin_data_size);
+        if (abi_json_data == nullptr) {
+            throw std::runtime_error("empty_abi_def_json: Failed to convert testKvTablesAbi (bin) to json");
+        }
+        printf("test_abi_kv_table: Successfully converted empty_abi_def_json (bin) to json\n");
 
-      rapidjson::Document orig_json;
-      orig_json.Parse(empty_abi_def_json.c_str());
-      rapidjson::StringBuffer orig_buf;
-      rapidjson::Writer<rapidjson::StringBuffer> orig_writer(orig_buf);
-      orig_json.Accept(orig_writer);
+        rapidjson::Document orig_json;
+        orig_json.Parse(empty_abi_def_json.c_str());
+        rapidjson::StringBuffer orig_buf;
+        rapidjson::Writer<rapidjson::StringBuffer> orig_writer(orig_buf);
+        orig_json.Accept(orig_writer);
 
-      rapidjson::Document cvtd_json;
-      cvtd_json.Parse(abi_json_data);
-      rapidjson::StringBuffer cvtd_buf;
-      rapidjson::Writer<rapidjson::StringBuffer> cvtd_writer(cvtd_buf);
-      cvtd_json.Accept(cvtd_writer);
-      if (strcmp(orig_buf.GetString(), cvtd_buf.GetString())) {
-         throw std::runtime_error("test_abi_kv_table: Converted empty_abi_def_json json is different from orig");
-      }
-      abieos_destroy(abi_cnxt);
-   }
-   // every field o abi_def has some value
-   {
-      abieos_context* abi_cnxt = abieos_create();
+        rapidjson::Document cvtd_json;
+        cvtd_json.Parse(abi_json_data);
+        rapidjson::StringBuffer cvtd_buf;
+        rapidjson::Writer<rapidjson::StringBuffer> cvtd_writer(cvtd_buf);
+        cvtd_json.Accept(cvtd_writer);
+        if (strcmp(orig_buf.GetString(), cvtd_buf.GetString())) {
+            throw std::runtime_error("test_abi_kv_table: Converted empty_abi_def_json json is different from orig");
+        }
+        abieos_destroy(abi_cnxt);
+    }
+    // every field o abi_def has some value
+    {
+        abieos_context* abi_cnxt = abieos_create();
 
-      abieos::abi_def all_abi_def;
-      all_abi_def.version = "eosio::abi/1.2";
-      all_abi_def.types.push_back({"t_new_type_1", "t_type1"});
-      all_abi_def.structs.push_back(eosio::struct_def{""});
-      all_abi_def.structs.push_back(eosio::struct_def{"s_name1", "s_base1", {eosio::field_def{"f_name1", "f_type1"}}});
-      all_abi_def.actions.push_back(eosio::action_def{eosio::name{"name1"}, "a_type1", "a_rc_1"});
-      all_abi_def.tables.push_back(eosio::table_def{eosio::name{"tname1"}, "idx_type1", {"k_name_1"}, {"k_type1"}, {"t_type1"}});
-      all_abi_def.ricardian_clauses.push_back(eosio::clause_pair{"cp_id_1", "cp_body_1"});
-      all_abi_def.error_messages.push_back(eosio::error_message{1234567890, "msg1"});
-      // Ignore abi_extensions in to_json and from_json
-      all_abi_def.variants.value.push_back(eosio::variant_def{"v_name1", {"v_type1"}});
-      all_abi_def.action_results.value.push_back(eosio::action_result_def{eosio::name{"aname1"}, {"a_type1"}});
-      eosio::kv_table_entry_def kv_def{"kv_type1", eosio::primary_key_index_def{eosio::name{"pki1"}, "kv_type1"}, {}};
-      kv_def.secondary_indices[eosio::name{"sec2"}] = eosio::secondary_index_def{"sid2"};
-      all_abi_def.kv_tables.value[eosio::name{"kv1"}] = kv_def;
+        abieos::abi_def all_abi_def;
+        all_abi_def.version = "eosio::abi/1.2";
+        all_abi_def.types.push_back({"t_new_type_1", "t_type1"});
+        all_abi_def.structs.push_back(eosio::struct_def{""});
+        all_abi_def.structs.push_back(
+            eosio::struct_def{"s_name1", "s_base1", {eosio::field_def{"f_name1", "f_type1"}}});
+        all_abi_def.actions.push_back(eosio::action_def{eosio::name{"name1"}, "a_type1", "a_rc_1"});
+        all_abi_def.tables.push_back(
+            eosio::table_def{eosio::name{"tname1"}, "idx_type1", {"k_name_1"}, {"k_type1"}, {"t_type1"}});
+        all_abi_def.ricardian_clauses.push_back(eosio::clause_pair{"cp_id_1", "cp_body_1"});
+        all_abi_def.error_messages.push_back(eosio::error_message{1234567890, "msg1"});
+        // Ignore abi_extensions in to_json and from_json
+        all_abi_def.variants.value.push_back(eosio::variant_def{"v_name1", {"v_type1"}});
+        all_abi_def.action_results.value.push_back(eosio::action_result_def{eosio::name{"aname1"}, {"a_type1"}});
+        eosio::kv_table_entry_def kv_def{"kv_type1", eosio::primary_key_index_def{eosio::name{"pki1"}, "kv_type1"}, {}};
+        kv_def.secondary_indices[eosio::name{"sec2"}] = eosio::secondary_index_def{"sid2"};
+        all_abi_def.kv_tables.value[eosio::name{"kv1"}] = kv_def;
 
-      std::vector<char> bytes;
-      eosio::vector_stream byte_stream(bytes);
-      to_json(all_abi_def, byte_stream);
-      const std::string all_abi_def_json(bytes.begin(), bytes.end());
+        std::vector<char> bytes;
+        eosio::vector_stream byte_stream(bytes);
+        to_json(all_abi_def, byte_stream);
+        const std::string all_abi_def_json(bytes.begin(), bytes.end());
 
-      if (!abieos_abi_json_to_bin(abi_cnxt, all_abi_def_json.c_str())) {
-         printf("test_abi_kv_table: %s\n", abieos_get_error(abi_cnxt));
-         throw std::runtime_error("test_abi_kv_table: Failed to convert all_abi_def_json (json) to bin");
-      }
-      printf("test_abi_kv_table: Successfully converted all_abi_def_json (json) to bin\n");
+        if (!abieos_abi_json_to_bin(abi_cnxt, all_abi_def_json.c_str())) {
+            printf("test_abi_kv_table: %s\n", abieos_get_error(abi_cnxt));
+            throw std::runtime_error("test_abi_kv_table: Failed to convert all_abi_def_json (json) to bin");
+        }
+        printf("test_abi_kv_table: Successfully converted all_abi_def_json (json) to bin\n");
 
-      const int bin_data_size = abieos_get_bin_size(abi_cnxt);
-      printf("test_abi_kv_table: Get all_abi_def_json (bin) data size: %d\n", bin_data_size);
+        const int bin_data_size = abieos_get_bin_size(abi_cnxt);
+        printf("test_abi_kv_table: Get all_abi_def_json (bin) data size: %d\n", bin_data_size);
 
-      const char* abi_bin_data = abieos_get_bin_data(abi_cnxt);
+        const char* abi_bin_data = abieos_get_bin_data(abi_cnxt);
 
-      const char* abi_json_data = abieos_abi_bin_to_json(abi_cnxt, abi_bin_data, bin_data_size);
-      if (abi_json_data == nullptr) {
-         throw std::runtime_error("all_abi_def_json: Failed to convert testKvTablesAbi (bin) to json");
-      }
-      printf("test_abi_kv_table: Successfully converted all_abi_def_json (bin) to json\n");
+        const char* abi_json_data = abieos_abi_bin_to_json(abi_cnxt, abi_bin_data, bin_data_size);
+        if (abi_json_data == nullptr) {
+            throw std::runtime_error("all_abi_def_json: Failed to convert testKvTablesAbi (bin) to json");
+        }
+        printf("test_abi_kv_table: Successfully converted all_abi_def_json (bin) to json\n");
 
-      rapidjson::Document orig_json;
-      orig_json.Parse(all_abi_def_json.c_str());
-      rapidjson::StringBuffer orig_buf;
-      rapidjson::Writer<rapidjson::StringBuffer> orig_writer(orig_buf);
-      orig_json.Accept(orig_writer);
+        rapidjson::Document orig_json;
+        orig_json.Parse(all_abi_def_json.c_str());
+        rapidjson::StringBuffer orig_buf;
+        rapidjson::Writer<rapidjson::StringBuffer> orig_writer(orig_buf);
+        orig_json.Accept(orig_writer);
 
-      rapidjson::Document cvtd_json;
-      cvtd_json.Parse(abi_json_data);
-      rapidjson::StringBuffer cvtd_buf;
-      rapidjson::Writer<rapidjson::StringBuffer> cvtd_writer(cvtd_buf);
-      cvtd_json.Accept(cvtd_writer);
-      if (strcmp(orig_buf.GetString(), cvtd_buf.GetString())) {
-         throw std::runtime_error("test_abi_kv_table: Converted all_abi_def_json json is different from orig");
-      }
-      abieos_destroy(abi_cnxt);
-   }
+        rapidjson::Document cvtd_json;
+        cvtd_json.Parse(abi_json_data);
+        rapidjson::StringBuffer cvtd_buf;
+        rapidjson::Writer<rapidjson::StringBuffer> cvtd_writer(cvtd_buf);
+        cvtd_json.Accept(cvtd_writer);
+        if (strcmp(orig_buf.GetString(), cvtd_buf.GetString())) {
+            throw std::runtime_error("test_abi_kv_table: Converted all_abi_def_json json is different from orig");
+        }
+        abieos_destroy(abi_cnxt);
+    }
 }
 
 int main() {
