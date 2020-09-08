@@ -1135,11 +1135,10 @@ void test_abi_kv_table()
       all_abi_def.tables.push_back(eosio::table_def{eosio::name{"tname1"}, "idx_type1", {"k_name_1"}, {"k_type1"}, {"t_type1"}});
       all_abi_def.ricardian_clauses.push_back(eosio::clause_pair{"cp_id_1", "cp_body_1"});
       all_abi_def.error_messages.push_back(eosio::error_message{1234567890, "msg1"});
-      // should std::pair needs to be supported? from_json does not support
-      // all_abi_def.abi_extensions.push_back({123, {'a', 'b'}});
+      // Ignore abi_extensions in to_json and from_json
       all_abi_def.variants.value.push_back(eosio::variant_def{"v_name1", {"v_type1"}});
       all_abi_def.action_results.value.push_back(eosio::action_result_def{eosio::name{"aname1"}, {"a_type1"}});
-      eosio::kv_table_entry_def kv_def{"kv_type1", eosio::primary_key_index_def{eosio::name{"pki1"}, "kv_type1"}};
+      eosio::kv_table_entry_def kv_def{"kv_type1", eosio::primary_key_index_def{eosio::name{"pki1"}, "kv_type1"}, {}};
       kv_def.secondary_indices[eosio::name{"sec2"}] = eosio::secondary_index_def{"sid2"};
       all_abi_def.kv_tables.value[eosio::name{"kv1"}] = kv_def;
 

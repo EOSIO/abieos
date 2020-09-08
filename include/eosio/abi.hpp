@@ -325,77 +325,34 @@ abi_type* abi::add_type() {
    return add_type(*this, (T*)nullptr);
 }
 
-template <typename S>
-void to_json(const abi_extensions_type& ext_type, S& stream) {
-   stream.write('[');
-   bool first = true;
-   for(const auto& p : ext_type) {
-      if (first) {
-         first = false;
-      } else {
-         stream.write(',');
-      }
-      stream.write('{');
-      to_json(p.first, stream);
-      stream.write(':');
-      to_json(p.second, stream);
-      stream.write('}');
+template <typename T, typename S>
+void to_json_write_helper(const T& type, const std::string_view type_name, const bool has_comma, S& stream) {
+   if (has_comma) {
+      stream.write(',');
    }
-   stream.write(']');
+   to_json(type_name, stream);
+   stream.write(':');
+   to_json(type, stream);
 }
 
 template <typename S>
 void to_json(const abi_def& def, S& stream) {
    stream.write('{');
-   to_json("version", stream);
-   stream.write(':');
-   to_json(def.version, stream);
-   stream.write(',');
-   to_json("types", stream);
-   stream.write(':');
-   to_json(def.types, stream);
-   stream.write(',');
-   to_json("structs", stream);
-   stream.write(':');
-   to_json(def.structs, stream);
-   stream.write(',');
-   to_json("actions", stream);
-   stream.write(':');
-   to_json(def.actions, stream);
-   stream.write(',');
-   to_json("tables", stream);
-   stream.write(':');
-   to_json(def.tables, stream);
-   stream.write(',');
-
-   to_json("ricardian_clauses", stream);
-   stream.write(':');
-   to_json(def.ricardian_clauses, stream);
-   stream.write(',');
-   to_json("error_messages", stream);
-   stream.write(':');
-   to_json(def.error_messages, stream);
-   stream.write(',');
-   to_json("abi_extensions", stream);
-   stream.write(':');
-   to_json(def.abi_extensions, stream);
+   to_json_write_helper(def.version, "version", false, stream);
+   to_json_write_helper(def.types, "types", true, stream);
+   to_json_write_helper(def.structs, "structs", true, stream);
+   to_json_write_helper(def.actions, "actions", true, stream);
+   to_json_write_helper(def.tables, "tables", true, stream);
+   to_json_write_helper(def.ricardian_clauses, "ricardian_clauses", true, stream);
+   to_json_write_helper(def.error_messages, "error_messages", true, stream);
    if (!def.variants.value.empty()) {
-      stream.write(',');
-      to_json("variants", stream);
-      stream.write(':');
-      to_json(def.variants.value, stream);
+      to_json_write_helper(def.variants.value, "variants", true, stream);
    }
    if (!def.action_results.value.empty()) {
-      stream.write(',');
-      to_json("action_results", stream);
-      stream.write(':');
-      to_json(def.action_results.value, stream);
+      to_json_write_helper(def.action_results.value, "action_results", true, stream);
    }
    if (!def.kv_tables.value.empty()) {
-      stream.write(',');
-      to_json("kv_tables", stream);
-      stream.write(':');
-      to_json(def.kv_tables.value, stream);
+      to_json_write_helper(def.kv_tables.value, "kv_tables", true, stream);
    }
    stream.write('}');
 }
