@@ -362,15 +362,9 @@ void to_json(const abi_def& def, S& stream) {
    to_json_write_helper(def.tables, "tables", true, stream);
    to_json_write_helper(def.ricardian_clauses, "ricardian_clauses", true, stream);
    to_json_write_helper(def.error_messages, "error_messages", true, stream);
-   if (!def.variants.value.empty()) {
-      to_json_write_helper(def.variants.value, "variants", true, stream);
-   }
-   if (!def.action_results.value.empty()) {
-      to_json_write_helper(def.action_results.value, "action_results", true, stream);
-   }
-   if (!def.kv_tables.value.empty()) {
-      to_json_write_helper(def.kv_tables.value, "kv_tables", true, stream);
-   }
+   to_json_write_helper(def.variants.value.empty()? std::vector<variant_def>() : def.variants.value, "variants", true, stream);
+   to_json_write_helper(def.action_results.value.empty()? std::vector<action_result_def>() : def.action_results.value, "action_results", true, stream);
+   to_json_write_helper(def.kv_tables.value.empty() ? std::map<eosio::name, kv_table_entry_def>() : def.kv_tables.value, "kv_tables", true, stream);
    stream.write('}');
 }
 } // namespace eosio
