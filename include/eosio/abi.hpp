@@ -23,22 +23,6 @@ enum class abi_error {
    bad_abi
 };
 
-enum class abi_version {
-   invalid,
-   v_1_0,
-   v_1_1
-};
-
-inline abi_version get_abi_version(const std::string& ver_str) {
-   if (ver_str == "eosio::abi/1.0") {
-      return abi_version::v_1_0;
-   }
-   if (ver_str == "eosio::abi/1.1") {
-      return abi_version::v_1_1;
-   }
-   return abi_version::invalid;
-}
-
 constexpr inline std::string_view convert_abi_error(eosio::abi_error e) {
    switch (e) {
       case abi_error::no_error: return "No error";
@@ -378,12 +362,9 @@ void to_json(const abi_def& def, S& stream) {
    to_json_write_helper(def.tables, "tables", true, stream);
    to_json_write_helper(def.ricardian_clauses, "ricardian_clauses", true, stream);
    to_json_write_helper(def.error_messages, "error_messages", true, stream);
-   const abi_version ver = get_abi_version(def.version);
-   if (ver != abi_version::v_1_0) {
-      to_json_write_helper(def.variants.value.empty()? std::vector<variant_def>() : def.variants.value, "variants", true, stream);
-      to_json_write_helper(def.action_results.value.empty()? std::vector<action_result_def>() : def.action_results.value, "action_results", true, stream);
-      to_json_write_helper(def.kv_tables.value.empty() ? std::map<eosio::name, kv_table_entry_def>() : def.kv_tables.value, "kv_tables", true, stream);
-   }
+   to_json_write_helper(def.variants.value.empty()? std::vector<variant_def>() : def.variants.value, "variants", true, stream);
+   to_json_write_helper(def.action_results.value.empty()? std::vector<action_result_def>() : def.action_results.value, "action_results", true, stream);
+   to_json_write_helper(def.kv_tables.value.empty() ? std::map<eosio::name, kv_table_entry_def>() : def.kv_tables.value, "kv_tables", true, stream);
    stream.write('}');
 }
 } // namespace eosio
