@@ -36,7 +36,7 @@
 #pragma clang diagnostic pop
 #endif
 
-#include "abieos_numeric.hpp"
+#include "eosio/abieos_numeric.hpp"
 
 #include "rapidjson/reader.h"
 #include "rapidjson/stringbuffer.h"
