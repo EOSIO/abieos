@@ -81,7 +81,7 @@ namespace detail {
  */
 inline void check(bool pred, std::string_view msg) {
    if (!pred)
-      detail::assert_or_throw(msg);
+      eosio::detail::assert_or_throw(msg);
 }
 
 /**
@@ -96,7 +96,7 @@ inline void check(bool pred, std::string_view msg) {
  */
 inline void check(bool pred, const char* msg) {
    if (!pred)
-      detail::assert_or_throw(msg);
+      eosio::detail::assert_or_throw(msg);
 }
 
 /**
@@ -111,7 +111,7 @@ inline void check(bool pred, const char* msg) {
  */
 inline void check(bool pred, const std::string& msg) {
    if (!pred)
-      detail::assert_or_throw(std::string_view{msg.c_str(), msg.size()});
+      eosio::detail::assert_or_throw(std::string_view{msg.c_str(), msg.size()});
 }
 
 /**
@@ -126,7 +126,7 @@ inline void check(bool pred, const std::string& msg) {
  */
 inline void check(bool pred, std::string&& msg) {
    if (!pred)
-      detail::assert_or_throw(std::move(msg));
+      eosio::detail::assert_or_throw(std::move(msg));
 }
 
 /**
@@ -142,7 +142,7 @@ inline void check(bool pred, std::string&& msg) {
  */
 inline void check(bool pred, const char* msg, size_t n) {
    if (!pred)
-      detail::assert_or_throw(std::string_view{msg, n});
+      eosio::detail::assert_or_throw(std::string_view{msg, n});
 }
 
 /**
@@ -158,7 +158,7 @@ inline void check(bool pred, const char* msg, size_t n) {
  */
 inline void check(bool pred, const std::string& msg, size_t n) {
    if (!pred)
-      detail::assert_or_throw(msg.substr(0, n));
+      eosio::detail::assert_or_throw(msg.substr(0, n));
 }
 
 /**
@@ -173,6 +173,6 @@ inline void check(bool pred, const std::string& msg, size_t n) {
  */
 inline void check(bool pred, uint64_t code) {
    if (!pred)
-      detail::assert_or_throw(code);
+      eosio::detail::assert_or_throw(code);
 }
 } // namespace eosio
