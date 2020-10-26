@@ -603,13 +603,13 @@ namespace eosio { namespace ship_protocol {
    using contract_index_long_double = std::variant<contract_index_long_double_v0>;
 
    struct key_value_v0 {
-      eosio::name         database = {};
       eosio::name         contract = {};
       eosio::input_stream key      = {};
       eosio::input_stream value    = {};
+      eosio::name         payer    = {};
    };
 
-   EOSIO_REFLECT(key_value_v0, database, contract, key, value)
+   EOSIO_REFLECT(key_value_v0, contract, key, value, payer)
 
    using key_value = std::variant<key_value_v0>;
 
