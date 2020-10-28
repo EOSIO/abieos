@@ -9,7 +9,7 @@
 #include <string>
 #include <string_view>
 
-#include "abieos_ripemd160.hpp"
+#include "eosio/abieos_ripemd160.hpp"
 
 using namespace eosio;
 
