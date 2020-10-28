@@ -162,13 +162,17 @@ void to_json(const name& obj, S& stream) {
 }
 
 inline namespace literals {
-#pragma clang diagnostic push
-#pragma clang diagnostic ignored "-Wgnu-string-literal-operator-template"
+#if defined(__clang__)
+# pragma clang diagnostic push
+# pragma clang diagnostic ignored "-Wgnu-string-literal-operator-template"
+#endif
    template <typename T, T... Str>
    inline constexpr name operator""_n() {
       return name(string_to_name_strict<Str...>()); }
    inline constexpr name operator""_h(const char* s, size_t) { return name( hash_name(s) ); }
-#pragma clang diagnostic pop
+#if defined(__clang__)
+# pragma clang diagnostic pop
+#endif
 } // namespace literals
 
 } // namespace eosio
