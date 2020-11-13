@@ -144,21 +144,21 @@ namespace eosio { namespace ship_protocol {
 
    EOSIO_REFLECT(get_blocks_result_v0, base get_blocks_result_base, block, traces, deltas)
 
-   struct row {
-      bool                present = {};
+   struct row_v1 {
+      uint8_t             present = {};
       eosio::input_stream data    = {};
    };
 
-   EOSIO_REFLECT(row, present, data)
+   EOSIO_REFLECT(row_v1, present, data)
 
-   struct table_delta_v0 {
-      std::string      name = {};
-      std::vector<row> rows = {};
+   struct table_delta_v1 {
+      std::string         name = {};
+      std::vector<row_v1> rows = {};
    };
 
-   EOSIO_REFLECT(table_delta_v0, name, rows)
+   EOSIO_REFLECT(table_delta_v1, name, rows)
 
-   using table_delta = std::variant<table_delta_v0>;
+   using table_delta = std::variant<table_delta_v1>;
 
    struct permission_level {
       eosio::name actor      = {};
