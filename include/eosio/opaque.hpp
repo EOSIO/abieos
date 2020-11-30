@@ -67,6 +67,12 @@ class opaque_base {
    void from(S& stream) {
       eosio::from_bin(this->bin, stream);
    }
+
+  template <typename S>
+  void to_bin(S& stream) const {
+    eosio::to_bin(this->bin, stream);
+  }
+
 };
 
 template <typename T>
@@ -93,6 +99,7 @@ class opaque<std::vector<T>> : public opaque_base<std::vector<T>> {
       this->unpack_next(obj);
       return obj;
    }
+
 };
 
 template <typename T>
@@ -104,5 +111,10 @@ template <typename T, typename S>
 void from_bin(opaque<T>& obj, S& stream) {
    obj.from(stream);
 }
+
+  template <typename T, typename S>
+  void to_bin(const opaque<T>& obj, S& stream) {
+    obj.to_bin(stream);
+  }
 
 } // namespace eosio
