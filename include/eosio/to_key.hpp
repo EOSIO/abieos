@@ -111,6 +111,12 @@ void to_key(const std::vector<T>& obj, S& stream) {
    to_key_optional((const T*)nullptr, stream);
 }
 
+template <typename S>
+void to_key(const std::vector<bool>& obj, S& stream) {
+   for (bool elem : obj) { to_key_optional(&elem, stream); }
+   to_key_optional((const bool*)nullptr, stream);
+}
+
 template <typename T, typename S>
 void to_key(const std::list<T>& obj, S& stream) {
    to_key_range(obj, stream);
