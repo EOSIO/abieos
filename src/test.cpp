@@ -925,6 +925,19 @@ void check_types() {
     testWith(testAbiName);
     testWith(testHexAbiName);
 
+    auto check_checksum_capacity = [&](const auto& checksum, size_t capacity, const char* msg) {
+        if(checksum.capacity() != capacity)
+            throw std::runtime_error(std::string{msg} + " capacity test failed");
+    };
+
+    check_checksum_capacity(eosio::checksum160(), 20, "checksum160");
+    check_checksum_capacity(eosio::checksum256(), 32, "checksum256");
+    check_checksum_capacity(eosio::checksum512(), 64, "checksum512");
+
+    check_checksum_capacity(eosio::checksum160({1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1}), 20, "checksum160");
+    check_checksum_capacity(eosio::checksum256({1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1}), 32, "checksum256");
+    check_checksum_capacity(eosio::checksum512({1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1}), 64, "checksum512");
+
     abieos_destroy(context);
 }
 
