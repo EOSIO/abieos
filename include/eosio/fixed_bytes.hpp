@@ -185,6 +185,10 @@ class fixed_bytes {
    constexpr const Word* data() const { return value.data(); }
    constexpr std::size_t size() const { return value.size(); }
    /**
+    * Get the Word storing capacity in the underlying data of the contained std::array
+    */
+   constexpr std::size_t capacity() const { return Size; }
+   /**
     * Get the contained std::array
     */
    constexpr const auto&                 get_array() const { return value; }
