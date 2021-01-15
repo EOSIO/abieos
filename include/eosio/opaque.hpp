@@ -33,11 +33,13 @@ namespace eosio {
 ///   foo_type foo_value; 
 ///   from_bin(foo_value, serialized_foo_stream);
 ///   if (foo_value.field1 > 1 || foo_value.field2 == "meet_precondition") {
-///      auto sz = foo_value.field3.unpack_size();
-///      for (size_t i = 0; i < sz; ++i) {
-///         if (foo_value.field3.unpack_next() == "value_to_be_searched") {
-///            do_something_when_found();
-///            break;
+///      if(!foo_value.field3.empty()) {
+///         auto sz = foo_value.field3.unpack_size();
+///         for (size_t i = 0; i < sz; ++i) {
+///            if (foo_value.field3.unpack_next() == "value_to_be_searched") {
+///               do_something_when_found();
+///               break;
+///            }
 ///         }
 ///      }
 ///   }
@@ -53,8 +55,14 @@ class opaque_base {
    explicit opaque_base(const std::vector<char>& data) : bin(data) {}
    explicit opaque_base(input_stream strm) { eosio::from_bin(bin, strm); }
 
+   /**
+      @pre this->empty() should be false.
+   */
    void unpack(T& obj) { eosio::from_bin(obj, bin); }
 
+   /**
+      @pre this->empty() should be false.
+   */
    T unpack() {
       T obj;
       this->unpack(obj);
@@ -86,9 +94,13 @@ class opaque<std::vector<T>> : public opaque_base<std::vector<T>> {
  public:
    using opaque_base<std::vector<T>>::opaque_base;
 
-   size_t unpack_size() {
-      uint32_t num;
-      varuint32_from_bin(num, this->bin);
+   /** Determine the size of the vector to be unpacked.
+
+      @pre this->empty() should be false.
+   */
+   uint64_t unpack_size() {
+      uint64_t num;
+      varuint64_from_bin(num, this->bin);
       return num;
    }
 
