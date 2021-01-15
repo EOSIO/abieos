@@ -55,8 +55,14 @@ class opaque_base {
    explicit opaque_base(const std::vector<char>& data) : bin(data) {}
    explicit opaque_base(input_stream strm) { eosio::from_bin(bin, strm); }
 
+   /**
+      @pre this->empty() should be false.
+   */
    void unpack(T& obj) { eosio::from_bin(obj, bin); }
 
+   /**
+      @pre this->empty() should be false.
+   */
    T unpack() {
       T obj;
       this->unpack(obj);
@@ -90,7 +96,7 @@ class opaque<std::vector<T>> : public opaque_base<std::vector<T>> {
 
    /** Determine the size of the vector to be unpacked.
 
-    @pre this->empty() should be false.
+      @pre this->empty() should be false.
    */
    uint64_t unpack_size() {
       uint64_t num;
