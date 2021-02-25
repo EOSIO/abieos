@@ -616,6 +616,12 @@ extern const char* const state_history_plugin_abi = R"({
             "name": "prunable_data_none", "fields": [
                 { "name": "prunable_digest", "type": "signature" }
             ]
+        },
+        {
+            "name": "transaction_trace_exception", "fields": [
+                { "name": "error_code", "type": "int64" },
+                { "name": "error_message", "type": "string" }
+            ]
         }
     ],
     "types": [
@@ -661,7 +667,8 @@ extern const char* const state_history_plugin_abi = R"({
         { "name": "resource_limits_ratio", "types": ["resource_limits_ratio_v0"] },
         { "name": "elastic_limit_parameters", "types": ["elastic_limit_parameters_v0"] },
         { "name": "resource_limits_config", "types": ["resource_limits_config_v0"] },
-        { "name": "block_signing_authority", "types": ["block_signing_authority_v0"] }
+        { "name": "block_signing_authority", "types": ["block_signing_authority_v0"] },
+        { "name": "transaction_trace_msg", "types": ["transaction_trace_exception", "transaction_trace"] }
     ],
     "tables": [
         { "name": "account", "type": "account", "key_names": ["name"] },
