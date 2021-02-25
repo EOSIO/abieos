@@ -48,7 +48,7 @@ set_target_properties(abieos_module PROPERTIES OUTPUT_NAME "abieos")
 
 enable_testing()
 
-add_executable(test_abieos src/test.cpp src/abieos.cpp)
+add_executable(test_abieos src/test.cpp src/abieos.cpp src/ship.abi.cpp)
 target_link_libraries(test_abieos abieos ${CMAKE_THREAD_LIBS_INIT})
 add_test(NAME test_abieos COMMAND test_abieos)
 
