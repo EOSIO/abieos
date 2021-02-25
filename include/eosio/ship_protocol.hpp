@@ -75,12 +75,6 @@ namespace eosio { namespace ship_protocol {
       report_error("unknown status: " + s);
    }
 
-   template <typename S>
-   void to_json(const transaction_status& status, S& stream) {
-      // todo: switch to new serializer string support.
-      return eosio::to_json(to_string(status), stream);
-   }
-
    struct get_status_request_v0 {};
 
    EOSIO_REFLECT(get_status_request_v0)
@@ -337,6 +331,10 @@ namespace eosio { namespace ship_protocol {
       std::optional<account_delta>           account_ram_delta = {};
       std::optional<std::string>             except            = {};
       std::optional<uint64_t>                error_code        = {};
+      // semantically, this should be std::optional<transaction_trace>;
+      // optional serializes as bool[,transaction_trace]
+      // vector serializes as size[,transaction_trace..] but vector will only ever have 0 or 1 transaction trace
+      // This assumes that bool and size for false/true serializes to same as size 0/1
       std::vector<recurse_transaction_trace> failed_dtrx_trace = {};
       std::optional<partial_transaction>     partial           = {};
    };
@@ -349,21 +347,6 @@ namespace eosio { namespace ship_protocol {
    struct recurse_transaction_trace {
       transaction_trace recurse = {};
    };
-
-   template <typename S>
-   void to_bin(const recurse_transaction_trace& obj, S& stream) {
-      return to_bin(obj.recurse, stream);
-   }
-
-   template <typename S>
-   void from_bin(recurse_transaction_trace& obj, S& stream) {
-      return from_bin(obj.recurse, stream);
-   }
-
-   template <typename S>
-   void to_json(const recurse_transaction_trace& obj, S& stream) {
-      return to_json(obj.recurse, stream);
-   }
 
    struct producer_key {
       eosio::name       producer_name     = {};
@@ -890,3 +873,54 @@ namespace eosio { namespace ship_protocol {
    using resource_limits_config = std::variant<resource_limits_config_v0>;
 
 }} // namespace eosio::ship_protocol
+
+namespace eosio {
+
+   template <typename S>
+   void to_json(const ship_protocol::transaction_status& status, S& stream) {
+      // todo: switch to new serializer string support.
+      return eosio::to_json((uint8_t)status, stream);
+   }
+
+   template <typename S>
+   void from_json(ship_protocol::transaction_status& status, S& stream) {
+      uint8_t v;
+      eosio::from_json(v, stream);
+      status = (ship_protocol::transaction_status)v;
+   }
+
+   template <typename S>
+   void to_bin(const ship_protocol::recurse_transaction_trace& obj, S& stream) {
+      return to_bin(obj.recurse, stream);
+   }
+
+   template <typename S>
+   void from_bin(ship_protocol::recurse_transaction_trace& obj, S& stream) {
+      return from_bin(obj.recurse, stream);
+   }
+
+   template <typename S>
+   void to_json(const ship_protocol::recurse_transaction_trace& obj, S& stream) {
+      return to_json(obj.recurse, stream);
+   }
+
+   template <typename S>
+   void to_json(const std::vector<ship_protocol::recurse_transaction_trace>& obj, S& stream) {
+      if (!obj.empty()) {
+         to_json(obj[0], stream);
+      } else {
+         stream.write("null", 4);
+      }
+   }
+
+   template <typename S>
+   void from_json(std::vector<ship_protocol::recurse_transaction_trace>& result, S& stream) {
+      if(stream.get_null_pred()) {
+         result.clear();
+      } else {
+         result.emplace_back();
+         from_json(result[0], stream);
+      }
+   }
+
+}

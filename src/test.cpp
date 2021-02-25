@@ -11,6 +11,8 @@
 #include <string>
 #include <vector>
 
+extern const char* const state_history_plugin_abi;
+
 inline const bool generate_corpus = false;
 
 const char tokenHexAbi[] = "0e656f73696f3a3a6162692f312e30010c6163636f756e745f6e616d65046e61"
@@ -386,6 +388,146 @@ const char testKvTablesAbi[] = R"({
     }
 })";
 
+const char packedTransactionAbi[] = R"({
+    "version": "eosio::abi/1.0",
+    "types": [
+        {
+            "new_type_name": "account_name",
+            "type": "name"
+        },
+        {
+            "new_type_name": "action_name",
+            "type": "name"
+        },
+        {
+            "new_type_name": "permission_name",
+            "type": "name"
+        }
+    ],
+    "structs": [
+        {
+            "name": "permission_level",
+            "base": "",
+            "fields": [
+                {
+                    "name": "actor",
+                    "type": "account_name"
+                },
+                {
+                    "name": "permission",
+                    "type": "permission_name"
+                }
+            ]
+        },
+        {
+            "name": "action",
+            "base": "",
+            "fields": [
+                {
+                    "name": "account",
+                    "type": "account_name"
+                },
+                {
+                    "name": "name",
+                    "type": "action_name"
+                },
+                {
+                    "name": "authorization",
+                    "type": "permission_level[]"
+                },
+                {
+                    "name": "data",
+                    "type": "bytes"
+                }
+            ]
+        },
+        {
+            "name": "extension",
+            "base": "",
+            "fields": [
+                {
+                    "name": "type",
+                    "type": "uint16"
+                },
+                {
+                    "name": "data",
+                    "type": "bytes"
+                }
+            ]
+        },
+        {
+            "name": "transaction_header",
+            "base": "",
+            "fields": [
+                {
+                    "name": "expiration",
+                    "type": "time_point_sec"
+                },
+                {
+                    "name": "ref_block_num",
+                    "type": "uint16"
+                },
+                {
+                    "name": "ref_block_prefix",
+                    "type": "uint32"
+                },
+                {
+                    "name": "max_net_usage_words",
+                    "type": "varuint32"
+                },
+                {
+                    "name": "max_cpu_usage_ms",
+                    "type": "uint8"
+                },
+                {
+                    "name": "delay_sec",
+                    "type": "varuint32"
+                }
+            ]
+        },
+        {
+            "name": "transaction",
+            "base": "transaction_header",
+            "fields": [
+                {
+                    "name": "context_free_actions",
+                    "type": "action[]"
+                },
+                {
+                    "name": "actions",
+                    "type": "action[]"
+                },
+                {
+                    "name": "transaction_extensions",
+                    "type": "extension[]"
+                }
+            ]
+        },
+        {
+            "name": "packed_transaction_v0",
+            "base": "",
+            "fields": [
+                {
+                    "name": "signatures",
+                    "type": "signature[]"
+                },
+                {
+                    "name": "compression",
+                    "type": "uint8"
+                },
+                {
+                    "name": "packed_context_free_data",
+                    "type": "bytes"
+                },
+                {
+                    "name": "packed_trx",
+                    "type": "transaction"
+                }
+            ]
+        }
+    ]
+})";
+
 std::string string_to_hex(const std::string& s) {
     std::string result;
     uint8_t size = s.size();
@@ -456,6 +598,8 @@ void check_types() {
     auto testHexAbiName = check_context(context, abieos_string_to_name(context, "test.hex"));
     auto testKvAbiName = check_context(context, abieos_string_to_name(context, "testkv.abi"));
     check_context(context, abieos_set_abi(context, 0, transactionAbi));
+    check_context(context, abieos_set_abi(context, 1, packedTransactionAbi));
+    check_context(context, abieos_set_abi(context, 2, state_history_plugin_abi));
     check_context(context, abieos_set_abi_hex(context, token, tokenHexAbi));
     check_context(context, abieos_set_abi(context, testAbiName, testAbi));
     check_context(context, abieos_set_abi_hex(context, testHexAbiName, testHexAbi));
@@ -494,6 +638,12 @@ void check_types() {
         if (contract == 0) {
             abi_is_bin = false;
             abi = {transactionAbi, transactionAbi + strlen(transactionAbi)};
+        } else if (contract == 1) {
+           abi_is_bin = false;
+           abi = {packedTransactionAbi, packedTransactionAbi + strlen( packedTransactionAbi )};
+        } else if (contract == 2) {
+           abi_is_bin = false;
+           abi = {state_history_plugin_abi, state_history_plugin_abi + strlen( state_history_plugin_abi )};
         } else if (contract == token) {
             abi_is_bin = true;
             std::string error;
@@ -848,6 +998,12 @@ void check_types() {
         R"({"ref_block_num":1234,"ref_block_prefix":5678,"expiration":"2009-02-13T23:31:31.000","max_net_usage_words":0,"max_cpu_usage_ms":0,"delay_sec":0,"context_free_actions":[],"actions":[{"account":"eosio.token","name":"transfer","authorization":[{"actor":"useraaaaaaaa","permission":"active"}],"data":"608C31C6187315D6708C31C6187315D60100000000000000045359530000000000"}],"transaction_extensions":[]})",
         R"({"expiration":"2009-02-13T23:31:31.000","ref_block_num":1234,"ref_block_prefix":5678,"max_net_usage_words":0,"max_cpu_usage_ms":0,"delay_sec":0,"context_free_actions":[],"actions":[{"account":"eosio.token","name":"transfer","authorization":[{"actor":"useraaaaaaaa","permission":"active"}],"data":"608C31C6187315D6708C31C6187315D60100000000000000045359530000000000"}],"transaction_extensions":[]})",
         false);
+    check_type(
+        context, 1, "packed_transaction_v0",
+        R"({"signatures":["SIG_K1_K5PGhrkUBkThs8zdTD9mGUJZvxL4eU46UjfYJSEdZ9PXS2Cgv5jAk57yTx4xnrdSocQm6DDvTaEJZi5WLBsoZC4XYNS8b3"],"compression":0,"packed_context_free_data":"","packed_trx":{"expiration":"2009-02-13T23:31:31.000","ref_block_num":1234,"ref_block_prefix":5678,"max_net_usage_words":0,"max_cpu_usage_ms":0,"delay_sec":0,"context_free_actions":[],"actions":[{"account":"eosio.token","name":"transfer","authorization":[{"actor":"useraaaaaaaa","permission":"active"}],"data":"608C31C6187315D6708C31C6187315D60100000000000000045359530000000000"}],"transaction_extensions":[]}})");
+    check_type(
+        context, 2, "transaction_trace",
+        R"(["transaction_trace_v0",{"id":"3098EA9476266BFA957C13FA73C26806D78753099CE8DEF2A650971F07595A69","status":0,"cpu_usage_us":2000,"net_usage_words":25,"elapsed":"194","net_usage":"200","scheduled":false,"action_traces":[["action_trace_v1",{"action_ordinal":1,"creator_action_ordinal":0,"receipt":["action_receipt_v0",{"receiver":"eosio","act_digest":"F2FDEEFF77EFC899EED23EE05F9469357A096DC3083D493571CF68A422C69EFE","global_sequence":"11","recv_sequence":"11","auth_sequence":[{"account":"eosio","sequence":"11"}],"code_sequence":2,"abi_sequence":0}],"receiver":"eosio","act":{"account":"eosio","name":"newaccount","authorization":[{"actor":"eosio","permission":"active"}],"data":"0000000000EA305500409406A888CCA501000000010002C0DED2BC1F1305FB0FAAC5E6C03EE3A1924234985427B6167CA569D13DF435CF0100000001000000010002C0DED2BC1F1305FB0FAAC5E6C03EE3A1924234985427B6167CA569D13DF435CF01000000"},"context_free":false,"elapsed":"83","console":"","account_ram_deltas":[{"account":"oracle.aml","delta":"2724"}],"account_disk_deltas":[],"except":null,"error_code":null,"return_value":""}]],"account_ram_delta":null,"except":null,"error_code":null,"failed_dtrx_trace":null,"partial":null}])");
 
     check_error(context, "recursion limit reached", [&] {
         return abieos_json_to_bin_reorderable(
