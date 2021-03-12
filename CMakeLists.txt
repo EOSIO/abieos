@@ -34,7 +34,7 @@ endif()
 
 find_package(Threads)
 
-add_library(abieos STATIC src/abi.cpp src/crypto.cpp include/eosio/fpconv.c)
+add_library(abieos STATIC src/abi.cpp src/crypto.cpp include/eosio/fpconv.c src/abieos.cpp)
 target_include_directories(abieos PUBLIC include external/rapidjson/include)
 
 if(ABIEOS_NO_INT128)
@@ -86,3 +86,5 @@ endif()
 if (NOT ABIEOS_ONLY_LIBRARY)
 add_subdirectory(tools)
 endif()
+
+install(TARGETS abieos DESTINATION .)
