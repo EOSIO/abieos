@@ -714,7 +714,57 @@ namespace eosio { namespace ship_protocol {
 
    EOSIO_REFLECT(global_property_v1, proposed_schedule_block_num, proposed_schedule, configuration, chain_id)
 
-   using global_property = std::variant<global_property_v0, global_property_v1>;
+   struct kv_database_config {
+      uint32_t max_key_size   = 0; ///< the maximum size in bytes of a key
+      uint32_t max_value_size = 0; ///< the maximum size in bytes of a value
+      uint32_t max_iterators  = 0; ///< the maximum number of iterators that a contract can have simultaneously.
+   };
+
+   EOSIO_REFLECT(kv_database_config, max_key_size, max_value_size, max_iterators)
+
+   struct wasm_config {
+      uint32_t max_mutable_global_bytes;
+      uint32_t max_table_elements;
+      uint32_t max_section_elements;
+      uint32_t max_linear_memory_init;
+      uint32_t max_func_local_bytes;
+      uint32_t max_nested_structures;
+      uint32_t max_symbol_bytes;
+      uint32_t max_module_bytes;
+      uint32_t max_code_bytes;
+      uint32_t max_pages;
+      uint32_t max_call_depth;
+   };
+
+   EOSIO_REFLECT(wasm_config, max_mutable_global_bytes, max_table_elements, max_section_elements,
+                 max_linear_memory_init, max_func_local_bytes, max_nested_structures, max_symbol_bytes,
+                 max_module_bytes, max_code_bytes, max_pages, max_call_depth)
+
+   struct transaction_hook {
+      uint32_t type;
+      name     contract;
+      name     action;
+   };
+
+   EOSIO_REFLECT(transaction_hook, type, contract, action)
+
+   struct global_property_extension_v0 {
+      uint32_t                      proposed_security_group_block_num = 0;
+      std::vector<name>             proposed_security_group_participants;
+      std::vector<transaction_hook> transaction_hooks;
+   };
+
+   EOSIO_REFLECT(global_property_extension_v0, proposed_security_group_block_num, proposed_security_group_participants, transaction_hooks)
+
+   struct global_property_v2 : global_property_v1 {
+      kv_database_config                         kv_configuration;
+      wasm_config                                wasm_configuration;
+      std::variant<global_property_extension_v0> extension;
+   };
+
+   EOSIO_REFLECT(global_property_v2, base global_property_v1, kv_configuration, wasm_configuration, extension)
+
+   using global_property = std::variant<global_property_v0, global_property_v1, global_property_v2>;
 
    struct generated_transaction_v0 {
       eosio::name         sender     = {};
