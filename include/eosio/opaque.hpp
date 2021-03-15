@@ -70,6 +70,7 @@ class opaque_base {
    }
 
    bool empty() const { return !bin.remaining(); }
+   size_t num_bytes() const { return bin.remaining();  }
 
    template <typename S>
    void from(S& stream) {
