@@ -66,6 +66,7 @@ struct pseudo_variant;
 // !!!
 template <typename SrcIt, typename DestIt>
 void hex(SrcIt begin, SrcIt end, DestIt dest) {
+    static_assert(sizeof(*begin) == 1, "SrcIt should be an iterator to a byte");
     auto nibble = [&dest](uint8_t i) {
         if (i <= 9)
             *dest++ = '0' + i;
