@@ -53,7 +53,6 @@ class opaque_base {
  public:
    opaque_base() = default;
    explicit opaque_base(const std::vector<char>& data) : bin(data) {}
-   explicit opaque_base(input_stream strm) { eosio::from_bin(bin, strm); }
 
    /**
       @pre this->empty() should be false.
@@ -88,6 +87,8 @@ template <typename T>
 class opaque : public opaque_base<T> {
  public:
    using opaque_base<T>::opaque_base;
+   template <typename U>
+   friend opaque<U> as_opaque(input_stream bin);
 };
 
 template <typename T>
@@ -113,6 +114,8 @@ class opaque<std::vector<T>> : public opaque_base<std::vector<T>> {
       return obj;
    }
 
+   template <typename U>
+   friend opaque<U> as_opaque(input_stream bin);
 };
 
 template <typename T>
@@ -125,9 +128,16 @@ void from_bin(opaque<T>& obj, S& stream) {
    obj.from(stream);
 }
 
-  template <typename T, typename S>
-  void to_bin(const opaque<T>& obj, S& stream) {
-    obj.to_bin(stream);
-  }
+template <typename T, typename S>
+void to_bin(const opaque<T>& obj, S& stream) {
+   obj.to_bin(stream);
+}
+
+template <typename U>
+opaque<U> as_opaque(input_stream bin) {
+   opaque<U> result;
+   result.bin = bin;
+   return result;
+}
 
 } // namespace eosio
