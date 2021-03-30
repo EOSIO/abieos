@@ -52,7 +52,11 @@ constexpr inline std::string_view convert_stream_error(stream_error e) {
 
 template<typename T>
 constexpr bool has_bitwise_serialization() {
-   if constexpr (std::is_arithmetic_v<T>) {
+   if constexpr (std::is_arithmetic_v<T> 
+#ifndef ABIEOS_NO_INT128
+   || std::is_same_v<T, __int128> || std::is_same_v<T, unsigned __int128>
+#endif
+   ) {
       return true;
    } else if constexpr (std::is_enum_v<T>) {
       static_assert(!std::is_convertible_v<T, std::underlying_type_t<T>>, "Serializing unscoped enum");
