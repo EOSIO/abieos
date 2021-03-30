@@ -7,6 +7,13 @@
 #include <string>
 #include <variant>
 #include <vector>
+#include "fixed_bytes.hpp"
+#include "crypto.hpp"
+#include "varint.hpp"
+#include "float.hpp"
+#include "time.hpp"
+#include "bytes.hpp"
+#include "asset.hpp"
 
 namespace eosio {
 
@@ -269,8 +276,24 @@ extern const abi_serializer* const array_abi_serializer;
 extern const abi_serializer* const extension_abi_serializer;
 extern const abi_serializer* const optional_abi_serializer;
 
+using basic_abi_types =
+      std::tuple<bool, int8_t, uint8_t, int16_t, uint16_t, int32_t, uint32_t, int64_t, uint64_t, __int128, unsigned __int128,
+               varuint32, varint32, float, double, float128, time_point, time_point_sec, block_timestamp, name,
+               bytes, std::string, checksum160, checksum256, checksum256, public_key, private_key, signature,
+               symbol, symbol_code, asset>;
+
+namespace detail {
+   template <typename U, typename... T>
+   constexpr bool contains(std::tuple<T...>*) {
+      return (std::is_same_v<U, T> || ...);
+   }
+} // namespace detail
+
 template <typename T>
-auto add_type(abi& a, T*) -> std::enable_if_t<reflection::has_for_each_field_v<T>, abi_type*> {
+constexpr bool is_basic_abi_type = detail::contains<T>((basic_abi_types*)nullptr);
+
+template <typename T>
+auto add_type(abi& a, T*) -> std::enable_if_t<reflection::has_for_each_field_v<T> && !is_basic_abi_type<T>, abi_type*> {
    std::string name      = get_type_name((T*)nullptr);
    auto [iter, inserted] = a.abi_types.try_emplace(name, name, abi_type::struct_{}, object_abi_serializer);
    if (!inserted)
@@ -284,7 +307,7 @@ auto add_type(abi& a, T*) -> std::enable_if_t<reflection::has_for_each_field_v<T
 }
 
 template <typename T>
-auto add_type(abi& a, T* t) -> std::enable_if_t<!reflection::has_for_each_field_v<T>, abi_type*> {
+auto add_type(abi& a, T* t) -> std::enable_if_t<is_basic_abi_type<T>, abi_type*> {
    auto iter = a.abi_types.find(get_type_name(t));
    check(iter != a.abi_types.end(), convert_abi_error(abi_error::unknown_type));
    return &iter->second;
@@ -301,7 +324,7 @@ abi_type* add_type(abi& a, std::vector<T>*) {
 }
 
 template <typename... T>
-abi_type* add_type(abi& a, std::variant<T...>*) {
+auto add_type(abi& a, std::variant<T...>*) -> std::enable_if_t<!is_basic_abi_type<std::variant<T...>>, abi_type*> {
    abi_type::variant types;
    (
          [&](auto* t) {
