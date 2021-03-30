@@ -89,9 +89,15 @@ constexpr auto get_variant_type_name() {
 template <typename... T>
 constexpr auto variant_type_name = get_variant_type_name<T...>();
 
+} // namespace eosio
+
+namespace std {
+// For all the types defined in ship_protocal.hpp, it relies on the argument-dependent name lookup
+// to work; that is, the get_type_name() should be defined in the namespace which is the same namespace of
+// the first argument. For variant, it is defined in the namespace; therefore, we need to define get_type_name()
+// in the std namespace.
 template <typename... T>
 constexpr const char* get_type_name(std::variant<T...>*) {
-   return variant_type_name<T...>.data();
+   return eosio::variant_type_name<T...>.data();
 }
-
-} // namespace eosio
+}
