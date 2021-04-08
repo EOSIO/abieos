@@ -279,7 +279,7 @@ extern const abi_serializer* const optional_abi_serializer;
 using basic_abi_types =
       std::tuple<bool, int8_t, uint8_t, int16_t, uint16_t, int32_t, uint32_t, int64_t, uint64_t, __int128, unsigned __int128,
                varuint32, varint32, float, double, float128, time_point, time_point_sec, block_timestamp, name,
-               bytes, std::string, checksum160, checksum256, checksum256, public_key, private_key, signature,
+               bytes, std::string, checksum160, checksum256, checksum256, checksum512, public_key, private_key, signature,
                symbol, symbol_code, asset>;
 
 namespace detail {
