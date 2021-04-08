@@ -1,5 +1,5 @@
 #pragma once
-
+#include "to_bin.hpp"
 #include "from_bin.hpp"
 #include "stream.hpp"
 #include "types.hpp"
