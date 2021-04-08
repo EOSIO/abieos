@@ -35,14 +35,21 @@ endif()
 find_package(Threads)
 
 add_library(abieos STATIC src/abi.cpp src/crypto.cpp include/eosio/fpconv.c)
-target_include_directories(abieos PUBLIC include external/rapidjson/include)
+target_include_directories(abieos PUBLIC 
+                          "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>/include" 
+                          "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>/external/rapidjson/include"
+                          "$<INSTALL_INTERFACE:include>")
 
 if(ABIEOS_NO_INT128)
 target_compile_definitions(abieos PUBLIC ABIEOS_NO_INT128)
 endif()
 
 add_library(abieos_module MODULE src/abieos.cpp src/abi.cpp src/crypto.cpp include/eosio/fpconv.c)
-target_include_directories(abieos_module PUBLIC include external/rapidjson/include)
+target_include_directories(abieos_module PUBLIC 
+                          "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>/include;" 
+                          "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>/external/rapidjson/include" 
+                          "$<INSTALL_INTERFACE:include>")
+
 target_link_libraries(abieos_module ${CMAKE_THREAD_LIBS_INIT})
 set_target_properties(abieos_module PROPERTIES OUTPUT_NAME "abieos")
 
@@ -86,3 +93,24 @@ endif()
 if (NOT ABIEOS_ONLY_LIBRARY)
 add_subdirectory(tools)
 endif()
+
+
+install(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/include/eosio DESTINATION include)
+
+install(TARGETS abieos
+  EXPORT abieos
+	INCLUDES DESTINATION include
+	ARCHIVE
+)
+
+install(EXPORT abieos
+  DESTINATION "share/abieos"
+  FILE abieos-targets.cmake
+)
+
+export(TARGETS abieos 
+       FILE ${CMAKE_CURRENT_BINARY_DIR}/share/abieos/abieos-targets.cmake)
+configure_file(abieos-config.cmake.in ${CMAKE_CURRENT_BINARY_DIR}/share/abieos/abieos-config.cmake COPYONLY)
+
+install(FILES ${CMAKE_CURRENT_BINARY_DIR}/share/abieos/abieos-config.cmake
+        DESTINATION "share/abieos")
