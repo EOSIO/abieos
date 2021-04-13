@@ -99,6 +99,8 @@ namespace eosio { namespace ship_protocol {
    EOSIO_REFLECT(get_status_result_v0, head, last_irreversible, trace_begin_block, trace_end_block,
                  chain_state_begin_block, chain_state_end_block, chain_id)
 
+   // When using `get_blocks_request_v1`, `get_blocks_result_v0` will be returned for EOS version 2.0.x and before and
+   // `get_blocks_result_v1` will be returned for EOS version 2.1 RC bug not stable. 
    struct get_blocks_request_v0 {
       uint32_t                    start_block_num        = {};
       uint32_t                    end_block_num          = {};
@@ -113,13 +115,20 @@ namespace eosio { namespace ship_protocol {
    EOSIO_REFLECT(get_blocks_request_v0, start_block_num, end_block_num, max_messages_in_flight, have_positions,
                  irreversible_only, fetch_block, fetch_traces, fetch_deltas)
 
+   // When using `get_blocks_request_v1`, only `get_blocks_result_v2` will be returned
+   struct get_blocks_request_v1 : get_blocks_request_v0 {
+      bool                        fetch_block_header = {};
+   };
+
+   EOSIO_REFLECT(get_blocks_request_v1, base get_blocks_request_v0, fetch_block_header)
+
    struct get_blocks_ack_request_v0 {
       uint32_t num_messages = {};
    };
 
    EOSIO_REFLECT(get_blocks_ack_request_v0, num_messages)
 
-   using request = std::variant<get_status_request_v0, get_blocks_request_v0, get_blocks_ack_request_v0>;
+   using request = std::variant<get_status_request_v0, get_blocks_request_v0, get_blocks_ack_request_v0, get_blocks_request_v1>;
 
    struct get_blocks_result_base {
       block_position                head              = {};
@@ -448,7 +457,17 @@ namespace eosio { namespace ship_protocol {
    };
 
    EOSIO_REFLECT(get_blocks_result_v1, base get_blocks_result_base, block, traces, deltas)
-   using result = std::variant<get_status_result_v0, get_blocks_result_v0, get_blocks_result_v1>;
+
+   struct get_blocks_result_v2 : get_blocks_result_base { 
+      eosio::opaque<signed_block_variant>           block = {};
+      eosio::opaque<signed_block_header>            block_header = {};
+      eosio::opaque<std::vector<transaction_trace>> traces = {};
+      eosio::opaque<std::vector<table_delta>>       deltas = {};
+   };
+
+   EOSIO_REFLECT(get_blocks_result_v2, base get_blocks_result_base, block, block_header, traces, deltas)
+
+   using result = std::variant<get_status_result_v0, get_blocks_result_v0, get_blocks_result_v1, get_blocks_result_v2>;
 
    struct transaction_header {
       eosio::time_point_sec expiration          = {};
