@@ -153,7 +153,8 @@ template <typename T, typename U>
 std::enable_if_t<std::is_base_of_v<U, T>, bool> unpack(opaque<T> opq, U& obj) {
    if (opq.empty())
       return false;
-   eosio::from_bin(obj, opq.get());
+   input_stream bin = opq.get();
+   eosio::from_bin(obj, bin);
    return true;
 }
 
