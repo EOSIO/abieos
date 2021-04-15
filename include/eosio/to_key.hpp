@@ -12,6 +12,7 @@
 #include <variant>
 #include <vector>
 #include <cstring>
+#include <limits>
 
 namespace eosio {
 
