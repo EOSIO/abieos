@@ -100,7 +100,7 @@ install(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/include/eosio DESTINATION include)
 install(TARGETS abieos
   EXPORT abieos
 	INCLUDES DESTINATION include
-	ARCHIVE
+	ARCHIVE  DESTINATION lib
 )
 
 install(EXPORT abieos
