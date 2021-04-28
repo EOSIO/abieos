@@ -128,7 +128,10 @@ char* int_to_decimal(T value, char* buffer) {
 
 template <typename T, typename S>
 void int_to_json(T value, S& stream) {
-   small_buffer<std::numeric_limits<T>::digits10 + 4> b;
+   // For older versions of libstdc++ (g++ version 9 and below) std::numeric_limits<__int128>::digits10 
+   // would return 0 when compiling with -std=c++17 flag
+   const int num_digits = sizeof(T) == 16 ? 38 : std::numeric_limits<T>::digits10;
+   small_buffer<num_digits + 4> b;
    if (sizeof(T) > 4)
       *b.pos++ = '"';
    b.pos = int_to_decimal(value, b.pos);
