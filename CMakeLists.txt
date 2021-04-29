@@ -33,12 +33,13 @@ Please run the command 'git submodule update --init --recursive'.")
 endif()
 
 find_package(Threads)
+include(GNUInstallDirs)
 
 add_library(abieos STATIC src/abi.cpp src/crypto.cpp include/eosio/fpconv.c)
 target_include_directories(abieos PUBLIC 
                           "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>/include" 
                           "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>/external/rapidjson/include"
-                          "$<INSTALL_INTERFACE:include>")
+                          "$<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>")
 
 if(ABIEOS_NO_INT128)
 target_compile_definitions(abieos PUBLIC ABIEOS_NO_INT128)
@@ -48,7 +49,7 @@ add_library(abieos_module MODULE src/abieos.cpp src/abi.cpp src/crypto.cpp inclu
 target_include_directories(abieos_module PUBLIC 
                           "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>/include;" 
                           "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>/external/rapidjson/include" 
-                          "$<INSTALL_INTERFACE:include>")
+                          "$<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>")
 
 target_link_libraries(abieos_module ${CMAKE_THREAD_LIBS_INIT})
 set_target_properties(abieos_module PROPERTIES OUTPUT_NAME "abieos")
@@ -99,8 +100,8 @@ install(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/include/eosio DESTINATION include)
 
 install(TARGETS abieos
   EXPORT abieos
-	INCLUDES DESTINATION include
-	ARCHIVE  DESTINATION lib
+	INCLUDES DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
+	ARCHIVE  DESTINATION ${CMAKE_INSTALL_LIBDIR}
 )
 
 install(EXPORT abieos
