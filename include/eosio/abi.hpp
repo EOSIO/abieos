@@ -243,6 +243,14 @@ struct abi_type {
    const struct_* as_struct() const { return std::get_if<struct_>(&_data); }
    const variant* as_variant() const { return std::get_if<variant>(&_data); }
 
+   const abi_serializer* get_serializer() const { 
+      const alias* a = std::get_if<alias>(&_data);
+      if (a) {
+         return a->type->get_serializer();
+      }
+      return ser;
+   }
+
    std::string bin_to_json(
          input_stream& bin, std::function<void()> f = [] {}) const;
    std::vector<char> json_to_bin(
