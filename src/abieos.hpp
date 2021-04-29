@@ -588,11 +588,11 @@ using abi = eosio::abi;
 template<typename F>
 inline void json_to_bin(std::vector<char>& bin, const abi_type* type, const jvalue& value, F&& f) {
     jvalue_to_bin_state state{{bin}, &value};
-    type->ser->json_to_bin(state, true, type, true);
+    type->get_serializer()->json_to_bin(state, true, type, true);
     while (!state.stack.empty()) {
         f();
         auto& entry = state.stack.back();
-        entry.type->ser->json_to_bin(state, entry.allow_extensions, entry.type, false);
+        entry.type->get_serializer()->json_to_bin(state, entry.allow_extensions, entry.type, false);
     }
 }
 
@@ -604,14 +604,14 @@ inline void json_to_bin(pseudo_optional*, State& state, bool allow_extensions,
     }
     state.writer.write(char(1));
     const abi_type* t = type->optional_of();
-    return t->ser->json_to_bin(state, allow_extensions, t, true);
+    return t->get_serializer()->json_to_bin(state, allow_extensions, t, true);
 }
 
 template<typename State>
 inline void json_to_bin(pseudo_extension*, State& state, bool allow_extensions,
                                        const abi_type* type, bool) {
     const abi_type* t = type->extension_of();
-    return t->ser->json_to_bin(state, allow_extensions, t, true);
+    return t->get_serializer()->json_to_bin(state, allow_extensions, t, true);
 }
 
 inline void json_to_bin(pseudo_object*, jvalue_to_bin_state& state, bool allow_extensions,
@@ -650,7 +650,7 @@ inline void json_to_bin(pseudo_object*, jvalue_to_bin_state& state, bool allow_e
     eosio::check(!state.skipped_extension,
         eosio::convert_json_error(eosio::from_json_error::unexpected_field));
     state.received_value = &it->second;
-    return field.type->ser->json_to_bin(state, allow_extensions && &field == &fields.back(),
+    return field.type->get_serializer()->json_to_bin(state, allow_extensions && &field == &fields.back(),
                                         field.type, true);
 }
 
@@ -678,7 +678,7 @@ inline void json_to_bin(pseudo_array*, jvalue_to_bin_state& state, bool, const a
     if (trace_jvalue_to_bin)
         printf("%*sitem\n", int(state.stack.size() * 4), "");
     const abi_type * t = type->array_of();
-    return t->ser->json_to_bin(state, false, t, true);
+    return t->get_serializer()->json_to_bin(state, false, t, true);
 }
 
 inline void json_to_bin(pseudo_variant*, jvalue_to_bin_state& state, bool allow_extensions,
@@ -708,7 +708,7 @@ inline void json_to_bin(pseudo_variant*, jvalue_to_bin_state& state, bool allow_
             eosio::convert_json_error(eosio::from_json_error::invalid_type_for_variant));
         eosio::varuint32_to_bin(it - fields.begin(), state.writer);
         state.received_value = &arr[++stack_entry.position];
-        return it->type->ser->json_to_bin(state, allow_extensions, it->type, true);
+        return it->type->get_serializer()->json_to_bin(state, allow_extensions, it->type, true);
     } else {
         if (trace_jvalue_to_bin)
             printf("%*s]\n", int((state.stack.size() - 1) * 4), "");
@@ -747,14 +747,14 @@ inline void json_to_bin(std::vector<char>& bin, const abi_type* type, std::strin
     eosio::vector_stream out(out_buf);
     json_to_bin_state state(mutable_json.data(), out);
 
-    type->ser->json_to_bin(state, true, type, true);
+    type->get_serializer()->json_to_bin(state, true, type, true);
     while(!state.stack.empty()) {
         f();
         auto entry = state.stack.back();
         auto* type = entry.type;
         eosio::check(state.stack.size() <= max_stack_size,
             eosio::convert_abi_error(eosio::abi_error::recursion_limit_reached));
-        type->ser->json_to_bin(state, entry.allow_extensions, type, false);
+        type->get_serializer()->json_to_bin(state, entry.allow_extensions, type, false);
     }
     eosio::check(state.complete(),
         eosio::convert_json_error(eosio::from_json_error::expected_end));
@@ -808,7 +808,7 @@ inline void json_to_bin(pseudo_object*, json_to_bin_state& state, bool allow_ext
         if (trace_json_to_bin)
             printf("%*sfield %d/%d: %s\n", int(state.stack.size() * 4), "", int(stack_entry.position),
                    int(fields.size()), std::string{field.name}.c_str());
-        field.type->ser->json_to_bin(state, allow_extensions && &field == &fields.back(), field.type,
+        field.type->get_serializer()->json_to_bin(state, allow_extensions && &field == &fields.back(), field.type,
                                             true);
     }
 }
@@ -837,7 +837,7 @@ inline void json_to_bin(pseudo_array*, json_to_bin_state& state, bool, const abi
     if (trace_json_to_bin)
         printf("%*sitem\n", int(state.stack.size() * 4), "");
     const abi_type* t = type->array_of();
-    t->ser->json_to_bin(state, false, t, true);
+    t->get_serializer()->json_to_bin(state, false, t, true);
 }
 
 inline void json_to_bin(pseudo_variant*, json_to_bin_state& state, bool allow_extensions,
@@ -872,7 +872,7 @@ inline void json_to_bin(pseudo_variant*, json_to_bin_state& state, bool allow_ex
         eosio::varuint32_to_bin(stack_entry.variant_type_index, state.writer);
     } else if (stack_entry.position == 1) {
         auto& field = fields[stack_entry.variant_type_index];
-        field.type->ser->json_to_bin(state, allow_extensions, field.type, true);
+        field.type->get_serializer()->json_to_bin(state, allow_extensions, field.type, true);
     } else {
        eosio::check(false, eosio::convert_json_error(eosio::from_json_error::expected_variant));
     }
@@ -888,11 +888,11 @@ inline void bin_to_json(eosio::input_stream& bin, const abi_type* type, std::str
     std::vector<char> buffer;
     eosio::vector_stream writer{buffer};
     bin_to_json_state state{bin, writer};
-    type->ser->bin_to_json(state, true, type, true);
+    type->get_serializer()->bin_to_json(state, true, type, true);
     while (!state.stack.empty()) {
         f();
         auto& entry = state.stack.back();
-        entry.type->ser->bin_to_json(state, entry.allow_extensions, entry.type, false);
+        entry.type->get_serializer()->bin_to_json(state, entry.allow_extensions, entry.type, false);
         eosio::check(state.stack.size() <= max_stack_size,
             eosio::convert_abi_error(eosio::abi_error::recursion_limit_reached));
     }
@@ -900,7 +900,7 @@ inline void bin_to_json(eosio::input_stream& bin, const abi_type* type, std::str
 }
 
 inline void bin_to_json(bin_to_json_state& state, bool allow_extensions, const abi_type* type, bool start) {
-    type->ser->bin_to_json(state, allow_extensions, type, start);
+    type->get_serializer()->bin_to_json(state, allow_extensions, type, start);
 }
 
 inline void bin_to_json(pseudo_optional*, bin_to_json_state& state, bool allow_extensions,

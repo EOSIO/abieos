@@ -68,7 +68,7 @@ abi_type* get_type(std::map<std::string, abi_type>& abi_types,
             auto [iter, success] = abi_types.try_emplace(name, name, abi_type::extension{base}, &abi_serializer_for< ::abieos::pseudo_extension>);
             return &iter->second;
         } else
-           eosio::check(false, eosio::convert_abi_error(abi_error::unknown_type));
+           eosio::check(false, std::string("Unknown type ") + name);
     }
 
     // resolve aliases
