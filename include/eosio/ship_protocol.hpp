@@ -759,21 +759,12 @@ namespace eosio { namespace ship_protocol {
                  max_linear_memory_init, max_func_local_bytes, max_nested_structures, max_symbol_bytes,
                  max_module_bytes, max_code_bytes, max_pages, max_call_depth)
 
-   struct transaction_hook {
-      uint32_t type;
-      name     contract;
-      name     action;
-   };
-
-   EOSIO_REFLECT(transaction_hook, type, contract, action)
-
    struct global_property_extension_v0 {
       uint32_t                      proposed_security_group_block_num = 0;
       std::vector<name>             proposed_security_group_participants;
-      std::vector<transaction_hook> transaction_hooks;
    };
 
-   EOSIO_REFLECT(global_property_extension_v0, proposed_security_group_block_num, proposed_security_group_participants, transaction_hooks)
+   EOSIO_REFLECT(global_property_extension_v0, proposed_security_group_block_num, proposed_security_group_participants)
 
    struct global_property_v2 : global_property_v1 {
       kv_database_config                         kv_configuration;
