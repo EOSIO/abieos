@@ -570,7 +570,9 @@ void check_types() {
     check_type(context, 0, "string", R"("' + '*'.repeat(128) + '")");
     check_type(context, 0, "string", R"("\u0000  这是一个测试  Это тест  هذا اختبار 👍")");
     check(abieos_bin_to_json(context, 0, "string", "\x11invalid utf8: \xff\xfe\xfd", 18) == std::string(R"("invalid utf8: ???")"), "invalid utf8");
-    check(abieos_bin_to_json(context, 0, "string", "\4\xe8\xbf\x99\n", 5) == std::string("\"\xe8\xbf\x99\\u000A\""), "escaping");
+    check(abieos_bin_to_json(context, 0, "string", "\x08\xe8\xbf\x99\b\f\n\r\t", 9) ==
+              std::string("\"\xe8\xbf\x99\\b\\f\\n\\r\\t\""),
+          "escaping");
     check_error(context, "Stream overrun", [&] { return abieos_hex_to_json(context, 0, "string", "01"); });
     check_type(context, 0, "checksum160", R"("0000000000000000000000000000000000000000")");
     check_type(context, 0, "checksum160", R"("123456789ABCDEF01234567890ABCDEF70123456")");
