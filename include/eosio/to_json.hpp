@@ -51,6 +51,16 @@ void to_json(std::string_view sv, S& stream) {
             stream.write("\\\"", 2);
          } else if (*begin == '\\') {
             stream.write("\\\\", 2);
+         } else if (*begin == '\b') {
+            stream.write("\\b", 2);
+         } else if (*begin == '\f') {
+            stream.write("\\f", 2);
+         } else if (*begin == '\n') {
+            stream.write("\\n", 2);
+         } else if (*begin == '\r') {
+            stream.write("\\r", 2);
+         } else if (*begin == '\t') {
+            stream.write("\\t", 2);
          } else {
             stream.write("\\u00", 4);
             stream.write(hex_digits[(unsigned char)(*begin) >> 4]);
