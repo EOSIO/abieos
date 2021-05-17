@@ -54,9 +54,21 @@ target_include_directories(abieos_module PUBLIC
 target_link_libraries(abieos_module ${CMAKE_THREAD_LIBS_INIT})
 set_target_properties(abieos_module PROPERTIES OUTPUT_NAME "abieos")
 
+add_executable(ship_abi_gen src/ship_abi.cpp)
+target_link_libraries(ship_abi_gen abieos ${CMAKE_THREAD_LIBS_INIT})
+add_custom_command(OUTPUT ship_abi.json 
+                   COMMAND ship_abi_gen > ship_abi.json 
+                   DEPENDS ship_abi_gen)
+
+add_custom_target(ship_abi_json ALL
+   COMMAND echo "generate ship_abi.json"
+   DEPENDS ship_abi.json 
+   VERBATIM
+)
+
 enable_testing()
 
-add_executable(test_abieos src/test.cpp src/abieos.cpp src/ship.abi.cpp)
+add_executable(test_abieos src/test.cpp src/abieos.cpp)
 target_link_libraries(test_abieos abieos ${CMAKE_THREAD_LIBS_INIT})
 add_test(NAME test_abieos COMMAND test_abieos)
 
@@ -95,7 +107,6 @@ if (NOT ABIEOS_ONLY_LIBRARY)
 add_subdirectory(tools)
 endif()
 
-
 install(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/include/eosio DESTINATION include)
 
 install(TARGETS abieos
@@ -114,4 +125,5 @@ export(TARGETS abieos
 configure_file(abieos-config.cmake.in ${CMAKE_CURRENT_BINARY_DIR}/share/abieos/abieos-config.cmake COPYONLY)
 
 install(FILES ${CMAKE_CURRENT_BINARY_DIR}/share/abieos/abieos-config.cmake
+              ${CMAKE_CURRENT_BINARY_DIR}/ship_abi.json 
         DESTINATION "share/abieos")
