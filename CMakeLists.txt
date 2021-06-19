@@ -32,13 +32,19 @@ Please run the command 'git submodule update --init --recursive'.")
   endif()
 endif()
 
+if (_VCPKG_INSTALLED_DIR)
+find_package(RapidJSON CONFIG REQUIRED)
+else()
+set(RAPIDJSON_INCLUDE_DIRS "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>/external/rapidjson/include")
+endif()
+
 find_package(Threads)
 include(GNUInstallDirs)
 
 add_library(abieos STATIC src/abi.cpp src/crypto.cpp include/eosio/fpconv.c)
 target_include_directories(abieos PUBLIC 
-                          "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>/include" 
-                          "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>/external/rapidjson/include"
+                          "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>" 
+                          "${RAPIDJSON_INCLUDE_DIRS}"
                           "$<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>")
 
 if(ABIEOS_NO_INT128)
@@ -47,8 +53,8 @@ endif()
 
 add_library(abieos_module MODULE src/abieos.cpp src/abi.cpp src/crypto.cpp include/eosio/fpconv.c)
 target_include_directories(abieos_module PUBLIC 
-                          "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>/include;" 
-                          "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>/external/rapidjson/include" 
+                          "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>" 
+                          "${RAPIDJSON_INCLUDE_DIRS}" 
                           "$<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>")
 
 target_link_libraries(abieos_module ${CMAKE_THREAD_LIBS_INIT})
