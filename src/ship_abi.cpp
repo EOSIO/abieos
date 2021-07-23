@@ -57,8 +57,8 @@ int main() {
        {.name = "generatedtrx"_n, .key_names = {"sender", "sender_id"}, .type = "generated_transaction"},
        {.name = "protocolst"_n, .key_names = {}, .type = "protocol_state"},
        {.name = "permission"_n, .key_names = {"owner", "name"}, .type = "permission"},
-       {.name = "permlink"_n, .key_names = {"account", "code", "message_type"}, .type = "global_property"},
-       {.name = "rsclimits"_n, .key_names = {"owner"}, .type = "permission_link"},
+       {.name = "permlink"_n, .key_names = {"account", "code", "message_type"}, .type = "permission_link"},
+       {.name = "rsclimits"_n, .key_names = {"owner"}, .type = "resource_limits"},
        {.name = "rscusage"_n, .key_names = {"owner"}, .type = "resource_usage"},
        {.name = "rsclimitsst"_n, .key_names = {}, .type = "resource_limits_state"},
        {.name = "rsclimitscfg"_n, .key_names = {}, .type = "resource_limits_config"}};
