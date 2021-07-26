@@ -54,17 +54,21 @@ target_include_directories(abieos_module PUBLIC
 target_link_libraries(abieos_module ${CMAKE_THREAD_LIBS_INIT})
 set_target_properties(abieos_module PROPERTIES OUTPUT_NAME "abieos")
 
-add_executable(ship_abi_gen src/ship_abi.cpp)
+add_executable(ship_abi_gen src/ship_abi_gen.cpp)
 target_link_libraries(ship_abi_gen abieos ${CMAKE_THREAD_LIBS_INIT})
 add_custom_command(OUTPUT ship_abi.json 
                    COMMAND ship_abi_gen > ship_abi.json 
                    DEPENDS ship_abi_gen)
 
-add_custom_target(ship_abi_json ALL
-   COMMAND echo "generate ship_abi.json"
-   DEPENDS ship_abi.json 
-   VERBATIM
+add_custom_command(OUTPUT ship_abi.cpp
+  COMMAND ${CMAKE_COMMAND} -E echo "namespace eosio { namespace ship_protocol { extern const char* const ship_abi = R\"(" > ship_abi.cpp
+  COMMAND ${CMAKE_COMMAND} -E cat  ${CMAKE_CURRENT_BINARY_DIR}/ship_abi.json >> ship_abi.cpp
+  COMMAND ${CMAKE_COMMAND} -E echo ")\"; }}" >> ship_abi.cpp
+  DEPENDS ship_abi.json 
+  VERBATIM
 )
+
+add_library(ship_abi ${CMAKE_CURRENT_BINARY_DIR}/ship_abi.cpp)
 
 enable_testing()
 
@@ -109,7 +113,7 @@ endif()
 
 install(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/include/eosio DESTINATION include)
 
-install(TARGETS abieos
+install(TARGETS abieos ship_abi
   EXPORT abieos
 	INCLUDES DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
 	ARCHIVE  DESTINATION ${CMAKE_INSTALL_LIBDIR}
@@ -120,7 +124,7 @@ install(EXPORT abieos
   FILE abieos-targets.cmake
 )
 
-export(TARGETS abieos 
+export(TARGETS abieos ship_abi
        FILE ${CMAKE_CURRENT_BINARY_DIR}/share/abieos/abieos-targets.cmake)
 configure_file(abieos-config.cmake.in ${CMAKE_CURRENT_BINARY_DIR}/share/abieos/abieos-config.cmake COPYONLY)
 
