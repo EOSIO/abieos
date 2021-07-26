@@ -11,8 +11,6 @@
 #include <string>
 #include <vector>
 
-extern const char* const state_history_plugin_abi;
-
 inline const bool generate_corpus = false;
 
 const char tokenHexAbi[] = "0e656f73696f3a3a6162692f312e30010c6163636f756e745f6e616d65046e61"
@@ -599,7 +597,6 @@ void check_types() {
     auto testKvAbiName = check_context(context, abieos_string_to_name(context, "testkv.abi"));
     check_context(context, abieos_set_abi(context, 0, transactionAbi));
     check_context(context, abieos_set_abi(context, 1, packedTransactionAbi));
-    check_context(context, abieos_set_abi(context, 2, state_history_plugin_abi));
     check_context(context, abieos_set_abi_hex(context, token, tokenHexAbi));
     check_context(context, abieos_set_abi(context, testAbiName, testAbi));
     check_context(context, abieos_set_abi_hex(context, testHexAbiName, testHexAbi));
@@ -641,9 +638,6 @@ void check_types() {
         } else if (contract == 1) {
            abi_is_bin = false;
            abi = {packedTransactionAbi, packedTransactionAbi + strlen( packedTransactionAbi )};
-        } else if (contract == 2) {
-           abi_is_bin = false;
-           abi = {state_history_plugin_abi, state_history_plugin_abi + strlen( state_history_plugin_abi )};
         } else if (contract == token) {
             abi_is_bin = true;
             std::string error;
@@ -1002,16 +996,7 @@ void check_types() {
     check_type(
         context, 1, "packed_transaction_v0",
         R"({"signatures":["SIG_K1_K5PGhrkUBkThs8zdTD9mGUJZvxL4eU46UjfYJSEdZ9PXS2Cgv5jAk57yTx4xnrdSocQm6DDvTaEJZi5WLBsoZC4XYNS8b3"],"compression":0,"packed_context_free_data":"","packed_trx":{"expiration":"2009-02-13T23:31:31.000","ref_block_num":1234,"ref_block_prefix":5678,"max_net_usage_words":0,"max_cpu_usage_ms":0,"delay_sec":0,"context_free_actions":[],"actions":[{"account":"eosio.token","name":"transfer","authorization":[{"actor":"useraaaaaaaa","permission":"active"}],"data":"608C31C6187315D6708C31C6187315D60100000000000000045359530000000000"}],"transaction_extensions":[]}})");
-    check_type(
-        context, 2, "transaction_trace",
-        R"(["transaction_trace_v0",{"id":"3098EA9476266BFA957C13FA73C26806D78753099CE8DEF2A650971F07595A69","status":0,"cpu_usage_us":2000,"net_usage_words":25,"elapsed":"194","net_usage":"200","scheduled":false,"action_traces":[["action_trace_v1",{"action_ordinal":1,"creator_action_ordinal":0,"receipt":["action_receipt_v0",{"receiver":"eosio","act_digest":"F2FDEEFF77EFC899EED23EE05F9469357A096DC3083D493571CF68A422C69EFE","global_sequence":"11","recv_sequence":"11","auth_sequence":[{"account":"eosio","sequence":"11"}],"code_sequence":2,"abi_sequence":0}],"receiver":"eosio","act":{"account":"eosio","name":"newaccount","authorization":[{"actor":"eosio","permission":"active"}],"data":"0000000000EA305500409406A888CCA501000000010002C0DED2BC1F1305FB0FAAC5E6C03EE3A1924234985427B6167CA569D13DF435CF0100000001000000010002C0DED2BC1F1305FB0FAAC5E6C03EE3A1924234985427B6167CA569D13DF435CF01000000"},"context_free":false,"elapsed":"83","console":"","account_ram_deltas":[{"account":"oracle.aml","delta":"2724"}],"account_disk_deltas":[],"except":null,"error_code":null,"return_value":""}]],"account_ram_delta":null,"except":null,"error_code":null,"failed_dtrx_trace":null,"partial":null}])");
-    check_type(
-        context, 2, "transaction_trace_msg",
-        R"(["transaction_trace_exception",{"error_code":"3","error_message":"error happens"}])");
-    check_type(
-        context, 2, "transaction_trace_msg",
-        R"(["transaction_trace",["transaction_trace_v0",{"id":"B2C8D46F161E06740CFADABFC9D11F013A1C90E25337FF3E22840B195E1ADC4B","status":0,"cpu_usage_us":2000,"net_usage_words":12,"elapsed":"7670","net_usage":"96","scheduled":false,"action_traces":[["action_trace_v1",{"action_ordinal":1,"creator_action_ordinal":0,"receipt":["action_receipt_v0",{"receiver":"eosio","act_digest":"7670940C29EC0A4C573EF052C5A29236393F587F208222B3C1B6A9C8FEA2C66A","global_sequence":"27","recv_sequence":"1","auth_sequence":[{"account":"eosio","sequence":"2"}],"code_sequence":1,"abi_sequence":0}],"receiver":"eosio","act":{"account":"eosio","name":"doit","authorization":[{"actor":"eosio","permission":"active"}],"data":"00"},"context_free":false,"elapsed":"7589","console":"","account_ram_deltas":[],"account_disk_deltas":[],"except":null,"error_code":null,"return_value":"01FFFFFFFFFFFFFFFF00"}]],"account_ram_delta":null,"except":null,"error_code":null,"failed_dtrx_trace":null,"partial":null}]])");
-
+    
     check_error(context, "recursion limit reached", [&] {
         return abieos_json_to_bin_reorderable(
             context, 0, "int8",
