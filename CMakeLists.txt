@@ -19,6 +19,7 @@ set(CMAKE_CXX_EXTENSIONS ON)
 
 option(ABIEOS_NO_INT128 "disable use of __int128" OFF)
 option(ABIEOS_ONLY_LIBRARY "define and build the ABIEOS library" OFF)
+option(BUILD_SHARED_LIBS "build ABIEOS share library" ON)
 
 if(NOT DEFINED SKIP_SUBMODULE_CHECK)
   execute_process(COMMAND git submodule status --recursive
@@ -45,26 +46,43 @@ if(ABIEOS_NO_INT128)
 target_compile_definitions(abieos PUBLIC ABIEOS_NO_INT128)
 endif()
 
-add_library(abieos_module MODULE src/abieos.cpp src/abi.cpp src/crypto.cpp include/eosio/fpconv.c)
-target_include_directories(abieos_module PUBLIC 
-                          "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>/include;" 
-                          "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>/external/rapidjson/include" 
-                          "$<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>")
+if (BUILD_SHARED_LIBS)
+  add_library(abieos_module MODULE src/abieos.cpp src/abi.cpp src/crypto.cpp include/eosio/fpconv.c)
+  target_include_directories(abieos_module PUBLIC 
+                            "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>/include;" 
+                            "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>/external/rapidjson/include" 
+                            "$<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>")
 
-target_link_libraries(abieos_module ${CMAKE_THREAD_LIBS_INIT})
-set_target_properties(abieos_module PROPERTIES OUTPUT_NAME "abieos")
+  target_link_libraries(abieos_module ${CMAKE_THREAD_LIBS_INIT})
+  set_target_properties(abieos_module PROPERTIES OUTPUT_NAME "abieos")
+endif()
 
-add_executable(ship_abi_gen src/ship_abi_gen.cpp)
-target_link_libraries(ship_abi_gen abieos ${CMAKE_THREAD_LIBS_INIT})
-add_custom_command(OUTPUT ship_abi.json 
-                   COMMAND ship_abi_gen > ship_abi.json 
-                   DEPENDS ship_abi_gen)
+if (NOT CMAKE_CROSSCOMPILING)
+  add_executable(ship_abi_gen src/ship_abi_gen.cpp)
+  target_link_libraries(ship_abi_gen abieos ${CMAKE_THREAD_LIBS_INIT})
+  add_custom_command(OUTPUT ship_abi.json 
+                    COMMAND ship_abi_gen > ship_abi.json 
+                    DEPENDS ship_abi_gen)
+
+  add_custom_target(ship_abi_json
+    DEPENDS ship_abi.json 
+  )
+
+else()
+  include(ExternalProject)
+  externalproject_add(ship_abi_json
+                    SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}"
+                    CMAKE_ARGS "-DCMAKE_INSTALL_PREFIX=${CMAKE_CURRENT_BINARY_DIR}" "-DCMAKE_BUILD_TYPE=Release"
+                    BUILD_COMMAND ${CMAKE_COMMAND} --build . --target install.ship_abi_json
+                    BUILD_BYPRODUCTS ${CMAKE_CURRENT_BINARY_DIR}/ship_abi.json
+                    INSTALL_COMMAND "")
+endif()
 
 add_custom_command(OUTPUT ship_abi.cpp
   COMMAND ${CMAKE_COMMAND} -E echo "namespace eosio { namespace ship_protocol { extern const char* const ship_abi = R\"(" > ship_abi.cpp
   COMMAND ${CMAKE_COMMAND} -E cat  ${CMAKE_CURRENT_BINARY_DIR}/ship_abi.json >> ship_abi.cpp
   COMMAND ${CMAKE_COMMAND} -E echo ")\"; }}" >> ship_abi.cpp
-  DEPENDS ship_abi.json 
+  DEPENDS ship_abi_json 
   VERBATIM
 )
 
@@ -131,3 +149,7 @@ configure_file(abieos-config.cmake.in ${CMAKE_CURRENT_BINARY_DIR}/share/abieos/a
 install(FILES ${CMAKE_CURRENT_BINARY_DIR}/share/abieos/abieos-config.cmake
               ${CMAKE_CURRENT_BINARY_DIR}/ship_abi.json 
         DESTINATION "share/abieos")
+
+add_custom_target(install.ship_abi_json
+        COMMAND ${CMAKE_COMMAND} -E copy ${CMAKE_CURRENT_BINARY_DIR}/ship_abi.json ${CMAKE_INSTALL_PREFIX}
+        DEPENDS ship_abi.json)
