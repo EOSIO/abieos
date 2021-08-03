@@ -79,11 +79,9 @@ else()
 endif()
 
 add_custom_command(OUTPUT ship_abi.cpp
-  COMMAND ${CMAKE_COMMAND} -E echo "namespace eosio { namespace ship_protocol { extern const char* const ship_abi = R\"(" > ship_abi.cpp
-  COMMAND ${CMAKE_COMMAND} -E cat  ${CMAKE_CURRENT_BINARY_DIR}/ship_abi.json >> ship_abi.cpp
-  COMMAND ${CMAKE_COMMAND} -E echo ")\"; }}" >> ship_abi.cpp
+  COMMAND ${CMAKE_COMMAND} -P ${CMAKE_CURRENT_SOURCE_DIR}/gen_ship_abi_cpp.cmake 
+  WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
   DEPENDS ship_abi_json 
-  VERBATIM
 )
 
 add_library(ship_abi ${CMAKE_CURRENT_BINARY_DIR}/ship_abi.cpp)
