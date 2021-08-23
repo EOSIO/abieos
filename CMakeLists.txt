@@ -19,7 +19,7 @@ set(CMAKE_CXX_EXTENSIONS ON)
 
 option(ABIEOS_NO_INT128 "disable use of __int128" OFF)
 option(ABIEOS_ONLY_LIBRARY "define and build the ABIEOS library" OFF)
-option(BUILD_SHARED_LIBS "build ABIEOS share library" ON)
+option(ABIEOS_BUILD_SHARED_LIB "build ABIEOS share library" ON)
 
 if(NOT DEFINED SKIP_SUBMODULE_CHECK)
   execute_process(COMMAND git submodule status --recursive
@@ -46,7 +46,7 @@ if(ABIEOS_NO_INT128)
 target_compile_definitions(abieos PUBLIC ABIEOS_NO_INT128)
 endif()
 
-if (BUILD_SHARED_LIBS)
+if (ABIEOS_BUILD_SHARED_LIB)
   add_library(abieos_module MODULE src/abieos.cpp src/abi.cpp src/crypto.cpp include/eosio/fpconv.c)
   target_include_directories(abieos_module PUBLIC 
                             "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>/include;" 
