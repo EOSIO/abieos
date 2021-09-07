@@ -75,7 +75,7 @@ abi_type* get_type(std::map<std::string, abi_type>& abi_types,
          } else if(is_szarray(name) ){
             int pos = name.find_last_of('[');
             auto element = get_type(abi_types, name.substr(0, pos), depth + 1);
-            eosio::check(!holds_any_alternative< abi_type::szarray, abi_type::extension>(element->_data),
+            eosio::check(!holds_any_alternative<abi_type::optional, abi_type::array, abi_type::szarray, abi_type::extension>(element->_data),
                   eosio::convert_abi_error(abi_error::invalid_nesting));
             auto [iter, success] = abi_types.try_emplace(name, name, abi_type::szarray{element}, &abi_serializer_for< ::abieos::pseudo_szarray>);
             return &iter->second;
