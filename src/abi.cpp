@@ -10,6 +10,17 @@ bool ends_with(const std::string& s, const char (&suffix)[i]) {
     return s.size() >= i - 1 && !strcmp(s.c_str() + s.size() - (i - 1), suffix);
 }
 
+bool is_szarray(const std::string& s){
+   int n = s.size();
+   if(n < 3) return false;
+   if(s[n-1] != ']') return false;
+   int i = n -2;
+   if(!(s[i] >= '0' && s[i] <= '9')) return false;
+   while(i >=0 &&  s[i] >= '0' && s[i] <= '9' ) --i;
+   if(i < 0  || s[i] != '[' ) return false;
+   return true;
+}
+
 template <typename T>
 struct abi_serializer_impl : abi_serializer {
     void json_to_bin(::abieos::jvalue_to_bin_state& state, bool allow_extensions, const abi_type* type,
@@ -51,15 +62,22 @@ abi_type* get_type(std::map<std::string, abi_type>& abi_types,
     if (it == abi_types.end()) {
         if (ends_with(name, "?")) {
             auto base = get_type(abi_types, name.substr(0, name.size() - 1), depth + 1);
-            eosio::check(!holds_any_alternative<abi_type::optional, abi_type::array, abi_type::extension>(base->_data),
+            eosio::check(!holds_any_alternative<abi_type::optional, abi_type::array, abi_type::szarray, abi_type::extension>(base->_data),
                   eosio::convert_abi_error(abi_error::invalid_nesting));
             auto [iter, success] = abi_types.try_emplace(name, name, abi_type::optional{base}, &abi_serializer_for< ::abieos::pseudo_optional>);
             return &iter->second;
         } else if (ends_with(name, "[]")) {
             auto element = get_type(abi_types, name.substr(0, name.size() - 2), depth + 1);
-            eosio::check(!holds_any_alternative<abi_type::optional, abi_type::array, abi_type::extension>(element->_data),
+            eosio::check(!holds_any_alternative<abi_type::optional, abi_type::array, abi_type::szarray, abi_type::extension>(element->_data),
                   eosio::convert_abi_error(abi_error::invalid_nesting));
             auto [iter, success] = abi_types.try_emplace(name, name, abi_type::array{element}, &abi_serializer_for< ::abieos::pseudo_array>);
+            return &iter->second;
+         } else if(is_szarray(name) ){
+            int pos = name.find_last_of('[');
+            auto element = get_type(abi_types, name.substr(0, pos), depth + 1);
+            eosio::check(!holds_any_alternative<abi_type::optional, abi_type::array, abi_type::szarray, abi_type::extension>(element->_data),
+                  eosio::convert_abi_error(abi_error::invalid_nesting));
+            auto [iter, success] = abi_types.try_emplace(name, name, abi_type::szarray{element}, &abi_serializer_for< ::abieos::pseudo_szarray>);
             return &iter->second;
         } else if (ends_with(name, "$")) {
             auto base = get_type(abi_types, name.substr(0, name.size() - 1), depth + 1);
@@ -205,6 +223,7 @@ void eosio::convert(const abi_def& abi, eosio::abi& c) {
 void to_abi_def(abi_def& def, const std::string& name, const abi_type::builtin&) {}
 void to_abi_def(abi_def& def, const std::string& name, const abi_type::optional&) {}
 void to_abi_def(abi_def& def, const std::string& name, const abi_type::array&) {}
+void to_abi_def(abi_def& def, const std::string& name, const abi_type::szarray&) {}
 void to_abi_def(abi_def& def, const std::string& name, const abi_type::extension&) {}
 
 template<typename T>
@@ -250,6 +269,7 @@ void eosio::convert(const eosio::abi& abi, eosio::abi_def& def) {
 const abi_serializer* const eosio::object_abi_serializer = &abi_serializer_for< ::abieos::pseudo_object>;
 const abi_serializer* const eosio::variant_abi_serializer = &abi_serializer_for< ::abieos::pseudo_variant>;
 const abi_serializer* const eosio::array_abi_serializer = &abi_serializer_for< ::abieos::pseudo_array>;
+const abi_serializer* const eosio::szarray_abi_serializer = &abi_serializer_for< ::abieos::pseudo_szarray>;
 const abi_serializer* const eosio::extension_abi_serializer = &abi_serializer_for< ::abieos::pseudo_extension>;
 const abi_serializer* const eosio::optional_abi_serializer = &abi_serializer_for< ::abieos::pseudo_optional>;
 
