@@ -37,7 +37,7 @@ int main() {
 
    using namespace eosio::literals;
 
-   ship_abi_def.tables = {
+   ship_abi_def.tables = std::vector<eosio::table_def>{
        {.name = "account"_n, .key_names = {"name"}, .type = "account"},
        {.name = "actmetadata"_n, .key_names = {"name"}, .type = "account_metadata"},
        {.name = "code"_n, .key_names = {"vm_type", "vm_version", "code_hash"}, .type = "code"},
