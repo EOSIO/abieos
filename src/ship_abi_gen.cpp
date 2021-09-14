@@ -37,7 +37,7 @@ int main() {
 
    using namespace eosio::literals;
 
-   ship_abi_def.tables = {
+   ship_abi_def.tables = std::vector<eosio::table_def>{
        {.name = "account"_n, .key_names = {"name"}, .type = "account"},
        {.name = "actmetadata"_n, .key_names = {"name"}, .type = "account_metadata"},
        {.name = "code"_n, .key_names = {"vm_type", "vm_version", "code_hash"}, .type = "code"},
@@ -67,8 +67,9 @@ int main() {
    eosio::vector_stream strm{data};
    to_json(ship_abi_def, strm);
 
-   // remove the empty value elements in the json, like {"name": "myname","type":""}  ==> {"name":"myname"}
-   std::regex empty_value_re(R"===(,"[^"]+":(""|\[\]|\{\}))===");
+   // remove the empty value elements in the json, like {"name": "myname","type":""}  ==> {"name":"myname"};
+   // however, do not remove empty `fields` elements, like {'name': 'get_status_request_v0', "fields":[] } ==> {'name': 'get_status_request_v0', "fields":[] }
+   std::regex empty_value_re(R"===(,"(?!fields\b)\b[^"]+":(""|\[\]|\{\}))===");
    std::regex_replace(std::ostreambuf_iterator<char>(std::cout),
                       data.begin(), data.end(), empty_value_re, "");
    return 0;
