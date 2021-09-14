@@ -37,31 +37,31 @@ int main() {
 
    using namespace eosio::literals;
 
-   ship_abi_def.tables = std::vector<eosio::table_def>{
-       {.name = "account"_n, .key_names = {"name"}, .type = "account"},
-       {.name = "actmetadata"_n, .key_names = {"name"}, .type = "account_metadata"},
-       {.name = "code"_n, .key_names = {"vm_type", "vm_version", "code_hash"}, .type = "code"},
-       {.name = "contracttbl"_n, .key_names = {"code", "scope", "table"}, .type = "contract_table"},
-       {.name = "contractrow"_n, .key_names = {"code", "scope", "table", "primary_key"}, .type = "contract_row"},
-       {.name = "cntrctidx1"_n, .key_names = {"code", "scope", "table", "primary_key"}, .type = "contract_index64"},
-       {.name = "cntrctidx2"_n, .key_names = {"code", "scope", "table", "primary_key"}, .type = "contract_index128"},
-       {.name = "cntrctidx3"_n, .key_names = {"code", "scope", "table", "primary_key"}, .type = "contract_index256"},
-       {.name = "cntrctidx4"_n,
+   ship_abi_def.tables = {
+       eosio::table_def{.name = "account"_n, .key_names = {"name"}, .type = "account"},
+       eosio::table_def{.name = "actmetadata"_n, .key_names = {"name"}, .type = "account_metadata"},
+       eosio::table_def{.name = "code"_n, .key_names = {"vm_type", "vm_version", "code_hash"}, .type = "code"},
+       eosio::table_def{.name = "contracttbl"_n, .key_names = {"code", "scope", "table"}, .type = "contract_table"},
+       eosio::table_def{.name = "contractrow"_n, .key_names = {"code", "scope", "table", "primary_key"}, .type = "contract_row"},
+       eosio::table_def{.name = "cntrctidx1"_n, .key_names = {"code", "scope", "table", "primary_key"}, .type = "contract_index64"},
+       eosio::table_def{.name = "cntrctidx2"_n, .key_names = {"code", "scope", "table", "primary_key"}, .type = "contract_index128"},
+       eosio::table_def{.name = "cntrctidx3"_n, .key_names = {"code", "scope", "table", "primary_key"}, .type = "contract_index256"},
+       eosio::table_def{.name = "cntrctidx4"_n,
         .key_names = {"code", "scope", "table", "primary_key"},
         .type = "contract_index_double"},
-       {.name = "cntrctidx5"_n,
+       eosio::table_def{.name = "cntrctidx5"_n,
         .key_names = {"code", "scope", "table", "primary_key"},
         .type = "contract_index_long_double"},
-       {.name = "keyvalue"_n, .key_names = {"contract", "key"}, .type = "key_value"},
-       {.name = "global.pty"_n, .key_names = {}, .type = "global_property"},
-       {.name = "generatedtrx"_n, .key_names = {"sender", "sender_id"}, .type = "generated_transaction"},
-       {.name = "protocolst"_n, .key_names = {}, .type = "protocol_state"},
-       {.name = "permission"_n, .key_names = {"owner", "name"}, .type = "permission"},
-       {.name = "permlink"_n, .key_names = {"account", "code", "message_type"}, .type = "permission_link"},
-       {.name = "rsclimits"_n, .key_names = {"owner"}, .type = "resource_limits"},
-       {.name = "rscusage"_n, .key_names = {"owner"}, .type = "resource_usage"},
-       {.name = "rsclimitsst"_n, .key_names = {}, .type = "resource_limits_state"},
-       {.name = "rsclimitscfg"_n, .key_names = {}, .type = "resource_limits_config"}};
+       eosio::table_def{.name = "keyvalue"_n, .key_names = {"contract", "key"}, .type = "key_value"},
+       eosio::table_def{.name = "global.pty"_n, .key_names = {}, .type = "global_property"},
+       eosio::table_def{.name = "generatedtrx"_n, .key_names = {"sender", "sender_id"}, .type = "generated_transaction"},
+       eosio::table_def{.name = "protocolst"_n, .key_names = {}, .type = "protocol_state"},
+       eosio::table_def{.name = "permission"_n, .key_names = {"owner", "name"}, .type = "permission"},
+       eosio::table_def{.name = "permlink"_n, .key_names = {"account", "code", "message_type"}, .type = "permission_link"},
+       eosio::table_def{.name = "rsclimits"_n, .key_names = {"owner"}, .type = "resource_limits"},
+       eosio::table_def{.name = "rscusage"_n, .key_names = {"owner"}, .type = "resource_usage"},
+       eosio::table_def{.name = "rsclimitsst"_n, .key_names = {}, .type = "resource_limits_state"},
+       eosio::table_def{.name = "rsclimitscfg"_n, .key_names = {}, .type = "resource_limits_config"}};
 
    std::vector<char> data;
    eosio::vector_stream strm{data};
