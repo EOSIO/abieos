@@ -10,7 +10,7 @@ namespace ship_protocol {
 using types = std::tuple<request, result, account, account_metadata, code, contract_index_double, contract_index_long_double, contract_index128,
                contract_index256, contract_index64, contract_row, contract_table, generated_transaction,
                global_property, key_value, permission, permission_link, protocol_state, resource_limits,
-               resource_limits_config, resource_limits_state, resource_usage>;
+               resource_limits_config, resource_limits_state, resource_usage, block_header>;
 } // namespace ship_protocol
 
 inline abi_type* add_type(abi& a, ship_protocol::transaction_status*) {
