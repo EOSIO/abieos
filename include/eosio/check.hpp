@@ -9,11 +9,11 @@
 namespace eosio {
 namespace internal_use_do_not_use {
 extern "C" {
-__attribute__((eosio_wasm_import, noreturn))
+__attribute__((eosio_wasm_import))
 void eosio_assert_message(uint32_t, const char*, uint32_t);
-__attribute__((eosio_wasm_import, noreturn))
+__attribute__((eosio_wasm_import))
 void eosio_assert(uint32_t, const char*);
-__attribute__((eosio_wasm_import, noreturn))
+__attribute__((eosio_wasm_import))
 void eosio_assert_code(uint32_t, uint64_t);
 }
 }
