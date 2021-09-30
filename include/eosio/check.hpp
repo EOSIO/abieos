@@ -39,28 +39,28 @@ struct eosio_error : std::exception {
 };
 
 namespace detail {
-   [[noreturn]] inline void assert_or_throw(std::string_view msg) {
+   inline void assert_or_throw(std::string_view msg) {
 #ifdef __eosio_cdt__
          internal_use_do_not_use::eosio_assert_message(false, msg.data(), msg.size());
 #else
          throw std::runtime_error(std::string(msg));
 #endif
    }
-   [[noreturn]] inline void assert_or_throw(const char* msg) {
+   inline void assert_or_throw(const char* msg) {
 #ifdef __eosio_cdt__
          internal_use_do_not_use::eosio_assert(false, msg);
 #else
          throw std::runtime_error(msg);
 #endif
    }
-   [[noreturn]] inline void assert_or_throw(std::string&& msg) {
+   inline void assert_or_throw(std::string&& msg) {
 #ifdef __eosio_cdt__
          internal_use_do_not_use::eosio_assert_message(false, msg.c_str(), msg.size());
 #else
          throw std::runtime_error(std::move(msg));
 #endif
    }
-   [[noreturn]] inline void assert_or_throw(uint64_t code) {
+   inline void assert_or_throw(uint64_t code) {
 #ifdef __eosio_cdt__
          internal_use_do_not_use::eosio_assert_code(false, code);
 #else
