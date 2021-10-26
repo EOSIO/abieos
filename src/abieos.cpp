@@ -5,8 +5,6 @@
 
 #include <memory>
 
-inline const bool catch_all = true;
-
 using namespace abieos;
 
 struct abieos_context_s {
@@ -36,13 +34,9 @@ auto handle_exceptions(abieos_context* context, T errval, F f) noexcept -> declt
     try {
         return f();
     } catch (std::exception& e) {
-        if (!catch_all)
-            throw;
         set_error(context, e.what());
         return errval;
     } catch (...) {
-        if (!catch_all)
-            throw;
         set_error(context, "unknown exception");
         return errval;
     }
@@ -52,8 +46,6 @@ extern "C" abieos_context* abieos_create() {
     try {
         return new abieos_context{};
     } catch (...) {
-        if (!catch_all)
-            throw;
         return nullptr;
     }
 }
