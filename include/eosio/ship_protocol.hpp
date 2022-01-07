@@ -107,8 +107,8 @@ namespace eosio { namespace ship_protocol {
 
    EOSIO_REFLECT(get_status_result_v0, base get_status_result_base, chain_id)
 
-   // When using `get_blocks_request_v1`, `get_blocks_result_v0` will be returned for EOS version 2.0.x and before and
-   // `get_blocks_result_v1` will be returned for EOS version 2.1 RC bug not stable. 
+   // When using `get_blocks_request_v0`, `get_blocks_result_v0` will be returned for EOS version 2.0.x and before and
+   // `get_blocks_result_v1` will be returned for EOS version 2.1 RC
    struct get_blocks_request_v0 {
       uint32_t                    start_block_num        = {};
       uint32_t                    end_block_num          = {};
