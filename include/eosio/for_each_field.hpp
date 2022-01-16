@@ -3,9 +3,9 @@
 #include "reflection.hpp"
 #include <utility>
 
-#if __has_include(<boost/pfr/precise/core.hpp>)
+#if __has_include(<boost/pfr/core.hpp>)
 
-#   include <boost/pfr/precise/core.hpp>
+#   include <boost/pfr/core.hpp>
 
 namespace eosio {
 template <typename T, typename F>
