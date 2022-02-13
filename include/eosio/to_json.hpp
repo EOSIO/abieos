@@ -311,7 +311,7 @@ void to_json_hex(const char* data, size_t size, S& stream) {
    stream.write('"');
 }
 
-#ifdef __eosio_cdt__
+#ifdef __wasm__
 
 template <typename S> void to_json(long double value, S& stream) {
    return to_json_hex(reinterpret_cast<const char*>(&value), sizeof(long double), stream);

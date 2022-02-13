@@ -607,7 +607,7 @@ void from_json_hex(std::vector<char>& result, S& stream) {
          convert_json_error(from_json_error::expected_hex_string) );
 }
 
-#ifdef __eosio_cdt__
+#ifdef __wasm__
 
 template <typename S> void from_json(long double& result, S& stream) {
    auto s = stream.get_string();
