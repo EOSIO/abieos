@@ -27,7 +27,7 @@ constexpr const char* get_type_name(__int128*) { return "int128"; }
 constexpr const char* get_type_name(unsigned __int128*) { return "uint128"; }
 #endif
 
-#ifdef __eosio_cdt__
+#ifdef __wasm__
 constexpr const char* get_type_name(long double*) { return "float128"; }
 #endif
 

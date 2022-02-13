@@ -1,6 +1,6 @@
 #pragma once
 
-#ifdef __eosio_cdt__
+#ifdef __wasm__
 
 namespace eosio {
 

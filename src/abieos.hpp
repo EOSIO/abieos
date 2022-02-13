@@ -19,7 +19,7 @@
 #include <eosio/float.hpp>
 #include <eosio/varint.hpp>
 
-#ifdef __eosio_cdt__
+#ifdef __wasm__
 #include <cwchar>
 
 #pragma clang diagnostic push
@@ -32,7 +32,7 @@
 #include <variant>
 #include <vector>
 
-#ifdef __eosio_cdt__
+#ifdef __wasm__
 #pragma clang diagnostic pop
 #endif
 
