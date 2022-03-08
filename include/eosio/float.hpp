@@ -12,7 +12,7 @@ using float128 = long double;
 
 #else
 
-#   include <eosio/fixed_bytes.hpp>
+#   include "fixed_bytes.hpp"
 #   include <limits>
 
 namespace eosio {
