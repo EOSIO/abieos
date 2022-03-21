@@ -122,16 +122,16 @@ struct fixed_buf_stream {
 struct size_stream {
    size_t size = 0;
 
-   void write(char c) {
+   void write(char) {
       ++size;
    }
 
-   void write(const void* src, std::size_t sz) {
+   void write(const void*, std::size_t sz) {
       size += sz;
    }
 
    template <int Size>
-   void write(const char (&src)[Size]) {
+   void write(const char (&)[Size]) {
       size += Size;
    }
 
