@@ -4,7 +4,11 @@
  */
 #pragma once
 
-#ifndef __cpp_exceptions
+#if __has_include(<eosio/eosio.hpp>)
+#define HAS_EOSIO_ASSERT
+#endif
+
+#ifdef HAS_EOSIO_ASSERT
 #include <cstdint>
 namespace eosio {
 namespace internal_use_do_not_use {
@@ -40,28 +44,28 @@ struct eosio_error : std::exception {
 
 namespace detail {
    inline void assert_or_throw(std::string_view msg) {
-#ifndef __cpp_exceptions
+#ifdef HAS_EOSIO_ASSERT
          internal_use_do_not_use::eosio_assert_message(false, msg.data(), msg.size());
 #else
          throw std::runtime_error(std::string(msg));
 #endif
    }
    inline void assert_or_throw(const char* msg) {
-#ifndef __cpp_exceptions
+#ifdef HAS_EOSIO_ASSERT
          internal_use_do_not_use::eosio_assert(false, msg);
 #else
          throw std::runtime_error(msg);
 #endif
    }
    inline void assert_or_throw(std::string&& msg) {
-#ifndef __cpp_exceptions
+#ifdef HAS_EOSIO_ASSERT
          internal_use_do_not_use::eosio_assert_message(false, msg.c_str(), msg.size());
 #else
          throw std::runtime_error(std::move(msg));
 #endif
    }
    inline void assert_or_throw(uint64_t code) {
-#ifndef __cpp_exceptions
+#ifdef HAS_EOSIO_ASSERT
          internal_use_do_not_use::eosio_assert_code(false, code);
 #else
          throw std::runtime_error(std::to_string(code));

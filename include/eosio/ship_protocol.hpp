@@ -25,7 +25,7 @@ namespace eosio { namespace ship_protocol {
 
    typedef __uint128_t uint128_t;
 
-#ifndef __cpp_exceptions
+#ifdef HAS_EOSIO_ASSERT
 #   pragma clang diagnostic push
 #   pragma clang diagnostic ignored "-Winvalid-noreturn"
    [[noreturn]] inline void report_error(const std::string& s) { eosio::check(false, s); }
