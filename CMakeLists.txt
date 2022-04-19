@@ -17,8 +17,13 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS ON)
 
+if (POLICY CMP0077)
+  cmake_policy(SET CMP0077 NEW)
+endif()
+
 option(ABIEOS_NO_INT128 "disable use of __int128" OFF)
 option(ABIEOS_ONLY_LIBRARY "define and build the ABIEOS library" OFF)
+option(ABIEOS_BUILD_SHARED_LIB "build ABIEOS share library" ON)
 
 if(NOT DEFINED SKIP_SUBMODULE_CHECK)
   execute_process(COMMAND git submodule status --recursive
@@ -45,18 +50,49 @@ if(ABIEOS_NO_INT128)
 target_compile_definitions(abieos PUBLIC ABIEOS_NO_INT128)
 endif()
 
-add_library(abieos_module MODULE src/abieos.cpp src/abi.cpp src/crypto.cpp include/eosio/fpconv.c)
-target_include_directories(abieos_module PUBLIC 
-                          "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>/include;" 
-                          "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>/external/rapidjson/include" 
-                          "$<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>")
+if (ABIEOS_BUILD_SHARED_LIB)
+  add_library(abieos_module MODULE src/abieos.cpp src/abi.cpp src/crypto.cpp include/eosio/fpconv.c)
+  target_include_directories(abieos_module PUBLIC 
+                            "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>/include;" 
+                            "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>/external/rapidjson/include" 
+                            "$<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>")
 
-target_link_libraries(abieos_module ${CMAKE_THREAD_LIBS_INIT})
-set_target_properties(abieos_module PROPERTIES OUTPUT_NAME "abieos")
+  target_link_libraries(abieos_module ${CMAKE_THREAD_LIBS_INIT})
+  set_target_properties(abieos_module PROPERTIES OUTPUT_NAME "abieos")
+endif()
+
+if (NOT CMAKE_CROSSCOMPILING)
+  add_executable(ship_abi_gen src/ship_abi_gen.cpp)
+  target_link_libraries(ship_abi_gen abieos ${CMAKE_THREAD_LIBS_INIT})
+  add_custom_command(OUTPUT ship_abi.json 
+                    COMMAND ship_abi_gen > ship_abi.json 
+                    DEPENDS ship_abi_gen)
+
+  add_custom_target(ship_abi_json
+    DEPENDS ship_abi.json 
+  )
+
+else()
+  include(ExternalProject)
+  externalproject_add(ship_abi_json
+                    SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}"
+                    CMAKE_ARGS "-DCMAKE_INSTALL_PREFIX=${CMAKE_CURRENT_BINARY_DIR}" "-DCMAKE_BUILD_TYPE=Release"
+                    BUILD_COMMAND ${CMAKE_COMMAND} --build . --target install.ship_abi_json
+                    BUILD_BYPRODUCTS ${CMAKE_CURRENT_BINARY_DIR}/ship_abi.json
+                    INSTALL_COMMAND "")
+endif()
+
+add_custom_command(OUTPUT ship_abi.cpp
+  COMMAND ${CMAKE_COMMAND} -P ${CMAKE_CURRENT_SOURCE_DIR}/gen_ship_abi_cpp.cmake 
+  WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
+  DEPENDS ship_abi_json 
+)
+
+add_library(ship_abi ${CMAKE_CURRENT_BINARY_DIR}/ship_abi.cpp)
 
 enable_testing()
 
-add_executable(test_abieos src/test.cpp src/abieos.cpp src/ship.abi.cpp)
+add_executable(test_abieos src/test.cpp src/abieos.cpp)
 target_link_libraries(test_abieos abieos ${CMAKE_THREAD_LIBS_INIT})
 add_test(NAME test_abieos COMMAND test_abieos)
 
@@ -95,10 +131,9 @@ if (NOT ABIEOS_ONLY_LIBRARY)
 add_subdirectory(tools)
 endif()
 
-
 install(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/include/eosio DESTINATION include)
 
-install(TARGETS abieos
+install(TARGETS abieos ship_abi
   EXPORT abieos
 	INCLUDES DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
 	ARCHIVE  DESTINATION ${CMAKE_INSTALL_LIBDIR}
@@ -109,9 +144,14 @@ install(EXPORT abieos
   FILE abieos-targets.cmake
 )
 
-export(TARGETS abieos 
+export(TARGETS abieos ship_abi
        FILE ${CMAKE_CURRENT_BINARY_DIR}/share/abieos/abieos-targets.cmake)
 configure_file(abieos-config.cmake.in ${CMAKE_CURRENT_BINARY_DIR}/share/abieos/abieos-config.cmake COPYONLY)
 
 install(FILES ${CMAKE_CURRENT_BINARY_DIR}/share/abieos/abieos-config.cmake
+              ${CMAKE_CURRENT_BINARY_DIR}/ship_abi.json 
         DESTINATION "share/abieos")
+
+add_custom_target(install.ship_abi_json
+        COMMAND ${CMAKE_COMMAND} -E copy ${CMAKE_CURRENT_BINARY_DIR}/ship_abi.json ${CMAKE_INSTALL_PREFIX}
+        DEPENDS ship_abi.json)

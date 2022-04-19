@@ -18,6 +18,7 @@ void to_json(const input_stream& data, S& stream) {
 }
 
 constexpr const char* get_type_name(const input_stream*) { return "bytes"; }
+constexpr bool        is_basic_abi_type(input_stream*) { return true;  }
 } // namespace eosio
 
 namespace eosio { namespace ship_protocol {
@@ -47,6 +48,8 @@ namespace eosio { namespace ship_protocol {
       delayed   = 3, // transaction delayed/deferred/scheduled for future execution
       expired   = 4, // transaction expired and storage space refunded to user
    };
+   constexpr const char* get_type_name(transaction_status*) { return "transaction_status"; }
+   constexpr bool        is_basic_abi_type(transaction_status*) { return true;  }
 
    // todo: switch to eosio::result. switch to new serializer string support.
    inline std::string to_string(transaction_status status) {
@@ -86,21 +89,26 @@ namespace eosio { namespace ship_protocol {
 
    EOSIO_REFLECT(block_position, block_num, block_id)
 
-   struct get_status_result_v0 {
+   struct get_status_result_base {
       block_position     head                    = {};
       block_position     last_irreversible       = {};
       uint32_t           trace_begin_block       = {};
       uint32_t           trace_end_block         = {};
       uint32_t           chain_state_begin_block = {};
       uint32_t           chain_state_end_block   = {};
+   };
+
+   struct get_status_result_v0 : get_status_result_base {
       eosio::checksum256 chain_id                = {}; // todo: switch to binary extension
    };
 
-   EOSIO_REFLECT(get_status_result_v0, head, last_irreversible, trace_begin_block, trace_end_block,
-                 chain_state_begin_block, chain_state_end_block, chain_id)
+   EOSIO_REFLECT(get_status_result_base, head, last_irreversible, trace_begin_block, trace_end_block,
+                 chain_state_begin_block, chain_state_end_block)
 
-   // When using `get_blocks_request_v1`, `get_blocks_result_v0` will be returned for EOS version 2.0.x and before and
-   // `get_blocks_result_v1` will be returned for EOS version 2.1 RC bug not stable. 
+   EOSIO_REFLECT(get_status_result_v0, base get_status_result_base, chain_id)
+
+   // When using `get_blocks_request_v0`, `get_blocks_result_v0` will be returned for EOS version 2.0.x and before and
+   // `get_blocks_result_v1` will be returned for EOS version 2.1 RC
    struct get_blocks_request_v0 {
       uint32_t                    start_block_num        = {};
       uint32_t                    end_block_num          = {};
@@ -129,6 +137,7 @@ namespace eosio { namespace ship_protocol {
    EOSIO_REFLECT(get_blocks_ack_request_v0, num_messages)
 
    using request = std::variant<get_status_request_v0, get_blocks_request_v0, get_blocks_ack_request_v0, get_blocks_request_v1>;
+   constexpr const char* get_type_name(request*) { return "request"; }
 
    struct get_blocks_result_base {
       block_position                head              = {};
@@ -176,6 +185,7 @@ namespace eosio { namespace ship_protocol {
    EOSIO_REFLECT(table_delta_v1, name, rows)
 
    using table_delta = std::variant<table_delta_v0, table_delta_v1>;
+   constexpr const char* get_type_name(table_delta*) { return "table_delta"; } 
 
    struct permission_level {
       eosio::name actor      = {};
@@ -215,7 +225,8 @@ namespace eosio { namespace ship_protocol {
                  abi_sequence)
 
    using action_receipt = std::variant<action_receipt_v0>;
-
+   constexpr const char* get_type_name(action_receipt*) { return "action_receipt"; } 
+   
    struct account_delta {
       eosio::name account = {};
       int64_t     delta   = {};
@@ -261,39 +272,42 @@ namespace eosio { namespace ship_protocol {
                  console, account_ram_deltas, account_disk_deltas, except, error_code, return_value)
 
    using action_trace = std::variant<action_trace_v0, action_trace_v1>;
+   constexpr const char* get_type_name(action_trace*) { return "action_trace"; } 
+   
+   struct prunable_data_none {
+      eosio::checksum256 prunable_digest;
+   };
 
+   using segment_type = std::variant<eosio::checksum256, eosio::input_stream>;
+   constexpr const char* get_type_name(segment_type*){ return "segment_type"; }
+
+   struct prunable_data_partial {
+      std::vector<eosio::signature> signatures;
+      std::vector<segment_type>     context_free_segments;
+   };
+
+   struct prunable_data_full {
+      std::vector<eosio::signature>    signatures;
+      std::vector<eosio::input_stream> context_free_segments;
+   };
+
+   struct prunable_data_full_legacy {
+      std::vector<eosio::signature> signatures;
+      eosio::input_stream           packed_context_free_data;
+   };
+
+   using prunable_data_t = std::variant<prunable_data_full_legacy, prunable_data_none, prunable_data_partial, prunable_data_full>;
+   constexpr const char* get_type_name(prunable_data_t*){ return "prunable_data_t"; }
+   
    struct prunable_data_type {
-      struct none {
-         eosio::checksum256 prunable_digest;
-      };
-
-      using segment_type = std::variant<eosio::checksum256, eosio::input_stream>;
-
-      struct partial {
-         std::vector<eosio::signature> signatures;
-         std::vector<segment_type>     context_free_segments;
-      };
-
-      struct full {
-         std::vector<eosio::signature>    signatures;
-         std::vector<eosio::input_stream> context_free_segments;
-      };
-
-      struct full_legacy {
-         std::vector<eosio::signature> signatures;
-         eosio::input_stream           packed_context_free_data;
-      };
-
-      using prunable_data_t = std::variant<full_legacy, none, partial, full>;
-
       prunable_data_t prunable_data;
    };
 
    EOSIO_REFLECT(prunable_data_type, prunable_data)
-   EOSIO_REFLECT(prunable_data_type::none, prunable_digest)
-   EOSIO_REFLECT(prunable_data_type::partial, signatures, context_free_segments)
-   EOSIO_REFLECT(prunable_data_type::full, signatures, context_free_segments)
-   EOSIO_REFLECT(prunable_data_type::full_legacy, signatures, packed_context_free_data)
+   EOSIO_REFLECT(prunable_data_none, prunable_digest)
+   EOSIO_REFLECT(prunable_data_partial, signatures, context_free_segments)
+   EOSIO_REFLECT(prunable_data_full, signatures, context_free_segments)
+   EOSIO_REFLECT(prunable_data_full_legacy, signatures, packed_context_free_data)
 
    struct partial_transaction_v0 {
       eosio::time_point_sec            expiration             = {};
@@ -325,6 +339,7 @@ namespace eosio { namespace ship_protocol {
                  max_cpu_usage_ms, delay_sec, transaction_extensions, prunable_data)
 
    using partial_transaction = std::variant<partial_transaction_v0, partial_transaction_v1>;
+   constexpr const char* get_type_name(partial_transaction*) { return "partial_transaction"; } 
 
    struct recurse_transaction_trace;
 
@@ -352,6 +367,7 @@ namespace eosio { namespace ship_protocol {
                  action_traces, account_ram_delta, except, error_code, failed_dtrx_trace, partial)
 
    using transaction_trace = std::variant<transaction_trace_v0>;
+   constexpr const char* get_type_name(transaction_trace*) { return "transaction_trace"; } 
 
    struct recurse_transaction_trace {
       transaction_trace recurse = {};
@@ -397,6 +413,7 @@ namespace eosio { namespace ship_protocol {
    EOSIO_REFLECT(packed_transaction, compression, prunable_data, packed_trx)
 
    using transaction_variant_v0 = std::variant<eosio::checksum256, packed_transaction_v0>;
+   constexpr const char* get_type_name(transaction_variant_v0*) { return "transaction_variant_v0"; } 
 
    struct transaction_receipt_v0 : transaction_receipt_header {
       transaction_variant_v0 trx = {};
@@ -405,6 +422,7 @@ namespace eosio { namespace ship_protocol {
    EOSIO_REFLECT(transaction_receipt_v0, base transaction_receipt_header, trx)
 
    using transaction_variant = std::variant<eosio::checksum256, packed_transaction>;
+   constexpr const char* get_type_name(transaction_variant*) { return "transaction_variant"; } 
 
    struct transaction_receipt : transaction_receipt_header {
       transaction_variant trx = {};
@@ -449,6 +467,7 @@ namespace eosio { namespace ship_protocol {
    EOSIO_REFLECT(signed_block_v1, base signed_block_header, prune_state, transactions, block_extensions)
 
    using signed_block_variant = std::variant<signed_block_v0, signed_block_v1>;
+   constexpr const char* get_type_name(signed_block_variant*) { return "signed_block_variant"; } 
 
    struct get_blocks_result_v1 : get_blocks_result_base {
       std::optional<signed_block_variant>           block  = {};
@@ -467,7 +486,12 @@ namespace eosio { namespace ship_protocol {
 
    EOSIO_REFLECT(get_blocks_result_v2, base get_blocks_result_base, block, block_header, traces, deltas)
 
+   // result_v0 is used by EOS 2.0.x 
+   using result_v0 = std::variant<get_status_result_base, get_blocks_result_v0>;
+
+   // result is used by EOS 2.1.x and above
    using result = std::variant<get_status_result_v0, get_blocks_result_v0, get_blocks_result_v1, get_blocks_result_v2>;
+   constexpr const char* get_type_name(result*) { return "result"; } 
 
    struct transaction_header {
       eosio::time_point_sec expiration          = {};
@@ -506,6 +530,7 @@ namespace eosio { namespace ship_protocol {
    EOSIO_REFLECT(account_v0, name, creation_date, abi)
 
    using account = std::variant<account_v0>;
+   constexpr const char* get_type_name(account*) { return "account"; }
 
    struct account_metadata_v0 {
       eosio::name            name             = {};
@@ -517,6 +542,7 @@ namespace eosio { namespace ship_protocol {
    EOSIO_REFLECT(account_metadata_v0, name, privileged, last_code_update, code)
 
    using account_metadata = std::variant<account_metadata_v0>;
+   constexpr const char* get_type_name(account_metadata*) { return "account_metadata"; }
 
    struct code_v0 {
       uint8_t             vm_type    = {};
@@ -528,6 +554,7 @@ namespace eosio { namespace ship_protocol {
    EOSIO_REFLECT(code_v0, vm_type, vm_version, code_hash, code)
 
    using code = std::variant<code_v0>;
+   constexpr const char* get_type_name(code*) { return "code"; }
 
    struct contract_table_v0 {
       eosio::name code  = {};
@@ -539,6 +566,7 @@ namespace eosio { namespace ship_protocol {
    EOSIO_REFLECT(contract_table_v0, code, scope, table, payer)
 
    using contract_table = std::variant<contract_table_v0>;
+   constexpr const char* get_type_name(contract_table*) { return "contract_table"; }
 
    struct contract_row_v0 {
       eosio::name         code        = {};
@@ -552,6 +580,7 @@ namespace eosio { namespace ship_protocol {
    EOSIO_REFLECT(contract_row_v0, code, scope, table, primary_key, payer, value)
 
    using contract_row = std::variant<contract_row_v0>;
+   constexpr const char* get_type_name(contract_row*) { return "contract_row"; }
 
    struct contract_index64_v0 {
       eosio::name code          = {};
@@ -565,6 +594,7 @@ namespace eosio { namespace ship_protocol {
    EOSIO_REFLECT(contract_index64_v0, code, scope, table, primary_key, payer, secondary_key)
 
    using contract_index64 = std::variant<contract_index64_v0>;
+   constexpr const char* get_type_name(contract_index64*) { return "contract_index64"; }
 
    struct contract_index128_v0 {
       eosio::name code          = {};
@@ -578,6 +608,7 @@ namespace eosio { namespace ship_protocol {
    EOSIO_REFLECT(contract_index128_v0, code, scope, table, primary_key, payer, secondary_key)
 
    using contract_index128 = std::variant<contract_index128_v0>;
+   constexpr const char* get_type_name(contract_index128*) { return "contract_index128"; }
 
    struct contract_index256_v0 {
       eosio::name        code          = {};
@@ -591,6 +622,7 @@ namespace eosio { namespace ship_protocol {
    EOSIO_REFLECT(contract_index256_v0, code, scope, table, primary_key, payer, secondary_key)
 
    using contract_index256 = std::variant<contract_index256_v0>;
+   constexpr const char* get_type_name(contract_index256*) { return "contract_index256"; }
 
    struct contract_index_double_v0 {
       eosio::name code          = {};
@@ -604,6 +636,7 @@ namespace eosio { namespace ship_protocol {
    EOSIO_REFLECT(contract_index_double_v0, code, scope, table, primary_key, payer, secondary_key)
 
    using contract_index_double = std::variant<contract_index_double_v0>;
+   constexpr const char* get_type_name(contract_index_double*) { return "contract_index_double"; }
 
    struct contract_index_long_double_v0 {
       eosio::name     code          = {};
@@ -617,6 +650,7 @@ namespace eosio { namespace ship_protocol {
    EOSIO_REFLECT(contract_index_long_double_v0, code, scope, table, primary_key, payer, secondary_key)
 
    using contract_index_long_double = std::variant<contract_index_long_double_v0>;
+   constexpr const char* get_type_name(contract_index_long_double*) { return "contract_index_long_double"; }
 
    struct key_value_v0 {
       eosio::name         contract = {};
@@ -628,6 +662,7 @@ namespace eosio { namespace ship_protocol {
    EOSIO_REFLECT(key_value_v0, contract, key, value, payer)
 
    using key_value = std::variant<key_value_v0>;
+   constexpr const char* get_type_name(key_value*) { return "key_value"; }
 
    struct key_weight {
       eosio::public_key key    = {};
@@ -644,6 +679,7 @@ namespace eosio { namespace ship_protocol {
    EOSIO_REFLECT(block_signing_authority_v0, threshold, keys)
 
    using block_signing_authority = std::variant<block_signing_authority_v0>;
+   constexpr const char* get_type_name(block_signing_authority*) { return "block_signing_authority"; }
 
    struct producer_authority {
       eosio::name             producer_name = {};
@@ -715,6 +751,7 @@ namespace eosio { namespace ship_protocol {
                max_authority_depth, max_action_return_value_size)
 
    using chain_config = std::variant<chain_config_v0, chain_config_v1>;
+   constexpr const char* get_type_name(chain_config*) { return "chain_config"; }
 
    struct global_property_v0 {
       std::optional<uint32_t> proposed_schedule_block_num = {};
@@ -759,7 +796,23 @@ namespace eosio { namespace ship_protocol {
                  max_linear_memory_init, max_func_local_bytes, max_nested_structures, max_symbol_bytes,
                  max_module_bytes, max_code_bytes, max_pages, max_call_depth)
 
-   using global_property = std::variant<global_property_v0, global_property_v1>;
+   struct global_property_extension_v0 {
+      uint32_t                      proposed_security_group_block_num = 0;
+      std::vector<name>             proposed_security_group_participants;
+   };
+
+   EOSIO_REFLECT(global_property_extension_v0, proposed_security_group_block_num, proposed_security_group_participants)
+
+   struct global_property_v2 : global_property_v1 {
+      kv_database_config                         kv_configuration;
+      wasm_config                                wasm_configuration;
+      std::variant<global_property_extension_v0> extension;
+   };
+
+   EOSIO_REFLECT(global_property_v2, base global_property_v1, kv_configuration, wasm_configuration, extension)
+
+   using global_property = std::variant<global_property_v0, global_property_v1, global_property_v2>;
+   constexpr const char* get_type_name(global_property*) { return "global_property"; }
 
    struct generated_transaction_v0 {
       eosio::name         sender     = {};
@@ -772,6 +825,7 @@ namespace eosio { namespace ship_protocol {
    EOSIO_REFLECT(generated_transaction_v0, sender, sender_id, payer, trx_id, packed_trx)
 
    using generated_transaction = std::variant<generated_transaction_v0>;
+   constexpr const char* get_type_name(generated_transaction*) { return "generated_transaction"; }
 
    struct activated_protocol_feature_v0 {
       eosio::checksum256 feature_digest       = {};
@@ -781,6 +835,7 @@ namespace eosio { namespace ship_protocol {
    EOSIO_REFLECT(activated_protocol_feature_v0, feature_digest, activation_block_num)
 
    using activated_protocol_feature = std::variant<activated_protocol_feature_v0>;
+   constexpr const char* get_type_name(activated_protocol_feature*) { return "activated_protocol_feature"; }
 
    struct protocol_state_v0 {
       std::vector<activated_protocol_feature> activated_protocol_features = {};
@@ -789,6 +844,7 @@ namespace eosio { namespace ship_protocol {
    EOSIO_REFLECT(protocol_state_v0, activated_protocol_features)
 
    using protocol_state = std::variant<protocol_state_v0>;
+   constexpr const char* get_type_name(protocol_state*) { return "protocol_state"; }
 
    struct permission_level_weight {
       permission_level permission = {};
@@ -824,6 +880,7 @@ namespace eosio { namespace ship_protocol {
    EOSIO_REFLECT(permission_v0, owner, name, parent, last_updated, auth)
 
    using permission = std::variant<permission_v0>;
+   constexpr const char* get_type_name(permission*) { return "permission"; }
 
    struct permission_link_v0 {
       eosio::name account             = {};
@@ -835,7 +892,8 @@ namespace eosio { namespace ship_protocol {
    EOSIO_REFLECT(permission_link_v0, account, code, message_type, required_permission)
 
    using permission_link = std::variant<permission_link_v0>;
-
+   constexpr const char* get_type_name(permission_link*) { return "permission_link"; }
+   
    struct resource_limits_v0 {
       eosio::name owner      = {};
       int64_t     net_weight = {};
@@ -845,8 +903,9 @@ namespace eosio { namespace ship_protocol {
 
    EOSIO_REFLECT(resource_limits_v0, owner, net_weight, cpu_weight, ram_bytes)
 
-   using resource_limits = std::variant<resource_limits_v0>;
-
+   using resource_limits = std::variant<resource_limits_v0>; 
+   constexpr const char* get_type_name(resource_limits*) { return "resource_limits"; }
+   
    struct usage_accumulator_v0 {
       uint32_t last_ordinal = {};
       uint64_t value_ex     = {};
@@ -856,7 +915,8 @@ namespace eosio { namespace ship_protocol {
    EOSIO_REFLECT(usage_accumulator_v0, last_ordinal, value_ex, consumed)
 
    using usage_accumulator = std::variant<usage_accumulator_v0>;
-
+   constexpr const char* get_type_name(usage_accumulator*) { return "usage_accumulator"; } 
+   
    struct resource_usage_v0 {
       eosio::name       owner     = {};
       usage_accumulator net_usage = {};
@@ -867,7 +927,8 @@ namespace eosio { namespace ship_protocol {
    EOSIO_REFLECT(resource_usage_v0, owner, net_usage, cpu_usage, ram_usage)
 
    using resource_usage = std::variant<resource_usage_v0>;
-
+   constexpr const char* get_type_name(resource_usage*) { return "resource_usage"; } 
+   
    struct resource_limits_state_v0 {
       usage_accumulator average_block_net_usage = {};
       usage_accumulator average_block_cpu_usage = {};
@@ -882,7 +943,8 @@ namespace eosio { namespace ship_protocol {
                  total_cpu_weight, total_ram_bytes, virtual_net_limit, virtual_cpu_limit)
 
    using resource_limits_state = std::variant<resource_limits_state_v0>;
-
+   constexpr const char* get_type_name(resource_limits_state*) { return "resource_limits_state"; } 
+   
    struct resource_limits_ratio_v0 {
       uint64_t numerator   = {};
       uint64_t denominator = {};
@@ -891,7 +953,8 @@ namespace eosio { namespace ship_protocol {
    EOSIO_REFLECT(resource_limits_ratio_v0, numerator, denominator)
 
    using resource_limits_ratio = std::variant<resource_limits_ratio_v0>;
-
+   constexpr const char* get_type_name(resource_limits_ratio*) { return "resource_limits_ratio"; } 
+   
    struct elastic_limit_parameters_v0 {
       uint64_t              target         = {};
       uint64_t              max            = {};
@@ -904,7 +967,8 @@ namespace eosio { namespace ship_protocol {
    EOSIO_REFLECT(elastic_limit_parameters_v0, target, max, periods, max_multiplier, contract_rate, expand_rate)
 
    using elastic_limit_parameters = std::variant<elastic_limit_parameters_v0>;
-
+   constexpr const char* get_type_name(elastic_limit_parameters*) { return "elastic_limit_parameters"; } 
+   
    struct resource_limits_config_v0 {
       elastic_limit_parameters cpu_limit_parameters             = {};
       elastic_limit_parameters net_limit_parameters             = {};
@@ -916,6 +980,7 @@ namespace eosio { namespace ship_protocol {
                  account_cpu_usage_average_window, account_net_usage_average_window)
 
    using resource_limits_config = std::variant<resource_limits_config_v0>;
+   constexpr const char* get_type_name(resource_limits_config*) { return "resource_limits_config"; } 
 
 }} // namespace eosio::ship_protocol
 
