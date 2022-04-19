@@ -363,10 +363,6 @@ template <typename SrcIt, typename DestIt>
    return true;
 }
 
-/// \exclude
-template <typename T, typename S>
-void from_json(T& result, S& stream);
-
 /// \group from_json_explicit Parse JSON (Explicit Types)
 /// Parse JSON and convert to `result`. These overloads handle specified types.
 template <typename S>
@@ -649,7 +645,7 @@ void from_json_skip_value(S& stream) {
 /// \output_section Parse JSON (Reflected Objects)
 /// Parse JSON and convert to `obj`. This overload works with
 /// [reflected objects](standardese://reflection/).
-template <typename T, typename S>
+template <typename T, typename S, typename std::enable_if_t<!std::is_enum_v<T>, bool> = true>
 void from_json(T& obj, S& stream) {
    from_json_object(stream, [&](std::string_view key) {
       bool found = false;
