@@ -35,7 +35,7 @@ namespace eosio {
 
 
 struct eosio_error : std::exception {
-   explicit eosio_error(uint64_t) {}
+   explicit eosio_error(uint64_t code) {}
 };
 
 namespace detail {
