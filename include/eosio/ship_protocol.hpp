@@ -1032,5 +1032,4 @@ namespace eosio {
          from_json(result[0], stream);
       }
    }
-
 }

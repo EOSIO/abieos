@@ -264,7 +264,7 @@ void to_json(const std::variant<T...>& obj, S& stream) {
       using value_type = T;
    };
 
-template <typename T, typename S, typename std::enable_if_t<!std::is_enum_v<T>, bool> = true>
+template <typename T, typename S>
 void to_json(const T& t, S& stream) {
    bool         first = true;
    stream.write('{');

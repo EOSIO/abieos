@@ -14,7 +14,6 @@
 #include <cstring>
 #include <limits>
 
-//This file is updated according to CDT eosio.lib/libraries/eosiolib/core/eosio/key_utils.hpp
 namespace eosio {
 
 template <typename... Ts, typename S>
@@ -224,11 +223,6 @@ template <typename... Ts, typename S>
 void to_key(const std::variant<Ts...>& obj, S& stream) {
    to_key_varuint32(static_cast<uint32_t>(obj.index()), stream);
    std::visit([&](const auto& item) { to_key(item, stream); }, obj);
-}
-
-template <std::size_t N, typename S>
-void to_key(const char (&str)[N], S& stream) {
-    to_key(std::string_view{str, N-1}, stream);
 }
 
 template <typename S>
