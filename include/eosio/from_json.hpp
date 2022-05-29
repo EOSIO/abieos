@@ -44,6 +44,7 @@ enum class from_json_error {
    unexpected_field,
    number_out_of_range,
    from_json_no_pair,
+   array_incorrect_length,
 
    // These are from rapidjson:
    document_empty,

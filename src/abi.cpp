@@ -59,32 +59,40 @@ abi_type* get_type(std::map<std::string, abi_type>& abi_types,
    eosio::check(depth < 32,
         eosio::convert_abi_error(abi_error::recursion_limit_reached));
     auto it = abi_types.find(name);
+
+    auto res = [&](auto&& abi_of, auto ser) {
+        return std::addressof(abi_types.try_emplace(name, name, std::move(abi_of), ser).first->second);
+    };
+
     if (it == abi_types.end()) {
         if (ends_with(name, "?")) {
             auto base = get_type(abi_types, name.substr(0, name.size() - 1), depth + 1);
             eosio::check(!holds_any_alternative<abi_type::optional, abi_type::array, abi_type::szarray, abi_type::extension>(base->_data),
                   eosio::convert_abi_error(abi_error::invalid_nesting));
-            auto [iter, success] = abi_types.try_emplace(name, name, abi_type::optional{base}, &abi_serializer_for< ::abieos::pseudo_optional>);
-            return &iter->second;
+            return res(abi_type::optional{base}, &abi_serializer_for< ::abieos::pseudo_optional>);
         } else if (ends_with(name, "[]")) {
             auto element = get_type(abi_types, name.substr(0, name.size() - 2), depth + 1);
             eosio::check(!holds_any_alternative<abi_type::optional, abi_type::array, abi_type::szarray, abi_type::extension>(element->_data),
                   eosio::convert_abi_error(abi_error::invalid_nesting));
-            auto [iter, success] = abi_types.try_emplace(name, name, abi_type::array{element}, &abi_serializer_for< ::abieos::pseudo_array>);
-            return &iter->second;
+            return res( abi_type::array{element}, &abi_serializer_for< ::abieos::pseudo_array>);
          } else if(is_szarray(name) ){
             int pos = name.find_last_of('[');
-            auto element = get_type(abi_types, name.substr(0, pos), depth + 1);
+            auto element_type_name = name.substr(0, pos);
+            auto element = get_type(abi_types, element_type_name, depth + 1);
             eosio::check(!holds_any_alternative<abi_type::optional, abi_type::array, abi_type::szarray, abi_type::extension>(element->_data),
                   eosio::convert_abi_error(abi_error::invalid_nesting));
-            auto [iter, success] = abi_types.try_emplace(name, name, abi_type::szarray{element}, &abi_serializer_for< ::abieos::pseudo_szarray>);
-            return &iter->second;
+            auto end_pos = name.find_last_of(']');
+            auto size = std::stoul(name.substr(pos+1, end_pos - pos -1));
+            if (element_type_name == "uint8" || element_type_name == "int8") 
+                return res(abi_type::szarray{element, size}, &abi_serializer_for<::abieos::pseudo_szbytes>);
+            else 
+                return res(abi_type::szarray{element, size}, &abi_serializer_for<::abieos::pseudo_szarray>);
+            
         } else if (ends_with(name, "$")) {
             auto base = get_type(abi_types, name.substr(0, name.size() - 1), depth + 1);
             eosio::check(!std::holds_alternative<abi_type::extension>(base->_data),
                   eosio::convert_abi_error(abi_error::invalid_nesting));
-            auto [iter, success] = abi_types.try_emplace(name, name, abi_type::extension{base}, &abi_serializer_for< ::abieos::pseudo_extension>);
-            return &iter->second;
+            return res(abi_type::extension{base}, &abi_serializer_for< ::abieos::pseudo_extension>);
         } else
            eosio::check(false, std::string("Unknown type ") + name);
     }
@@ -272,6 +280,7 @@ const abi_serializer* const eosio::array_abi_serializer = &abi_serializer_for< :
 const abi_serializer* const eosio::szarray_abi_serializer = &abi_serializer_for< ::abieos::pseudo_szarray>;
 const abi_serializer* const eosio::extension_abi_serializer = &abi_serializer_for< ::abieos::pseudo_extension>;
 const abi_serializer* const eosio::optional_abi_serializer = &abi_serializer_for< ::abieos::pseudo_optional>;
+const abi_serializer* const eosio::szbytes_abi_serializer = &abi_serializer_for< ::abieos::pseudo_szbytes>;
 
 std::vector<char> eosio::abi_type::json_to_bin_reorderable(std::string_view json, std::function<void()> f) const {
    abieos::jvalue tmp;
