@@ -705,6 +705,11 @@ void check_types() {
     check_type(context, 0, "uint8[]", R"([10])");
     check_type(context, 0, "uint8[]", R"([10,9])");
     check_type(context, 0, "uint8[]", R"([10,9,8])");
+
+    check_type(context, 0, "int32[3]", R"([10,9,8])");
+    check_error(context, "array size mismatch",
+                [&] { return abieos_json_to_bin(context, 0, "int32[3]", R"([10,9])"); });
+
     check_type(context, 0, "int16", R"(0)");
     check_type(context, 0, "int16", R"(32767)");
     check_type(context, 0, "int16", R"(-32768)");
@@ -852,6 +857,15 @@ void check_types() {
     check_error(context, "expected string containing hex digits",
                 [&] { return abieos_json_to_bin(context, 0, "bytes", R"(true)"); });
     check_error(context, "Stream overrun", [&] { return abieos_hex_to_json(context, 0, "bytes", "01"); });
+
+    check_type(context, 0, "uint8[2]", R"("AABB")");
+    check_error(context, "expected fixed array size matches",
+                [&] { return abieos_json_to_bin(context, 0, "uint8[2]", R"(")"); });
+
+    check_type(context, 0, "int8[2]", R"("AABB")");
+    check_error(context, "expected fixed array size matches",
+                [&] { return abieos_json_to_bin(context, 0, "int8[2]", R"(")"); });
+
     check_type(context, 0, "string", R"("")");
     check_type(context, 0, "string", R"("z")");
     check_type(context, 0, "string", R"("This is a string.")");

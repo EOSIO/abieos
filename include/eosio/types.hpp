@@ -55,6 +55,36 @@ constexpr auto append_type_name(const char (&suffix)[N]) {
 template <typename T>
 constexpr auto vector_type_name = append_type_name<T>("[]");
 
+
+namespace detail {
+   template<std::size_t... digits>
+   struct to_chars { static constexpr std::array<char, sizeof...(digits)> value  = {('0' + digits)...}; };
+
+   template<unsigned rem, unsigned... digits>
+   struct explode : explode<rem / 10, rem % 10, digits...> {};
+
+   template<unsigned... digits>
+   struct explode<0, digits...> : to_chars<digits...> {};
+}
+
+template<unsigned num>
+struct num_to_string : detail::explode<num> {};
+
+template <typename T, std::size_t S>
+constexpr auto create_array_type_name() {
+   constexpr std::string_view name = get_type_name((T*)nullptr);
+   constexpr std::array<char,1> left_bracket = {'['};
+   constexpr std::array<char,1> right_bracket = {']'};
+   constexpr auto num = num_to_string<5>::value;
+   return array_cat(array_cat(array_cat(to_array<name.size()>(name), left_bracket), num), right_bracket);
+}
+
+template <typename T,std::size_t S>
+constexpr auto array_type_name = create_array_type_name<T, S>();
+
+template <typename T,std::size_t S>
+constexpr const char* get_type_name(const std::array<T,S>*) { return array_type_name<T,S>.data(); }
+
 template <typename T>
 constexpr auto optional_type_name = append_type_name<T>("?");
 

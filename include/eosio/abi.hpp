@@ -207,6 +207,7 @@ struct abi_type {
    };
    struct szarray {
       abi_type* type;
+      std::size_t size;
    };
    struct struct_ {
       abi_type*              base = nullptr;
@@ -252,6 +253,7 @@ struct abi_type {
 
    const struct_* as_struct() const { return std::get_if<struct_>(&_data); }
    const variant* as_variant() const { return std::get_if<variant>(&_data); }
+   const szarray* as_szarray() const { return std::get_if<szarray>(&_data); }
 
    const abi_serializer* get_serializer() const { 
       const alias* a = std::get_if<alias>(&_data);
@@ -292,13 +294,14 @@ extern const abi_serializer* const object_abi_serializer;
 extern const abi_serializer* const variant_abi_serializer;
 extern const abi_serializer* const array_abi_serializer;
 extern const abi_serializer* const szarray_abi_serializer;
+extern const abi_serializer* const szbytes_abi_serializer;
 extern const abi_serializer* const extension_abi_serializer;
 extern const abi_serializer* const optional_abi_serializer;
 
 using basic_abi_types =
       std::tuple<bool, int8_t, uint8_t, int16_t, uint16_t, int32_t, uint32_t, int64_t, uint64_t, __int128, unsigned __int128,
                varuint32, varint32, float, double, float128, time_point, time_point_sec, block_timestamp, name,
-               bytes, std::string, checksum160, checksum256, checksum256, checksum512, public_key, private_key, signature,
+               bytes, std::string, checksum160, checksum256, checksum512, public_key, private_key, signature, 
                symbol, symbol_code, asset>;
 
 namespace detail {
@@ -344,6 +347,32 @@ abi_type* add_type(abi& a, std::vector<T>*) {
          convert_abi_error(abi_error::invalid_nesting));
    std::string name      = get_type_name((std::vector<T>*)nullptr);
    auto [iter, inserted] = a.abi_types.try_emplace(name, name, abi_type::array{ element_type }, array_abi_serializer);
+   return &iter->second;
+}
+
+template <std::size_t SZ>
+abi_type* add_type(abi& a, std::array<uint8_t, SZ>*) {
+   auto element_type = a.add_type<uint8_t>();
+   std::string name      = get_type_name((std::array<uint8_t, SZ>*)nullptr);
+   auto [iter, inserted] = a.abi_types.try_emplace(name, name, abi_type::szarray{ element_type, SZ}, szbytes_abi_serializer);
+   return &iter->second;
+}
+
+template <std::size_t SZ>
+abi_type* add_type(abi& a, std::array<char, SZ>*) {
+   auto element_type = a.add_type<char>();
+   std::string name      = get_type_name((std::array<int8_t, SZ>*)nullptr);
+   auto [iter, inserted] = a.abi_types.try_emplace(name, name, abi_type::szarray{ element_type, SZ}, szbytes_abi_serializer);
+   return &iter->second;
+}
+
+template <typename T, std::size_t SZ>
+abi_type* add_type(abi& a, std::array<T, SZ>*) {
+   auto element_type = a.add_type<T>();
+   check(!(element_type->optional_of() || element_type->array_of() || element_type->extension_of()),
+         convert_abi_error(abi_error::invalid_nesting));
+   std::string name      = get_type_name((std::array<T, SZ>*)nullptr);
+   auto [iter, inserted] = a.abi_types.try_emplace(name, name, abi_type::szarray{ element_type , SZ}, szarray_abi_serializer);
    return &iter->second;
 }
 
