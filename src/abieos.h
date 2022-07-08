@@ -56,6 +56,14 @@ const char* abieos_get_type_for_table(abieos_context* context, uint64_t contract
 // abieos_get_error to retrieve error.
 const char* abieos_get_kv_table_def(abieos_context* context, uint64_t contract, uint64_t table);
 
+// Get the type for a kv table. The context owns the returned memory. Returns null on error; use
+// abieos_get_error to retrieve error.
+const char* abieos_get_type_for_kv_table(abieos_context* context, uint64_t contract, uint64_t table);
+
+// Get the name for the primary index of a kv table. The context owns the returned memory. Returns null on error; use
+// abieos_get_error to retrieve error.
+const char* abieos_get_kv_table_primary_index_name(abieos_context* context, uint64_t contract, uint64_t table);
+
 // Get the type name for an action_result. The context owns the returned memory. Returns null on error; use
 // abieos_get_error to retrieve error.
 const char* abieos_get_type_for_action_result(abieos_context* context, uint64_t contract, uint64_t action_result);

@@ -40,7 +40,7 @@ endif()
 find_package(Threads)
 include(GNUInstallDirs)
 
-add_library(abieos STATIC src/abi.cpp src/crypto.cpp include/eosio/fpconv.c)
+add_library(abieos STATIC src/abieos.cpp src/abi.cpp src/crypto.cpp include/eosio/fpconv.c)
 target_include_directories(abieos PUBLIC 
                           "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>/include" 
                           "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>/external/rapidjson/include"

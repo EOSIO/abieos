@@ -275,6 +275,8 @@ struct abi {
    std::map<eosio::name, std::string> action_types;
    std::map<eosio::name, std::string> table_types;
    std::map<eosio::name, std::string> kv_tables;
+   std::map<eosio::name, std::string> kv_table_types;
+   std::map<eosio::name, eosio::name> kv_table_primary_key_name;
    std::map<std::string, abi_type>    abi_types;
    std::map<eosio::name, std::string> action_result_types;
    const abi_type*                    get_type(const std::string& name);

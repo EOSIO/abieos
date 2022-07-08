@@ -327,6 +327,24 @@ const char testKvTablesAbi[] = R"({
             "name": "updateerr2",
             "base": "",
             "fields": []
+        },
+        {
+            "name": "quardep",
+            "base": "",
+            "fields": [
+                {
+                    "name": "customer",
+                    "type": "name"
+                },
+                {
+                    "name": "asset",
+                    "type": "asset"
+                },
+                {
+                    "name": "uid",
+                    "type": "uint64"
+                }
+            ]
         }
     ],
     "actions": [
@@ -364,6 +382,11 @@ const char testKvTablesAbi[] = R"({
             "name": "updateerr2",
             "type": "updateerr2",
             "ricardian_contract": ""
+        },
+        {
+            "name": "quardep",
+            "type": "quardep",
+            "ricardian_contract": ""
         }
     ],
     "tables": [],
@@ -371,7 +394,7 @@ const char testKvTablesAbi[] = R"({
         "testtable": {
             "type": "my_struct",
             "primary_index": {
-                "name": "primary",
+                "name": "by.id",
                 "type": "name"
             },
             "secondary_indices": {
@@ -383,7 +406,13 @@ const char testKvTablesAbi[] = R"({
                 }
             }
         }
-    }
+    },
+    "action_results": [
+        {
+            "name": "quardep",
+            "result_type": "uint64"
+        }
+    ]
 })";
 
 const char packedTransactionAbi[] = R"({
@@ -1237,8 +1266,28 @@ void check_types() {
     std::string table_def = check_context(
         context, abieos_get_kv_table_def(context, testKvAbiName, abieos_string_to_name(context, "testtable")));
     if (table_def !=
-        R"({"type":"my_struct","primary_index":{"name":"primary","type":"name"},"secondary_indices":{"bar":{"type":"uint64"},"foo":{"type":"string"}}})")
-        throw std::runtime_error("mismatch");
+        R"({"type":"my_struct","primary_index":{"name":"by.id","type":"name"},"secondary_indices":{"bar":{"type":"uint64"},"foo":{"type":"string"}}})")
+        throw std::runtime_error("kv_table_def mismatch");
+
+    std::string action_type = check_context(
+        context, abieos_get_type_for_action(context, testKvAbiName, abieos_string_to_name(context, "updateerr2")));
+    if(action_type != "updateerr2")
+        throw std::runtime_error("action type mismatch");
+
+    std::string action_result_type = check_context(
+        context, abieos_get_type_for_action_result(context, testKvAbiName, abieos_string_to_name(context, "quardep")));
+    if(action_result_type != "uint64")
+        throw std::runtime_error("action return type mismatch");
+
+    std::string kv_table_type = check_context(
+        context, abieos_get_type_for_kv_table(context, testKvAbiName, abieos_string_to_name(context, "testtable")));
+    if(kv_table_type != "my_struct")
+        throw std::runtime_error("kv_table type mismatch");
+
+    std::string kv_table_primary_index_name = check_context(
+        context, abieos_get_kv_table_primary_index_name(context, testKvAbiName, abieos_string_to_name(context, "testtable")));
+    if(kv_table_primary_index_name != "by.id")
+        throw std::runtime_error("kv_table primary name mismatch");
 
     auto check_checksum_capacity = [&](const auto& checksum, size_t capacity, const char* msg) {
         if(checksum.capacity() != capacity)

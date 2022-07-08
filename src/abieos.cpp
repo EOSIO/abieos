@@ -103,7 +103,7 @@ extern "C" abieos_bool abieos_set_abi(abieos_context* context, uint64_t contract
             return set_error(context, std::move(error));
         abieos::abi c;
         convert(def, c);
-        context->contracts.insert({name{contract}, std::move(c)});
+        context->contracts[name{contract}] = std::move(c);
         return true;
     });
 }
@@ -124,7 +124,7 @@ extern "C" abieos_bool abieos_set_abi_bin(abieos_context* context, uint64_t cont
         from_bin(def, stream);
         abieos::abi c;
         convert(def, c);
-        context->contracts.insert({name{contract}, std::move(c)});
+        context->contracts[name{contract}] = std::move(c);
         return true;
     });
 }
@@ -170,6 +170,37 @@ extern "C" const char* abieos_get_type_for_table(abieos_context* context, uint64
             throw std::runtime_error("contract \"" + eosio::name_to_string(contract) + "\" does not have table \"" +
                                      eosio::name_to_string(table) + "\"");
         return table_it->second.c_str();
+    });
+}
+
+extern "C" const char* abieos_get_type_for_kv_table(abieos_context* context, uint64_t contract, uint64_t kv_table) {
+    return handle_exceptions(context, nullptr, [&] {
+        auto contract_it = context->contracts.find(::abieos::name{contract});
+        if (contract_it == context->contracts.end())
+            throw std::runtime_error("contract \"" + eosio::name_to_string(contract) + "\" is not loaded");
+        auto& c = contract_it->second;
+
+        auto kv_table_it = c.kv_table_types.find(name{kv_table});
+        if (kv_table_it == c.kv_table_types.end())
+            throw std::runtime_error("contract \"" + eosio::name_to_string(contract) + "\" does not have kv table \"" +
+                                     eosio::name_to_string(kv_table) + "\"");
+        return kv_table_it->second.c_str();
+    });
+}
+
+extern "C" const char* abieos_get_kv_table_primary_index_name(abieos_context* context, uint64_t contract, uint64_t kv_table) {
+    return handle_exceptions(context, nullptr, [&] {
+        auto contract_it = context->contracts.find(::abieos::name{contract});
+        if (contract_it == context->contracts.end())
+            throw std::runtime_error("contract \"" + eosio::name_to_string(contract) + "\" is not loaded");
+        auto& c = contract_it->second;
+
+        auto kv_table_it = c.kv_table_primary_key_name.find(name{kv_table});
+        if (kv_table_it == c.kv_table_primary_key_name.end())
+            throw std::runtime_error("contract \"" + eosio::name_to_string(contract) + "\" does not have kv table \"" +
+                                     eosio::name_to_string(kv_table) + "\"");
+        context->result_str = eosio::name_to_string(kv_table_it->second.value);
+        return context->result_str.c_str();
     });
 }
 

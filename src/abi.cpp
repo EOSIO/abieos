@@ -225,6 +225,8 @@ void eosio::convert(const abi_def& abi, eosio::abi& c) {
         eosio::vector_stream strm(bytes);
         to_json(val, strm);
         c.kv_tables.try_emplace(key, bytes.begin(), bytes.end());
+        c.kv_table_types.try_emplace(key, val.type);
+        c.kv_table_primary_key_name.try_emplace(key, val.primary_index.name);
     }
 }
 
