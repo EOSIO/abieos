@@ -1,5 +1,5 @@
 #include <eosio/to_key.hpp>
-#include "abieos.hpp"
+#include <eosio/abieos.hpp>
 
 int error_count;
 

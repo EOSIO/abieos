@@ -1,7 +1,7 @@
 // copyright defined in abieos/LICENSE.txt
 
-#include "abieos.h"
-#include "abieos.hpp"
+#include <eosio/abieos.h>
+#include <eosio/abieos.hpp>
 
 #include <memory>
 
